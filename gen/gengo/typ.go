@@ -61,20 +61,25 @@ func WriteGoType(c *gen.Ctx, t typ.Type) error {
 				name = name[:len(name)-1]
 			}
 			c.WriteByte('\t')
-			c.WriteString(name)
-			c.WriteByte(' ')
+			if name != "" {
+				c.WriteString(name)
+				c.WriteByte(' ')
+			}
 			err := WriteGoType(c, f.Type)
 			if err != nil {
 				return err
 			}
-			c.WriteString(" `json:\"")
-			c.WriteString(strings.ToLower(name))
-			if opt {
-				c.WriteString(",omitempty")
+			if name != "" {
+				c.WriteString(" `json:\"")
+				c.WriteString(strings.ToLower(name))
+				if opt {
+					c.WriteString(",omitempty")
+				}
+				c.WriteString("\"`")
 			}
-			c.WriteString("\"`\n")
+			c.WriteByte('\n')
 		}
-		c.WriteRune('}')
+		c.WriteByte('}')
 		return nil
 	case typ.KindFlag, typ.KindEnum, typ.KindRec:
 		r = GoImport(c, t.Ref)
