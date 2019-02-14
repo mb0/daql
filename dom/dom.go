@@ -20,6 +20,7 @@ type Display struct {
 	Label string `json:"label,omitempty"`
 	Descr string `json:"descr,omitempty"`
 	Help  string `json:"help,omitempty"`
+	Doc   string `json:"doc,omitempty"`
 	Fmt   string `json:"fmt,omitempty"`
 }
 
