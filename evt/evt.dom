@@ -1,0 +1,44 @@
+(schema 'evt'
+(+Audit :doc `
+Audit holds meta information for a published transaction at uniqe revision.
+`
+	+Rev     time :pk
+	+Created time
+	+Arrived time
+	+Acct?   uuid
+	+Extra   map|any
+)
+(+Action :doc `
+Action is an unpublished event represented by a command string and argument map. It usually is a
+data operation on a record identified by a topic and primary key.
+`
+	+Top str
+	+Key str
+	+Cmd str
+	+Arg map|any
+)
+(+Event :doc `
+Event represents action published to a ledger with a revision and unique id.
+`
+	+ID  int :pk :auto
+	+Rev time :idx
+	+    @Action
+	-
+	:idx ['top' 'key']
+)
+(+Pub :doc `
+Pub is a request to publish a list of actions to a base revision.
+`
+	+Base    time
+	+Actions arr|@Action
+	+Created time?
+	+Extra   map|any
+)
+(+Trans :doc `
+Trans is an unfinished publish request with additional audit info.
+`
+	+        @Pub
+	+Acct?   uuid?
+	+Arrived time
+)
+)
