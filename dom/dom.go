@@ -126,6 +126,46 @@ type Project struct {
 	Extra   Extra     `json:"extra,omitempty"`
 }
 
+// Schema returns a schema for key or nil.
+func (p *Project) Schema(key string) *Schema {
+	for _, s := range p.Schemas {
+		if s.Name == key {
+			return s
+		}
+	}
+	return nil
+}
+
+// Model returns a model for key or nil.
+func (s *Schema) Model(key string) *Model {
+	for _, m := range s.Models {
+		if m.Key() == key {
+			return m
+		}
+	}
+	return nil
+}
+
+// Const returns a constant for key or nil.
+func (m *Model) Const(key string) *cor.Const {
+	for _, c := range m.Consts {
+		if strings.EqualFold(c.Name, key) {
+			return &c
+		}
+	}
+	return nil
+}
+
+// Field returns a field for key or nil.
+func (m *Model) Field(key string) *Field {
+	for _, f := range m.Fields {
+		if f.Key() == key {
+			return f
+		}
+	}
+	return nil
+}
+
 var bitConsts = []cor.Const{
 	{"Opt", BitOpt},
 	{"PK", BitPK},
