@@ -65,7 +65,7 @@ func TestDom(t *testing.T) {
 			}}},
 	}
 	for _, test := range tests {
-		env := NewProjectEnv(Env)
+		env := NewEnv(Env, &Project{})
 		s, err := ExecuteString(env, test.raw)
 		if err != nil {
 			t.Errorf("execute %s got error: %v", test.raw, err)

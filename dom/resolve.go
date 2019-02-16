@@ -65,7 +65,6 @@ func resolveModel(c *exp.Ctx, env *ModelEnv, name string, els []exp.El) (lit.Lit
 		return nil, err
 	}
 	env.Model = m
-	env.Node = p
 	r := modelRules
 	r.Decl.KeyPrepper = func(c *exp.Ctx, _ exp.Env, key string, args []exp.El) (lit.Lit, error) {
 		if m.Kind != typ.KindRec {

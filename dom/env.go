@@ -3,7 +3,10 @@ package dom
 import (
 	"strings"
 
+	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/exp"
+	"github.com/mb0/xelf/lit"
+	"github.com/mb0/xelf/typ"
 	"github.com/mb0/xelf/utl"
 )
 
@@ -13,15 +16,14 @@ var Env = exp.Builtin{
 	exp.Std, exp.Core,
 }
 
+// ProjectEnv is a root environment that allows schema declaration or model resolution.
 type ProjectEnv struct {
 	pa exp.Env
 	pr *Project
-	sm map[string]*SchemaEnv
 }
 
-func NewProjectEnv(env exp.Env) *ProjectEnv {
-	return &ProjectEnv{pa: env, pr: &Project{},
-		sm: make(map[string]*SchemaEnv)}
+func NewEnv(parent exp.Env, project *Project) *ProjectEnv {
+	return &ProjectEnv{pa: parent, pr: project}
 }
 
 func (s *ProjectEnv) Parent() exp.Env                      { return s.pa }
@@ -30,18 +32,45 @@ func (s *ProjectEnv) Get(sym string) exp.Resolver {
 	if sym == "schema" {
 		return &SchemaEnv{Project: s}
 	}
-	split := strings.SplitN(sym, ".", 2)
-	se := s.sm[split[0]]
-	if se == nil { // we found no schema, query parent
+	prefix := sym[0] == '~'
+	if prefix { // strip prefix and continue
+		sym = sym[1:]
+	}
+	split := strings.SplitN(sym, ".", 3)
+	ss := s.pr.Schema(split[0])
+	if ss == nil && !prefix { // no schema found query parent if not prefixed
 		return s.pa.Get(sym)
-
 	}
-	if len(split) == 1 { // schema ref
-		return se
+	if len(split) == 1 || s == nil {
+		return nil
 	}
-	return se.Get(split[1])
+	m := ss.Model(split[1])
+	if len(split) == 2 || m == nil {
+		return utl.LitResolver{m.Typ()}
+	}
+	if m.Kind&typ.MaskPrim != 0 {
+		c := m.Const(split[2])
+		if c != nil {
+			return utl.LitResolver{constLit(m, c)}
+		}
+	} else {
+		f := m.Field(split[2])
+		if f != nil {
+			return utl.TypedUnresolver{f.Type}
+		}
+	}
+	return nil
 }
 
+func constLit(m *Model, c *cor.Const) lit.Lit {
+	if m.Kind != typ.KindEnum {
+		return lit.FlagInt{m.Typ(), lit.Int(c.Val)}
+	}
+	return lit.EnumStr{m.Typ(), lit.Str(strings.ToLower(c.Name))}
+}
+
+// SchemaEnv is used inside schema definitions.
+// It resolves previously declared models.
 type SchemaEnv struct {
 	Project *ProjectEnv
 	Node    utl.Node
@@ -54,20 +83,17 @@ func (s *SchemaEnv) Def(sym string, r exp.Resolver) error { return exp.ErrNoDefE
 
 func (r *SchemaEnv) Get(sym string) exp.Resolver {
 	split := strings.SplitN(sym, ".", 2)
-	me := r.mm[split[0]]
-	if me == nil { // we found no model, query parent
-		return r.Project.Get(sym)
+	m := r.Schema.Model(split[0])
+	if m == nil {
+		r.Project.Get(sym)
 	}
-	if len(split) == 1 { // model ref
-		return utl.LitResolver{me.Model.Typ()}
+	if len(split) == 1 {
+		return utl.LitResolver{m.Typ()}
 	}
-	return me.Get(split[1])
+	return (&ModelEnv{r, m}).Get(split[1])
 }
 
 func (r *SchemaEnv) Resolve(c *exp.Ctx, env exp.Env, e exp.El) (exp.El, error) {
-	if r.Node != nil {
-		return r.Node, nil
-	}
 	x, ok := e.(*exp.Expr)
 	if !ok {
 		return e, exp.ErrUnres
@@ -76,17 +102,27 @@ func (r *SchemaEnv) Resolve(c *exp.Ctx, env exp.Env, e exp.El) (exp.El, error) {
 	if err != nil {
 		return e, err
 	}
-	r.Project.sm[r.Schema.Name] = r
 	return r.Node, nil
 }
 
+// ModelEnv is used inside model definitions.
+// It resolves previously declarted fields or constants.
 type ModelEnv struct {
 	*SchemaEnv
-	Node  utl.Node
 	Model *Model
 }
 
 func (r *ModelEnv) Get(sym string) exp.Resolver {
-	// TODO check local names
+	if r.Model.Kind&typ.MaskPrim != 0 {
+		c := r.Model.Const(sym)
+		if c != nil {
+			return utl.LitResolver{constLit(r.Model, c)}
+		}
+	} else {
+		f := r.Model.Field(sym)
+		if f != nil {
+			return utl.TypedUnresolver{f.Type}
+		}
+	}
 	return r.SchemaEnv.Get(sym)
 }
