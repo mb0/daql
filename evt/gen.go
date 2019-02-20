@@ -22,7 +22,8 @@ func main() {
 		log.Fatalf("open file %s error: %v", fname, err)
 	}
 	defer f.Close()
-	env := dom.NewProjectEnv(dom.Env)
+	pr := &dom.Project{}
+	env := dom.NewEnv(dom.Env, pr)
 	s, err := dom.Execute(env, f)
 	if err != nil {
 		log.Fatalf("execute %s error: %v", fname, err)
@@ -41,7 +42,7 @@ func main() {
 	for _, m := range s.Models {
 		els = append(els, m.Typ())
 	}
-	err = gengo.WriteGoFile(b, els)
+	err = gengo.WriteFile(b, els)
 	if err != nil {
 		log.Fatalf("write file %s error: %v", fname, err)
 	}
