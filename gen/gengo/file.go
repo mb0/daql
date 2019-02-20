@@ -13,11 +13,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-// GoImport takes a qualified name of the form 'pkg.Decl', looks up a path from context packages
+// Import takes a qualified name of the form 'pkg.Decl', looks up a path from context packages
 // map if available, otherwise the name is used as path. If the package path is the same as the
 // context package it returns the 'Decl' part. Otherwise it adds the package path to the import
 // list and returns a substring starting with last package path segment: 'pkg.Decl'.
-func GoImport(c *gen.Ctx, name string) string {
+func Import(c *gen.Ctx, name string) string {
 	idx := strings.LastIndexByte(name, '.')
 	var ns string
 	if idx > -1 {
@@ -39,10 +39,10 @@ func GoImport(c *gen.Ctx, name string) string {
 	return name
 }
 
-// WriteGoFile writes the elements to a go file with package and import declarations.
+// WriteFile writes the elements to a go file with package and import declarations.
 //
 // For now only flag, enum and rec type definitions are supported
-func WriteGoFile(c *gen.Ctx, els []exp.El) error {
+func WriteFile(c *gen.Ctx, els []exp.El) error {
 	b := bfr.Get()
 	defer bfr.Put(b)
 	// swap new buffer with context buffer
@@ -52,7 +52,7 @@ func WriteGoFile(c *gen.Ctx, els []exp.El) error {
 		c.WriteString("\n")
 		switch v := el.(type) {
 		case typ.Type:
-			err := DeclareGoType(c, v)
+			err := DeclareType(c, v)
 			if err != nil {
 				return err
 			}
@@ -89,9 +89,9 @@ func WriteGoFile(c *gen.Ctx, els []exp.El) error {
 	return nil
 }
 
-// DeclareGoType writes a type declaration for flag, enum and rec types.
+// DeclareType writes a type declaration for flag, enum and rec types.
 // For flag and enum types the declaration includes the constant declarations.
-func DeclareGoType(c *gen.Ctx, t typ.Type) (err error) {
+func DeclareType(c *gen.Ctx, t typ.Type) (err error) {
 	ref := refName(t)
 	switch k := t.Kind; k & typ.MaskRef {
 	case typ.KindFlag:
@@ -109,7 +109,7 @@ func DeclareGoType(c *gen.Ctx, t typ.Type) (err error) {
 		c.WriteString(refName(t))
 		c.WriteByte(' ')
 		t.Kind &^= typ.FlagRef
-		err = WriteGoType(c, t)
+		err = WriteType(c, t)
 		c.WriteByte('\n')
 	default:
 		err = errors.Errorf("type %s cannot be declared", t)

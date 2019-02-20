@@ -8,8 +8,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// WriteGoType writes the native go type for t to c or returns an error.
-func WriteGoType(c *gen.Ctx, t typ.Type) error {
+// WriteType writes the native go type for t to c or returns an error.
+func WriteType(c *gen.Ctx, t typ.Type) error {
 	k := t.Kind
 	if k == typ.KindAny {
 		_, err := c.WriteString("interface{}")
@@ -32,21 +32,21 @@ func WriteGoType(c *gen.Ctx, t typ.Type) error {
 	case typ.KindUUID:
 		r = "[16]byte"
 	case typ.KindTime:
-		r = GoImport(c, "time.Time")
+		r = Import(c, "time.Time")
 	case typ.KindSpan:
-		r = GoImport(c, "time.Duration")
+		r = Import(c, "time.Duration")
 	case typ.BaseList:
 		_, err := c.WriteString("[]interface{}")
 		return err
 	case typ.KindArr:
 		c.WriteString("[]")
-		return WriteGoType(c, t.Next())
+		return WriteType(c, t.Next())
 	case typ.BaseDict:
 		c.WriteString("map[string]interface{}")
 		return nil
 	case typ.KindMap:
 		c.WriteString("map[string]")
-		return WriteGoType(c, t.Next())
+		return WriteType(c, t.Next())
 	case typ.KindObj:
 		if k&typ.FlagOpt != 0 {
 			c.WriteByte('*')
@@ -65,7 +65,7 @@ func WriteGoType(c *gen.Ctx, t typ.Type) error {
 				c.WriteString(name)
 				c.WriteByte(' ')
 			}
-			err := WriteGoType(c, f.Type)
+			err := WriteType(c, f.Type)
 			if err != nil {
 				return err
 			}
@@ -82,7 +82,7 @@ func WriteGoType(c *gen.Ctx, t typ.Type) error {
 		c.WriteByte('}')
 		return nil
 	case typ.KindFlag, typ.KindEnum, typ.KindRec:
-		r = GoImport(c, t.Ref)
+		r = Import(c, t.Ref)
 	}
 	if r == "" {
 		return errors.Errorf("type %s cannot be represented in go", t)

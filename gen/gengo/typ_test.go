@@ -9,7 +9,7 @@ import (
 	"github.com/mb0/xelf/typ"
 )
 
-func TestWriteGoType(t *testing.T) {
+func TestWriteType(t *testing.T) {
 	tests := []struct {
 		t       typ.Type
 		s       string
@@ -25,15 +25,15 @@ func TestWriteGoType(t *testing.T) {
 			{Name: "Foo", Type: typ.Str},
 			{Name: "Bar?", Type: typ.Int},
 			{Name: "Spam", Type: typ.Opt(typ.Int)},
-		}), `struct {
-	Foo string ` + "`json:\"foo\"`" + `
-	Bar int64 ` + "`json:\"bar,omitempty\"`" + `
-	Spam *int64 ` + "`json:\"spam\"`\n}", nil},
+		}), "struct {\n\t" +
+			"Foo string `json:\"foo\"`\n\t" +
+			"Bar int64 `json:\"bar,omitempty\"`\n\t" +
+			"Spam *int64 `json:\"spam\"`\n}", nil},
 	}
 	for _, test := range tests {
 		var b strings.Builder
 		c := &gen.Ctx{B: &b}
-		err := WriteGoType(c, test.t)
+		err := WriteType(c, test.t)
 		if err != nil {
 			t.Errorf("test %s error: %v", test.s, err)
 			continue

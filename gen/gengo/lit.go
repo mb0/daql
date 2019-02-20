@@ -11,8 +11,8 @@ import (
 	"github.com/mb0/xelf/typ"
 )
 
-// WriteGoLit writes the native go literal for l to c or returns an error.
-func WriteGoLit(c *gen.Ctx, l lit.Lit) error {
+// WriteLit writes the native go literal for l to c or returns an error.
+func WriteLit(c *gen.Ctx, l lit.Lit) error {
 	t := l.Typ()
 	opt := t.IsOpt()
 	if opt && l.IsZero() {
@@ -61,58 +61,58 @@ func WriteGoLit(c *gen.Ctx, l lit.Lit) error {
 		return writeCall(c, "cor.Span", l)
 	case typ.BaseList:
 		c.WriteString("[]interface{}")
-		return writeGoIdxer(c, l)
+		return writeIdxer(c, l)
 	case typ.KindArr:
 		c.WriteString("[]")
-		err := WriteGoType(c, t.Next())
+		err := WriteType(c, t.Next())
 		if err != nil {
 			return err
 		}
-		return writeGoIdxer(c, l)
+		return writeIdxer(c, l)
 	case typ.BaseDict:
 		c.WriteString("map[string]interface{}")
-		return writeGoKeyer(c, l, func(i int, k string, e lit.Lit) error {
-			err := WriteGoLit(c, lit.Str(k))
+		return writeKeyer(c, l, func(i int, k string, e lit.Lit) error {
+			err := WriteLit(c, lit.Str(k))
 			if err != nil {
 				return err
 			}
 			c.WriteString(": ")
-			return WriteGoLit(c, e)
+			return WriteLit(c, e)
 		})
 	case typ.KindMap:
 		c.WriteString("map[string]")
-		err := WriteGoType(c, t.Next())
+		err := WriteType(c, t.Next())
 		if err != nil {
 			return err
 		}
-		return writeGoKeyer(c, l, func(i int, k string, e lit.Lit) error {
-			err := WriteGoLit(c, lit.Str(k))
+		return writeKeyer(c, l, func(i int, k string, e lit.Lit) error {
+			err := WriteLit(c, lit.Str(k))
 			if err != nil {
 				return err
 			}
 			c.WriteString(": ")
-			return WriteGoLit(c, e)
+			return WriteLit(c, e)
 		})
 	case typ.KindObj, typ.KindRec:
 		if opt {
 			c.WriteByte('&')
 		}
 		t, _ := t.Deopt()
-		err := WriteGoType(c, t)
+		err := WriteType(c, t)
 		if err != nil {
 			return err
 		}
-		return writeGoKeyer(c, l, func(i int, k string, e lit.Lit) error {
+		return writeKeyer(c, l, func(i int, k string, e lit.Lit) error {
 			c.WriteString(k)
 			c.WriteString(": ")
-			return WriteGoLit(c, e)
+			return WriteLit(c, e)
 		})
 	case typ.KindFlag, typ.KindEnum:
 		valer, ok := l.(interface{ Val() interface{} })
 		if !ok {
 			return fmt.Errorf("expect flag or enum to implement val method got %T", l)
 		}
-		tref := GoImport(c, t.Ref)
+		tref := Import(c, t.Ref)
 		if opt {
 			c.WriteString("&[]")
 			c.WriteString(tref)
@@ -151,14 +151,14 @@ func WriteGoLit(c *gen.Ctx, l lit.Lit) error {
 }
 
 func writeCall(c *gen.Ctx, name string, l lit.Lit) error {
-	c.WriteString(GoImport(c, name))
+	c.WriteString(Import(c, name))
 	c.WriteByte('(')
 	err := l.WriteBfr(bfr.Ctx{B: c.B, JSON: true})
 	c.WriteByte(')')
 	return err
 }
 
-func writeGoIdxer(c *gen.Ctx, l lit.Lit) error {
+func writeIdxer(c *gen.Ctx, l lit.Lit) error {
 	v, ok := l.(lit.Idxer)
 	if !ok {
 		return fmt.Errorf("expect idxer got %T", l)
@@ -173,7 +173,7 @@ func writeGoIdxer(c *gen.Ctx, l lit.Lit) error {
 		if err != nil {
 			return err
 		}
-		err = WriteGoLit(c, e)
+		err = WriteLit(c, e)
 		if err != nil {
 			return err
 		}
@@ -181,7 +181,7 @@ func writeGoIdxer(c *gen.Ctx, l lit.Lit) error {
 	return c.WriteByte('}')
 }
 
-func writeGoKeyer(c *gen.Ctx, l lit.Lit, el func(int, string, lit.Lit) error) error {
+func writeKeyer(c *gen.Ctx, l lit.Lit, el func(int, string, lit.Lit) error) error {
 	v, ok := l.(lit.Keyer)
 	if !ok {
 		return fmt.Errorf("expect keyer got %T", l)

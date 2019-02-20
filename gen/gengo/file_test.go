@@ -10,7 +10,7 @@ import (
 	"github.com/mb0/xelf/typ"
 )
 
-func TestWriteGoFile(t *testing.T) {
+func TestWriteFile(t *testing.T) {
 	align := typ.Flag("foo.Align")
 	align.Consts = []cor.Const{{"A", 1}, {"B", 2}, {"C", 3}}
 	kind := typ.Enum("foo.Kind")
@@ -65,7 +65,7 @@ func TestWriteGoFile(t *testing.T) {
 	for _, test := range tests {
 		var b strings.Builder
 		c := &gen.Ctx{B: &b, Pkg: "path/to/foo", Pkgs: pkgs}
-		err := WriteGoFile(c, test.els)
+		err := WriteFile(c, test.els)
 		if err != nil {
 			t.Errorf("write %+v error: %v", test.els, err)
 			continue
