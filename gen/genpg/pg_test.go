@@ -7,7 +7,6 @@ import (
 	"github.com/mb0/xelf/bfr"
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/typ"
-	"github.com/mb0/xelf/utl"
 )
 
 func TestRender(t *testing.T) {
@@ -68,6 +67,6 @@ func TestRender(t *testing.T) {
 
 func unresed(env exp.Env, t typ.Type, names ...string) {
 	for _, n := range names {
-		env.Def(n, utl.TypedUnresolver{t})
+		env.Def(n, exp.TypedUnresolver{t})
 	}
 }

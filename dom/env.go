@@ -26,7 +26,10 @@ func NewEnv(parent exp.Env, project *Project) *ProjectEnv {
 	return &ProjectEnv{pa: parent, pr: project}
 }
 
-func (s *ProjectEnv) Parent() exp.Env                      { return s.pa }
+func (s *ProjectEnv) Parent() exp.Env { return s.pa }
+func (s *ProjectEnv) Supports(x byte) bool {
+	return x == '~'
+}
 func (s *ProjectEnv) Def(sym string, r exp.Resolver) error { return exp.ErrNoDefEnv }
 func (s *ProjectEnv) Get(sym string) exp.Resolver {
 	if sym == "schema" {
@@ -46,17 +49,17 @@ func (s *ProjectEnv) Get(sym string) exp.Resolver {
 	}
 	m := ss.Model(split[1])
 	if len(split) == 2 || m == nil {
-		return utl.LitResolver{m.Typ()}
+		return exp.LitResolver{m.Typ()}
 	}
 	if m.Kind&typ.MaskPrim != 0 {
 		c := m.Const(split[2])
 		if c != nil {
-			return utl.LitResolver{constLit(m, c)}
+			return exp.LitResolver{constLit(m, c)}
 		}
 	} else {
 		f := m.Field(split[2])
 		if f != nil {
-			return utl.TypedUnresolver{f.Type}
+			return exp.TypedUnresolver{f.Type}
 		}
 	}
 	return nil
@@ -78,7 +81,10 @@ type SchemaEnv struct {
 	mm      map[string]*ModelEnv
 }
 
-func (s *SchemaEnv) Parent() exp.Env                      { return s.Project }
+func (s *SchemaEnv) Parent() exp.Env { return s.Project }
+func (s *SchemaEnv) Supports(x byte) bool {
+	return x == '~'
+}
 func (s *SchemaEnv) Def(sym string, r exp.Resolver) error { return exp.ErrNoDefEnv }
 
 func (r *SchemaEnv) Get(sym string) exp.Resolver {
@@ -88,7 +94,7 @@ func (r *SchemaEnv) Get(sym string) exp.Resolver {
 		r.Project.Get(sym)
 	}
 	if len(split) == 1 {
-		return utl.LitResolver{m.Typ()}
+		return exp.LitResolver{m.Typ()}
 	}
 	return (&ModelEnv{r, m}).Get(split[1])
 }
@@ -116,12 +122,12 @@ func (r *ModelEnv) Get(sym string) exp.Resolver {
 	if r.Model.Kind&typ.MaskPrim != 0 {
 		c := r.Model.Const(sym)
 		if c != nil {
-			return utl.LitResolver{constLit(r.Model, c)}
+			return exp.LitResolver{constLit(r.Model, c)}
 		}
 	} else {
 		f := r.Model.Field(sym)
 		if f != nil {
-			return utl.TypedUnresolver{f.Type}
+			return exp.TypedUnresolver{f.Type}
 		}
 	}
 	return r.SchemaEnv.Get(sym)
