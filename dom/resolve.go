@@ -106,9 +106,9 @@ func resolveConstVal(c *exp.Ctx, env *ModelEnv, args []exp.El, idx int) (_ lit.I
 		}
 		return lit.Int(idx) + 1, nil
 	case 1:
-		el, err = c.Resolve(env, args[0])
+		el, err = c.Resolve(env, args[0], typ.Int)
 	default:
-		el, err = c.Resolve(env, exp.Dyn(args))
+		el, err = c.Resolve(env, exp.Dyn(args), typ.Int)
 	}
 	if err != nil {
 		return 0, err

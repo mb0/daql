@@ -41,8 +41,8 @@ func (s *ProjectEnv) Get(sym string) exp.Resolver {
 	}
 	split := strings.SplitN(sym, ".", 3)
 	ss := s.pr.Schema(split[0])
-	if ss == nil && !prefix { // no schema found query parent if not prefixed
-		return s.pa.Get(sym)
+	if ss == nil && !prefix { // no schema found
+		return nil
 	}
 	if len(split) == 1 || s == nil {
 		return nil
@@ -90,19 +90,16 @@ func (s *SchemaEnv) Def(sym string, r exp.Resolver) error { return exp.ErrNoDefE
 func (r *SchemaEnv) Get(sym string) exp.Resolver {
 	split := strings.SplitN(sym, ".", 2)
 	m := r.Schema.Model(split[0])
-	if m == nil {
-		r.Project.Get(sym)
-	}
 	if len(split) == 1 {
 		return exp.LitResolver{m.Typ()}
 	}
 	return (&ModelEnv{r, m}).Get(split[1])
 }
 
-func (r *SchemaEnv) Resolve(c *exp.Ctx, env exp.Env, e exp.El) (exp.El, error) {
+func (r *SchemaEnv) Resolve(c *exp.Ctx, env exp.Env, e exp.El, hint typ.Type) (exp.El, error) {
 	x, ok := e.(*exp.Expr)
 	if !ok {
-		return e, exp.ErrUnres
+		return &exp.Form{typ.Type{Kind: typ.KindForm}, r}, nil
 	}
 	err := resolveSchema(c, r, "", x.Args)
 	if err != nil {

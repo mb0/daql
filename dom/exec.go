@@ -8,6 +8,7 @@ import (
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/lex"
 	"github.com/mb0/xelf/lit"
+	"github.com/mb0/xelf/typ"
 )
 
 func ExecuteString(env exp.Env, s string) (*Schema, error) {
@@ -24,7 +25,7 @@ func Execute(env exp.Env, r io.Reader) (*Schema, error) {
 		return nil, err
 	}
 	c := &exp.Ctx{Exec: true}
-	l, err := c.Resolve(env, x)
+	l, err := c.Resolve(env, x, typ.Void)
 	if err != nil {
 		return nil, fmt.Errorf("%v %s", err, c.Unres)
 	}
