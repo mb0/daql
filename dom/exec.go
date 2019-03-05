@@ -1,10 +1,10 @@
 package dom
 
 import (
-	"fmt"
 	"io"
 	"strings"
 
+	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/lex"
 	"github.com/mb0/xelf/lit"
@@ -27,11 +27,11 @@ func Execute(env exp.Env, r io.Reader) (*Schema, error) {
 	c := &exp.Ctx{Exec: true}
 	l, err := c.Resolve(env, x, typ.Void)
 	if err != nil {
-		return nil, fmt.Errorf("%v %s", err, c.Unres)
+		return nil, cor.Errorf("%s: %v", c.Unres, err)
 	}
 	s, ok := getPtr(l).(*Schema)
 	if !ok {
-		return nil, fmt.Errorf("expected *dom.Schema got %T", r)
+		return nil, cor.Errorf("expected *dom.Schema got %T", r)
 	}
 	return s, nil
 }

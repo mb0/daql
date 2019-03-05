@@ -11,43 +11,66 @@ import (
 	"github.com/mb0/xelf/utl"
 )
 
-var schemaRules = utl.NodeRules{}
+var schemaForm, modelForm *exp.Form
 
-func resolveSchema(c *exp.Ctx, env *SchemaEnv, name string, els []exp.El) error {
-	s := &Schema{Name: name}
-	n, err := utl.GetNode(s)
-	if err != nil {
-		return err
-	}
-	env.Schema = s
-	env.Node = n
-	env.mm = make(map[string]*ModelEnv)
+func init() {
+	schemaForm = &exp.Form{exp.FormSig("schema", []typ.Param{
+		{Name: "args"}, {Name: "decls"}, {},
+	}), exp.FormResolverFunc(resolveSchema)}
+	modelForm = &exp.Form{exp.FormSig("model", []typ.Param{
+		{Name: "args"}, {Name: "decls"}, {Name: "tail"}, {},
+	}), exp.FormResolverFunc(resolveModel)}
+}
 
-	r := schemaRules
-	if s.Name != "" {
-		r.Tags = r.Tags.WithOffset(1)
-	}
-	r.Decl.KeyPrepper = func(c *exp.Ctx, _ exp.Env, name string, args []exp.El) (lit.Lit, error) {
-		m := &ModelEnv{SchemaEnv: env}
-		p, err := resolveModel(c, m, name, args)
-		if err == nil {
-			env.mm[m.Model.Key()] = m
+func findProject(env exp.Env) *ProjectEnv {
+	for env != nil {
+		env = exp.Supports(env, '~')
+		if p, ok := env.(*ProjectEnv); ok {
+			return p
 		}
-		return p, err
 	}
-	r.Decl.KeySetter = func(n utl.Node, key string, el lit.Lit) error {
-		m := el.(utl.Node).Ptr().(*Model)
-		m.schema = s.Name
-		s.Models = append(s.Models, m)
-		return nil
+	return nil
+}
 
-	}
-	return utl.ParseDeclNode(c, env, els, n, r)
+func resolveSchema(c *exp.Ctx, env exp.Env, x *exp.Expr, h typ.Type) (exp.El, error) {
+	s := &Schema{}
+	env = &SchemaEnv{parent: env, Schema: s}
+	return utl.NodeResolverFunc(schemaRules, s)(c, env, x, h)
+}
+
+func resolveModel(c *exp.Ctx, env exp.Env, x *exp.Expr, h typ.Type) (exp.El, error) {
+	s := env.(*SchemaEnv)
+	m := &Model{Kind: typ.KindRec}
+	env = &ModelEnv{SchemaEnv: s, Model: m}
+	return utl.NodeResolverFunc(modelRules, m)(c, env, x, h)
+}
+
+var schemaRules = utl.NodeRules{
+	Tags: utl.TagRules{IdxKeyer: utl.ZeroKeyer},
+	Decl: utl.KeyRule{
+		KeyPrepper: func(c *exp.Ctx, env exp.Env, name string, args []exp.El) (lit.Lit, error) {
+			tmp := make([]exp.El, 0, len(args)+1)
+			tmp = append(tmp, lit.Str(name))
+			tmp = append(tmp, args...)
+			e, err := resolveModel(c, env, &exp.Expr{modelForm, tmp}, typ.Void)
+			if err != nil {
+				return nil, err
+			}
+			return e.(lit.Lit), nil
+		},
+		KeySetter: func(n utl.Node, key string, el lit.Lit) error {
+			m := el.(utl.Node).Ptr().(*Model)
+			s := n.Ptr().(*Schema)
+			m.schema = s.Name
+			s.Models = append(s.Models, m)
+			return nil
+		},
+	},
 }
 
 var modelRules = utl.NodeRules{
 	Tags: utl.TagRules{
-		IdxKeyer: utl.OffsetKeyer(1),
+		IdxKeyer: utl.ZeroKeyer,
 		KeyRule: utl.KeyRule{
 			KeySetter: utl.ExtraMapSetter("extra"),
 		},
@@ -56,37 +79,26 @@ var modelRules = utl.NodeRules{
 			"idx":  {KeyPrepper: idxPrepper, KeySetter: idxSetter},
 		},
 	},
-}
+	Decl: utl.KeyRule{
+		KeyPrepper: func(c *exp.Ctx, env exp.Env, key string, args []exp.El) (lit.Lit, error) {
+			m := env.(*ModelEnv)
+			if m.Model.Kind != typ.KindRec {
+				return resolveConst(c, m, key, args)
+			}
+			return resolveField(c, m, key, args)
 
-func resolveModel(c *exp.Ctx, env *ModelEnv, name string, els []exp.El) (lit.Lit, error) {
-	m := &Model{Name: name, Kind: typ.KindRec}
-	p, err := utl.GetNode(m)
-	if err != nil {
-		return nil, err
-	}
-	env.Model = m
-	r := modelRules
-	r.Decl.KeyPrepper = func(c *exp.Ctx, _ exp.Env, key string, args []exp.El) (lit.Lit, error) {
-		if m.Kind != typ.KindRec {
-			return resolveConst(c, env, key, args)
-		}
-		return resolveField(c, env, key, args)
-	}
-	r.Decl.KeySetter = func(n utl.Node, key string, el lit.Lit) error {
-		p := el.(utl.Node).Ptr()
-		if m.Kind != typ.KindRec {
-			m.Consts = append(m.Consts, *(p.(*cor.Const)))
-		} else {
-			m.Fields = append(m.Fields, p.(*Field))
-		}
-		return nil
-
-	}
-	err = utl.ParseDeclNode(c, env, els, p, r)
-	if err != nil {
-		return nil, err
-	}
-	return p, nil
+		},
+		KeySetter: func(n utl.Node, key string, el lit.Lit) error {
+			p := el.(utl.Node).Ptr()
+			m := n.Ptr().(*Model)
+			if m.Kind != typ.KindRec {
+				m.Consts = append(m.Consts, *(p.(*cor.Const)))
+			} else {
+				m.Fields = append(m.Fields, p.(*Field))
+			}
+			return nil
+		},
+	},
 }
 
 func resolveConst(c *exp.Ctx, env *ModelEnv, key string, args []exp.El) (lit.Lit, error) {

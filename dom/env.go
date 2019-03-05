@@ -26,38 +26,86 @@ func NewEnv(parent exp.Env, project *Project) *ProjectEnv {
 	return &ProjectEnv{pa: parent, pr: project}
 }
 
-func (s *ProjectEnv) Parent() exp.Env { return s.pa }
-func (s *ProjectEnv) Supports(x byte) bool {
-	return x == '~'
-}
+func (s *ProjectEnv) Parent() exp.Env      { return s.pa }
+func (s *ProjectEnv) Supports(x byte) bool { return x == '~' }
+
 func (s *ProjectEnv) Def(sym string, r exp.Resolver) error { return exp.ErrNoDefEnv }
 func (s *ProjectEnv) Get(sym string) exp.Resolver {
 	if sym == "schema" {
-		return &SchemaEnv{Project: s}
+		return schemaForm
 	}
 	prefix := sym[0] == '~'
 	if prefix { // strip prefix and continue
 		sym = sym[1:]
 	}
-	split := strings.SplitN(sym, ".", 3)
+	split := strings.SplitN(sym, ".", 2)
+	if len(split) == 1 { // builtin type
+		return nil
+	}
 	ss := s.pr.Schema(split[0])
-	if ss == nil && !prefix { // no schema found
+	if ss == nil {
 		return nil
 	}
-	if len(split) == 1 || s == nil {
+	return schemaElem(ss, split[1])
+}
+
+// SchemaEnv is used inside schema definitions and resolves previously declared models.
+type SchemaEnv struct {
+	parent exp.Env
+	Schema *Schema
+}
+
+func (s *SchemaEnv) Parent() exp.Env      { return s.parent }
+func (s *SchemaEnv) Supports(x byte) bool { return x == '~' }
+
+func (s *SchemaEnv) Def(sym string, r exp.Resolver) error { return exp.ErrNoDefEnv }
+
+func (r *SchemaEnv) Get(sym string) exp.Resolver {
+	if sym[0] == '~' {
+		if len(sym) < 3 || sym[1] != '.' {
+			return nil
+		}
+		sym = sym[2:]
+	}
+	return schemaElem(r.Schema, sym)
+}
+
+// ModelEnv wraps a schema env and resolves previously declared fields or constants.
+type ModelEnv struct {
+	*SchemaEnv
+	Model *Model
+}
+
+func (r *ModelEnv) Get(sym string) exp.Resolver {
+	if sym[0] != '~' {
+		r := modelElem(r.Model, sym[1:])
+		if r != nil {
+			return r
+		}
+	}
+	return r.SchemaEnv.Get(sym)
+}
+
+func schemaElem(s *Schema, key string) exp.Resolver {
+	split := strings.SplitN(key, ".", 2)
+	m := s.Model(split[0])
+	if m == nil {
 		return nil
 	}
-	m := ss.Model(split[1])
-	if len(split) == 2 || m == nil {
-		return exp.LitResolver{m.Typ()}
+	if len(split) > 1 {
+		return modelElem(m, split[1])
 	}
+	return exp.LitResolver{m.Typ()}
+}
+
+func modelElem(m *Model, key string) exp.Resolver {
 	if m.Kind&typ.MaskPrim != 0 {
-		c := m.Const(split[2])
+		c := m.Const(key)
 		if c != nil {
 			return exp.LitResolver{constLit(m, c)}
 		}
 	} else {
-		f := m.Field(split[2])
+		f := m.Field(key)
 		if f != nil {
 			return exp.TypedUnresolver{f.Type}
 		}
@@ -70,62 +118,4 @@ func constLit(m *Model, c *cor.Const) lit.Lit {
 		return lit.FlagInt{m.Typ(), lit.Int(c.Val)}
 	}
 	return lit.EnumStr{m.Typ(), lit.Str(strings.ToLower(c.Name))}
-}
-
-// SchemaEnv is used inside schema definitions.
-// It resolves previously declared models.
-type SchemaEnv struct {
-	Project *ProjectEnv
-	Node    utl.Node
-	Schema  *Schema
-	mm      map[string]*ModelEnv
-}
-
-func (s *SchemaEnv) Parent() exp.Env { return s.Project }
-func (s *SchemaEnv) Supports(x byte) bool {
-	return x == '~'
-}
-func (s *SchemaEnv) Def(sym string, r exp.Resolver) error { return exp.ErrNoDefEnv }
-
-func (r *SchemaEnv) Get(sym string) exp.Resolver {
-	split := strings.SplitN(sym, ".", 2)
-	m := r.Schema.Model(split[0])
-	if len(split) == 1 {
-		return exp.LitResolver{m.Typ()}
-	}
-	return (&ModelEnv{r, m}).Get(split[1])
-}
-
-func (r *SchemaEnv) Resolve(c *exp.Ctx, env exp.Env, e exp.El, hint typ.Type) (exp.El, error) {
-	x, ok := e.(*exp.Expr)
-	if !ok {
-		return &exp.Form{typ.Type{Kind: typ.KindForm}, r}, nil
-	}
-	err := resolveSchema(c, r, "", x.Args)
-	if err != nil {
-		return e, err
-	}
-	return r.Node, nil
-}
-
-// ModelEnv is used inside model definitions.
-// It resolves previously declarted fields or constants.
-type ModelEnv struct {
-	*SchemaEnv
-	Model *Model
-}
-
-func (r *ModelEnv) Get(sym string) exp.Resolver {
-	if r.Model.Kind&typ.MaskPrim != 0 {
-		c := r.Model.Const(sym)
-		if c != nil {
-			return exp.LitResolver{constLit(r.Model, c)}
-		}
-	} else {
-		f := r.Model.Field(sym)
-		if f != nil {
-			return exp.TypedUnresolver{f.Type}
-		}
-	}
-	return r.SchemaEnv.Get(sym)
 }
