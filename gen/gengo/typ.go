@@ -55,7 +55,7 @@ func WriteType(c *gen.Ctx, t typ.Type) error {
 			return typ.ErrInvalid
 		}
 		c.WriteString("struct {\n")
-		for _, f := range t.Info.Fields {
+		for _, f := range t.Info.Params {
 			name, opt := f.Name, f.Opt()
 			if opt {
 				name = name[:len(name)-1]

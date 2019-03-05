@@ -16,7 +16,7 @@ func RenderEl(b bfr.Ctx, env exp.Env, e exp.El) error {
 	switch v := e.(type) {
 	case lit.Lit:
 		return RenderLit(b, v)
-	case *exp.Ref:
+	case *exp.Sym:
 		// is this a column name?
 		return RenderRef(b, env, v)
 	case *exp.Expr:
@@ -29,7 +29,7 @@ func RenderEl(b bfr.Ctx, env exp.Env, e exp.El) error {
 // References can point schema objects like tables, enums and columns, or point inside composite
 // typed columns like arrays, jsonb or previous results. It uses env to determine how to render
 // the reference.
-func RenderRef(b bfr.Ctx, env exp.Env, r *exp.Ref) error {
+func RenderRef(b bfr.Ctx, env exp.Env, r *exp.Sym) error {
 	// TODO we need check the name, but for now work with the key as is
 	b.WriteString(r.Name)
 	return nil
@@ -40,13 +40,14 @@ func RenderRef(b bfr.Ctx, env exp.Env, r *exp.Ref) error {
 // expression in postgresql. Custom resolvers can be rendered to sql by detecting
 // and handling them before calling this function.
 func RenderExpr(b bfr.Ctx, env exp.Env, e *exp.Expr) error {
-	r := rendrMap[e.Name]
+	key := e.Rslv.Key()
+	r := rendrMap[key]
 	if r != nil {
 		return r.Render(b, env, e)
 	}
 	// dyn and reduce are not supported
 	// TODO let and with might use common table expressions on a higher level
-	return fmt.Errorf("not implemented for %s", e.Name)
+	return fmt.Errorf("not implemented for %s", key)
 }
 
 type exprRenderer interface {
@@ -116,7 +117,7 @@ func writeArray(b bfr.Ctx, l lit.Arr) error {
 	}
 	bb.WriteByte('}')
 	writeQuote(b, bb.String())
-	t, err := TypString(l.Elem())
+	t, err := TypString(l.Element())
 	if err != nil {
 		return err
 	}

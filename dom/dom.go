@@ -94,16 +94,16 @@ func (m *Model) Key() string {
 
 func (m *Model) Typ() typ.Type {
 	if m.typ == typ.Void {
-		fs := make([]typ.Field, 0, len(m.Fields))
+		fs := make([]typ.Param, 0, len(m.Fields))
 		for _, f := range m.Fields {
 			name := f.Name
 			if f.Bits&BitOpt != 0 {
 				name += "?"
 			}
-			fs = append(fs, typ.Field{Name: name, Type: f.Type})
+			fs = append(fs, typ.Param{Name: name, Type: f.Type})
 		}
 		m.typ = typ.Rec(m.Ref())
-		m.typ.Fields = fs
+		m.typ.Params = fs
 	}
 	return m.typ
 }

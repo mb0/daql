@@ -21,7 +21,7 @@ func TestWriteType(t *testing.T) {
 		{typ.Bool, "bool", nil},
 		{typ.Span, "time.Duration", []string{"time"}},
 		{typ.Arr(typ.Time), "[]time.Time", []string{"time"}},
-		{typ.Obj([]typ.Field{
+		{typ.Obj([]typ.Param{
 			{Name: "Foo", Type: typ.Str},
 			{Name: "Bar?", Type: typ.Int},
 			{Name: "Spam", Type: typ.Opt(typ.Int)},

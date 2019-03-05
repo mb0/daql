@@ -36,22 +36,22 @@ func TestWriteFile(t *testing.T) {
 				"\tKindC Kind = \"c\"\n" +
 				")\n",
 		},
-		{[]exp.El{rec("foo.Node", []typ.Field{
+		{[]exp.El{rec("foo.Node", []typ.Param{
 			{Name: "Name?", Type: typ.Str},
 		})}, "package foo\n\ntype Node struct {\n" +
 			"\tName string `json:\"name,omitempty\"`\n" + "}\n",
 		},
-		{[]exp.El{rec("foo.Node", []typ.Field{
+		{[]exp.El{rec("foo.Node", []typ.Param{
 			{Name: "Start", Type: typ.Time},
 		})}, "package foo\n\nimport (\n\t\"time\"\n)\n\ntype Node struct {\n" +
 			"\tStart time.Time `json:\"start\"`\n" + "}\n",
 		},
-		{[]exp.El{rec("foo.Node", []typ.Field{
+		{[]exp.El{rec("foo.Node", []typ.Param{
 			{Name: "Kind", Type: typ.Enum("bar.Kind")},
 		})}, "package foo\n\nimport (\n\t\"path/to/bar\"\n)\n\ntype Node struct {\n" +
 			"\tKind bar.Kind `json:\"kind\"`\n" + "}\n",
 		},
-		{[]exp.El{rec("foo.Node", []typ.Field{
+		{[]exp.El{rec("foo.Node", []typ.Param{
 			{Name: "Kind", Type: typ.Enum("foo.Kind")},
 		})}, "package foo\n\ntype Node struct {\n" +
 			"\tKind Kind `json:\"kind\"`\n" + "}\n",
@@ -76,8 +76,8 @@ func TestWriteFile(t *testing.T) {
 	}
 }
 
-func rec(ref string, fs []typ.Field) typ.Type {
+func rec(ref string, fs []typ.Param) typ.Type {
 	res := typ.Rec(ref)
-	res.Fields = fs
+	res.Params = fs
 	return res
 }

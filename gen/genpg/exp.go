@@ -204,10 +204,17 @@ func renderApd(b bfr.Ctx, env exp.Env, e *exp.Expr) error {
 	}
 	return nil
 }
+
+var layoutSet = []typ.Param{{Name: "a", Type: typ.Dict}, {Name: "unis"}}
+
 func renderSet(b bfr.Ctx, env exp.Env, e *exp.Expr) error {
 	// First arg can only be a jsonb obj
 	// TODO but check that
-	decls, err := exp.UniDeclForm(e.Args[1:])
+	lo, err := exp.LayoutArgs(layoutSet, e.Args)
+	if err != nil {
+		return err
+	}
+	decls, err := lo.Unis(1)
 	if err != nil {
 		return err
 	}
@@ -219,7 +226,7 @@ func renderSet(b bfr.Ctx, env exp.Env, e *exp.Expr) error {
 		switch v := d.Args[0].(type) {
 		case lit.Lit:
 			dict.SetKey(d.Name, v)
-		case *exp.Ref:
+		case *exp.Sym:
 			rest = append(rest, d)
 		case *exp.Expr:
 			rest = append(rest, d)
@@ -258,10 +265,10 @@ func renderBool(b bfr.Ctx, env exp.Env, not bool, e exp.El) error {
 	switch v := e.(type) {
 	case lit.Lit:
 		t = v.Typ()
-	case *exp.Ref:
+	case *exp.Sym:
 		t = v.Type
 	case *exp.Expr:
-		t = v.Type
+		t = v.Rslv.Res()
 	default:
 		return fmt.Errorf("unexpected element %s", e)
 	}
@@ -320,10 +327,10 @@ func elType(e exp.El) typ.Type {
 	switch v := e.(type) {
 	case lit.Lit:
 		return v.Typ()
-	case *exp.Ref:
+	case *exp.Sym:
 		return v.Type
 	case *exp.Expr:
-		return v.Type
+		return v.Rslv.Res()
 	}
 	return typ.Void
 }

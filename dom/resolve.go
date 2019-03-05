@@ -154,8 +154,11 @@ func kindPrepper(c *exp.Ctx, env exp.Env, key string, args []exp.El) (lit.Lit, e
 	if len(args) == 0 {
 		return nil, fmt.Errorf("expect type for model kind")
 	}
-	if t, ok := args[0].(typ.Type); ok {
-		return lit.Int(t.Kind), nil
+	if s, ok := args[0].(*exp.Sym); ok {
+		t, err := typ.ParseSym(s.Name, nil)
+		if err == nil {
+			return lit.Int(t.Kind), nil
+		}
 	}
 	return nil, fmt.Errorf("expect type for model kind, got %T", args[0])
 }
