@@ -93,6 +93,9 @@ func (m *Model) Key() string {
 }
 
 func (m *Model) Typ() typ.Type {
+	if m == nil {
+		return typ.Void
+	}
 	if m.typ == typ.Void {
 		fs := make([]typ.Param, 0, len(m.Fields))
 		for _, f := range m.Fields {
@@ -128,9 +131,11 @@ type Project struct {
 
 // Schema returns a schema for key or nil.
 func (p *Project) Schema(key string) *Schema {
-	for _, s := range p.Schemas {
-		if s.Name == key {
-			return s
+	if p != nil {
+		for _, s := range p.Schemas {
+			if s.Name == key {
+				return s
+			}
 		}
 	}
 	return nil
@@ -138,9 +143,11 @@ func (p *Project) Schema(key string) *Schema {
 
 // Model returns a model for key or nil.
 func (s *Schema) Model(key string) *Model {
-	for _, m := range s.Models {
-		if m.Key() == key {
-			return m
+	if s != nil {
+		for _, m := range s.Models {
+			if m.Key() == key {
+				return m
+			}
 		}
 	}
 	return nil
@@ -148,9 +155,11 @@ func (s *Schema) Model(key string) *Model {
 
 // Const returns a constant for key or nil.
 func (m *Model) Const(key string) *cor.Const {
-	for _, c := range m.Consts {
-		if strings.EqualFold(c.Name, key) {
-			return &c
+	if m != nil {
+		for _, c := range m.Consts {
+			if strings.EqualFold(c.Name, key) {
+				return &c
+			}
 		}
 	}
 	return nil
@@ -158,9 +167,11 @@ func (m *Model) Const(key string) *cor.Const {
 
 // Field returns a field for key or nil.
 func (m *Model) Field(key string) *Field {
-	for _, f := range m.Fields {
-		if f.Key() == key {
-			return f
+	if m != nil {
+		for _, f := range m.Fields {
+			if f.Key() == key {
+				return f
+			}
 		}
 	}
 	return nil
