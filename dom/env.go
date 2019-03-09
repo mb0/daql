@@ -19,11 +19,24 @@ var Env = exp.Builtin{
 // ProjectEnv is a root environment that allows schema declaration or model resolution.
 type ProjectEnv struct {
 	pa exp.Env
-	pr *Project
+	*Project
 }
 
 func NewEnv(parent exp.Env, project *Project) *ProjectEnv {
-	return &ProjectEnv{pa: parent, pr: project}
+	return &ProjectEnv{pa: parent, Project: project}
+}
+
+func FindEnv(env exp.Env) *ProjectEnv {
+	for env != nil {
+		env = exp.Supports(env, '~')
+		if p, ok := env.(*ProjectEnv); ok {
+			return p
+		}
+		if env != nil {
+			env = env.Parent()
+		}
+	}
+	return nil
 }
 
 func (s *ProjectEnv) Parent() exp.Env      { return s.pa }
@@ -42,7 +55,7 @@ func (s *ProjectEnv) Get(sym string) exp.Resolver {
 	if len(split) == 1 { // builtin type
 		return nil
 	}
-	ss := s.pr.Schema(split[0])
+	ss := s.Schema(split[0])
 	if ss == nil {
 		return nil
 	}

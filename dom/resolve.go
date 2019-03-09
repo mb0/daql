@@ -22,20 +22,18 @@ func init() {
 	}), exp.FormResolverFunc(resolveModel)}
 }
 
-func findProject(env exp.Env) *ProjectEnv {
-	for env != nil {
-		env = exp.Supports(env, '~')
-		if p, ok := env.(*ProjectEnv); ok {
-			return p
-		}
-	}
-	return nil
-}
-
 func resolveSchema(c *exp.Ctx, env exp.Env, x *exp.Expr, h typ.Type) (exp.El, error) {
 	s := &Schema{}
 	env = &SchemaEnv{parent: env, Schema: s}
-	return utl.NodeResolverFunc(schemaRules, s)(c, env, x, h)
+	n, err := utl.NodeResolverFunc(schemaRules, s)(c, env, x, h)
+	if err != nil {
+		return n, err
+	}
+	pro := FindEnv(env)
+	if pro != nil {
+		pro.Schemas = append(pro.Schemas, n.(utl.Node).Ptr().(*Schema))
+	}
+	return n, nil
 }
 
 func resolveModel(c *exp.Ctx, env exp.Env, x *exp.Expr, h typ.Type) (exp.El, error) {
