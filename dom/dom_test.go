@@ -17,6 +17,7 @@ func TestDom(t *testing.T) {
 		{`(schema 'test')`, &Schema{Name: "test"}},
 		{`(schema 'test' :label 'Test Schema')`,
 			&Schema{Name: "test", Display: Display{Label: "Test Schema"}}},
+
 		{`(schema 'test' (+Dir flag +North +East +South +West))`,
 			&Schema{Name: "test", Models: []*Model{
 				{Name: "Dir", Kind: typ.KindFlag, Consts: []cor.Const{
@@ -29,6 +30,14 @@ func TestDom(t *testing.T) {
 				{Name: "Dir", Kind: typ.KindEnum, Consts: []cor.Const{
 					{"North", 1}, {"East", 2},
 					{"South", 3}, {"West", 4},
+				}},
+			}}},
+		{`(schema 'test' (+Named :prop "something" +Name str))`,
+			&Schema{Name: "test", Models: []*Model{
+				{Name: "Named", Kind: typ.KindRec, Fields: []*Field{
+					{Name: "Name", Type: typ.Str},
+				}, Extra: map[string]interface{}{
+					"prop": "something",
 				}},
 			}}},
 		{`(schema 'test' (+Point +X int +Y int))`,
@@ -68,21 +77,30 @@ func TestDom(t *testing.T) {
 		env := NewEnv(Env, &Project{})
 		s, err := ExecuteString(env, test.raw)
 		if err != nil {
-			t.Errorf("execute %s got error: %v", test.raw, err)
+			t.Errorf("execute %s got error: %+v", test.raw, err)
 			continue
 		}
-		if !jsonEqual(s, test.want) {
-			t.Errorf("for %s want %+v got %+v", test.raw, test.want, s)
+		if !jsonEqual(t, s, test.want) {
 			continue
 		}
 	}
 }
 
-func jsonEqual(a, b interface{}) bool {
-	v, ev := json.Marshal(a)
-	w, ew := json.Marshal(a)
-	if ev != nil || ew != nil {
+func jsonEqual(t *testing.T, a, b interface{}) bool {
+	t.Helper()
+	v, err := json.Marshal(a)
+	if err != nil {
+		t.Errorf("json equal error for a: %v", err)
 		return false
 	}
-	return bytes.Equal(v, w)
+	w, err := json.Marshal(b)
+	if err != nil {
+		t.Errorf("json equal error for a: %v", err)
+		return false
+	}
+	if !bytes.Equal(v, w) {
+		t.Errorf("json equal want %s got %s", w, v)
+		return false
+	}
+	return true
 }
