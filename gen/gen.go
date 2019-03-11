@@ -9,12 +9,27 @@ import (
 
 // Ctx is the code generation context holding the buffer and addition information.
 type Ctx struct {
-	bfr.B
+	bfr.Ctx
 	Pkg    string
 	Target string
 	Header string
+	OpPrec int
 	Pkgs   map[string]string
 	Imports
+}
+
+func (c *Ctx) Prec(prec int) (restore func()) {
+	org := c.OpPrec
+	if org > prec {
+		c.WriteByte('(')
+	}
+	c.OpPrec = prec
+	return func() {
+		if org > prec {
+			c.WriteByte(')')
+		}
+		c.OpPrec = org
+	}
 }
 
 // Imports has a list of alphabetically sorted dependencies. A dependency can be any string

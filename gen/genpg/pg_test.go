@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mb0/daql/gen"
 	"github.com/mb0/xelf/bfr"
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/typ"
@@ -33,12 +34,19 @@ func TestRender(t *testing.T) {
 		{`(not a b)`, `NOT a AND NOT b`},
 		{`(and x v)`, `x != 0 AND v != ''`},
 		{`(eq x y 1)`, `x = y AND x = 1`},
-		{`(equal x 1)`, `x = 1 AND pg_typeof(x) = pg_typeof(1)`},
+		{`(equal x 1)`, `(x = 1 AND pg_typeof(x) = pg_typeof(1))`},
 		{`(gt x y 1)`, `x > y AND y > 1`},
 		{`(if a x 1)`, `CASE WHEN a THEN x ELSE 1 END`},
+		{`(add (add x 2) 3)`, `x + 2 + 3`},
+		{`(add (mul x 2) 3)`, `x * 2 + 3`},
+		{`(add 3 (mul x 2))`, `3 + x * 2`},
+		{`(mul (add x 2) 3)`, `(x + 2) * 3`},
+		{`(mul 3 (add x 2))`, `3 * (x + 2)`},
+		{`(and (or a b) c)`, `(a OR b) AND c`},
+		{`(or (and a b) c)`, `a AND b OR c`},
 	}
 	env := exp.NewScope(exp.Builtin{exp.Core})
-	unresed(env, typ.Bool, "a", "b")
+	unresed(env, typ.Bool, "a", "b", "c")
 	unresed(env, typ.Str, "v", "w")
 	unresed(env, typ.Int, "x", "y")
 	for _, test := range tests {
@@ -53,7 +61,7 @@ func TestRender(t *testing.T) {
 			continue
 		}
 		var b strings.Builder
-		err = RenderEl(bfr.Ctx{B: &b}, env, el)
+		err = WriteEl(&gen.Ctx{Ctx: bfr.Ctx{B: &b}}, env, el)
 		if err != nil {
 			t.Errorf("render %s err: %v", test.el, err)
 			continue

@@ -1,87 +1,109 @@
 package pg
 
 import (
-	"fmt"
 	"strings"
 
+	"github.com/mb0/daql/gen"
 	"github.com/mb0/xelf/bfr"
+	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/lit"
 	"github.com/mb0/xelf/typ"
 )
 
 type (
-	renderConst string
-	renderFunc  func(bfr.Ctx, exp.Env, *exp.Expr) error
-	renderArith string
-	renderCmp   string
-	renderLogic struct {
-		op  string
-		not bool
+	writeRaw struct {
+		raw  string
+		prec int
 	}
-	renderEq struct {
+	writeFunc  func(*gen.Ctx, exp.Env, *exp.Expr) error
+	writeArith struct {
+		op   string
+		prec int
+	}
+	writeCmp   string
+	writeLogic struct {
+		op   string
+		not  bool
+		prec int
+	}
+	writeEq struct {
 		op     string
 		strict bool
 	}
 )
 
-func (r renderConst) Render(b bfr.Ctx, env exp.Env, e *exp.Expr) error { return b.Fmt(string(r)) }
-func (r renderFunc) Render(b bfr.Ctx, env exp.Env, e *exp.Expr) error  { return r(b, env, e) }
-func (r renderLogic) Render(b bfr.Ctx, env exp.Env, e *exp.Expr) error {
+func (r writeRaw) WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
+	restore := b.Prec(r.prec)
+	b.WriteString(r.raw)
+	restore()
+	return nil
+}
+func (r writeFunc) WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Expr) error { return r(b, env, e) }
+func (r writeLogic) WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
+	restore := b.Prec(r.prec)
 	for i, arg := range e.Args {
 		if i > 0 {
 			b.WriteString(r.op)
 		}
-		err := renderBool(b, env, r.not, arg)
+		err := writeBool(b, env, r.not, arg)
 		if err != nil {
 			return err
 		}
 	}
+	restore()
 	return nil
 }
 
-func (r renderArith) Render(b bfr.Ctx, env exp.Env, e *exp.Expr) error {
-	// TODO we need to insert respect operator precedence and insert parens
+func (r writeArith) WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
+	restore := b.Prec(r.prec)
 	for i, arg := range e.Args {
 		if i > 0 {
-			b.WriteString(string(r))
+			b.WriteString(r.op)
 		}
-		err := RenderEl(b, env, arg)
+		err := WriteEl(b, env, arg)
 		if err != nil {
 			return err
 		}
 	}
+	restore()
 	return nil
 }
 
-func renderIf(b bfr.Ctx, env exp.Env, e *exp.Expr) error {
+func renderIf(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
+	restore := b.Prec(PrecDef)
 	b.WriteString("CASE ")
 	var i int
 	for i = 0; i+1 < len(e.Args); i += 2 {
 		b.WriteString("WHEN ")
-		err := renderBool(b, env, false, e.Args[i])
+		err := writeBool(b, env, false, e.Args[i])
 		if err != nil {
 			return err
 		}
 		b.WriteString(" THEN ")
-		err = RenderEl(b, env, e.Args[i+1])
+		err = WriteEl(b, env, e.Args[i+1])
 		if err != nil {
 			return err
 		}
 	}
 	if i < len(e.Args) {
 		b.WriteString(" ELSE ")
-		err := RenderEl(b, env, e.Args[i])
+		err := WriteEl(b, env, e.Args[i])
 		if err != nil {
 			return err
 		}
 	}
-	return b.Fmt(" END")
+	b.WriteString(" END")
+	restore()
+	return nil
 }
 
-func (r renderEq) Render(b bfr.Ctx, env exp.Env, e *exp.Expr) error {
+func (r writeEq) WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
+	if len(e.Args) > 2 {
+		defer b.Prec(PrecAnd)()
+	}
 	// TODO mind nulls
-	fst, err := renderString(env, e.Args[0])
+	fst, err := writeString(b, env, e.Args[0])
 	if err != nil {
 		return err
 	}
@@ -89,16 +111,21 @@ func (r renderEq) Render(b bfr.Ctx, env exp.Env, e *exp.Expr) error {
 		if i > 0 {
 			b.WriteString(" AND ")
 		}
-		b.WriteString(fst)
-		b.WriteString(r.op)
 		if !r.strict {
-			err = RenderEl(b, env, arg)
+			restore := b.Prec(PrecCmp)
+			b.WriteString(fst)
+			b.WriteString(r.op)
+			err = WriteEl(b, env, arg)
 			if err != nil {
 				return err
 			}
+			restore()
 			continue
 		}
-		oth, err := renderString(env, arg)
+		b.WriteByte('(')
+		b.WriteString(fst)
+		b.WriteString(r.op)
+		oth, err := writeString(b, env, arg)
 		if err != nil {
 			return err
 		}
@@ -110,13 +137,17 @@ func (r renderEq) Render(b bfr.Ctx, env exp.Env, e *exp.Expr) error {
 		b.WriteString("pg_typeof(")
 		b.WriteString(oth)
 		b.WriteByte(')')
+		b.WriteByte(')')
 	}
 	return nil
 }
 
-func (r renderCmp) Render(b bfr.Ctx, env exp.Env, e *exp.Expr) error {
+func (r writeCmp) WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
+	if len(e.Args) > 2 {
+		defer b.Prec(PrecAnd)()
+	}
 	// TODO mind nulls
-	last, err := renderString(env, e.Args[0])
+	last, err := writeString(b, env, e.Args[0])
 	if err != nil {
 		return err
 	}
@@ -124,25 +155,27 @@ func (r renderCmp) Render(b bfr.Ctx, env exp.Env, e *exp.Expr) error {
 		if i > 0 {
 			b.WriteString(" AND ")
 		}
+		restore := b.Prec(PrecCmp)
 		b.WriteString(last)
 		b.WriteString(string(r))
-		oth, err := renderString(env, arg)
+		oth, err := writeString(b, env, arg)
 		if err != nil {
 			return err
 		}
 		b.WriteString(oth)
+		restore()
 		last = oth
 	}
 	return nil
 }
 
-func renderAs(b bfr.Ctx, env exp.Env, e *exp.Expr) error {
+func writeAs(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
 	if len(e.Args) == 0 {
-		return fmt.Errorf("empty as expression")
+		return cor.Errorf("empty as expression")
 	}
 	t, ok := e.Args[0].(typ.Type)
 	if !ok {
-		return fmt.Errorf("as expression must start with a type")
+		return cor.Errorf("as expression must start with a type")
 	}
 	ts, err := TypString(t)
 	if err != nil {
@@ -156,39 +189,42 @@ func renderAs(b bfr.Ctx, env exp.Env, e *exp.Expr) error {
 		}
 		b.WriteString(zero)
 	case 2:
-		err = RenderEl(b, env, e.Args[1])
+		err = WriteEl(b, env, e.Args[1])
 		if err != nil {
 			return err
 		}
 	default:
-		return fmt.Errorf("not implemented")
+		return cor.Errorf("not implemented")
 	}
 	b.WriteString("::")
 	b.WriteString(ts)
 	return nil
 }
 
-func renderCat(b bfr.Ctx, env exp.Env, e *exp.Expr) error {
+func writeCat(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
+	restore := b.Prec(PrecDef)
 	for i, arg := range e.Args {
 		if i > 0 {
 			b.WriteString(" || ")
 		}
 		// TODO cast to element type
-		err := RenderEl(b, env, arg)
+		err := WriteEl(b, env, arg)
 		if err != nil {
 			return err
 		}
 	}
+	restore()
 	return nil
 }
-func renderApd(b bfr.Ctx, env exp.Env, e *exp.Expr) error {
+func writeApd(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
 	if len(e.Args) == 0 {
-		return fmt.Errorf("empty apd expression")
+		return cor.Errorf("empty apd expression")
 	}
 	t := elType(e.Args[0])
 	if t == typ.Void {
-		return fmt.Errorf("untyped first argument in apd expression")
+		return cor.Errorf("untyped first argument in apd expression")
 	}
+	restore := b.Prec(PrecDef)
 	// either jsonb or postgres array
 	ispg := t.Next().Kind&typ.MaskPrim != 0
 	for i, arg := range e.Args {
@@ -197,17 +233,18 @@ func renderApd(b bfr.Ctx, env exp.Env, e *exp.Expr) error {
 		}
 		// TODO cast to element type when ispg, otherwise jsonb
 		_ = ispg
-		err := RenderEl(b, env, arg)
+		err := WriteEl(b, env, arg)
 		if err != nil {
 			return err
 		}
 	}
+	restore()
 	return nil
 }
 
 var layoutSet = []typ.Param{{Name: "a", Type: typ.Dict}, {Name: "unis"}}
 
-func renderSet(b bfr.Ctx, env exp.Env, e *exp.Expr) error {
+func writeSet(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
 	// First arg can only be a jsonb obj
 	// TODO but check that
 	lo, err := exp.LayoutArgs(layoutSet, e.Args)
@@ -235,13 +272,13 @@ func renderSet(b bfr.Ctx, env exp.Env, e *exp.Expr) error {
 	for range rest {
 		b.WriteString("jsonb_set(")
 	}
-	err = RenderEl(b, env, e.Args[0])
+	err = WriteEl(b, env, e.Args[0])
 	if err != nil {
 		return err
 	}
 	if dict.Len() > 0 {
 		b.WriteString(" || ")
-		err = RenderLit(b, dict)
+		err = WriteLit(b, dict)
 		if err != nil {
 			return err
 		}
@@ -251,7 +288,7 @@ func renderSet(b bfr.Ctx, env exp.Env, e *exp.Expr) error {
 		b.WriteString(", {")
 		b.WriteString(strings.ToLower(d.Name))
 		b.WriteString("}, ")
-		err = RenderEl(b, env, d.Args[0])
+		err = WriteEl(b, env, d.Args[0])
 		if err != nil {
 			return err
 		}
@@ -260,7 +297,7 @@ func renderSet(b bfr.Ctx, env exp.Env, e *exp.Expr) error {
 	return nil
 }
 
-func renderBool(b bfr.Ctx, env exp.Env, not bool, e exp.El) error {
+func writeBool(b *gen.Ctx, env exp.Env, not bool, e exp.El) error {
 	var t typ.Type
 	switch v := e.(type) {
 	case lit.Lit:
@@ -270,18 +307,22 @@ func renderBool(b bfr.Ctx, env exp.Env, not bool, e exp.El) error {
 	case *exp.Expr:
 		t = v.Rslv.Res()
 	default:
-		return fmt.Errorf("unexpected element %s", e)
+		return cor.Errorf("unexpected element %s", e)
 	}
-	if t.Kind == typ.KindBool && not {
-		b.WriteString("NOT ")
+	if t.Kind == typ.KindBool {
+		if not {
+			defer b.Prec(PrecNot)()
+			b.WriteString("NOT ")
+		}
+		return WriteEl(b, env, e)
 	}
-	el, err := renderString(env, e)
-	if err != nil {
-		return err
-	}
-	b.WriteString(el)
 	// add boolean conversion if necessary
 	if t.Kind&typ.FlagOpt != 0 {
+		defer b.Prec(PrecIs)()
+		err := WriteEl(b, env, e)
+		if err != nil {
+			return err
+		}
 		if not {
 			b.WriteString(" IS NULL")
 		} else {
@@ -293,11 +334,25 @@ func renderBool(b bfr.Ctx, env exp.Env, not bool, e exp.El) error {
 	if err != nil {
 		return err
 	}
+	if oth != "" {
+		if not {
+			defer b.Prec(PrecOr)()
+		} else {
+			defer b.Prec(PrecAnd)()
+		}
+	} else if cmp != "" {
+		defer b.Prec(PrecCmp)()
+	}
+	err = WriteEl(b, env, e)
+	if err != nil {
+		return err
+	}
 	if cmp != "" {
 		op := " != "
 		if not {
 			op = " = "
 		}
+		restore := b.Prec(PrecCmp)
 		b.WriteString(op)
 		b.WriteString(cmp)
 		if oth != "" {
@@ -306,17 +361,23 @@ func renderBool(b bfr.Ctx, env exp.Env, not bool, e exp.El) error {
 			} else {
 				b.WriteString(" AND ")
 			}
-			b.WriteString(el)
+			err := WriteEl(b, env, e)
+			if err != nil {
+				return err
+			}
 			b.WriteString(op)
 			b.WriteString(oth)
 		}
+		restore()
 	}
 	return nil
 }
 
-func renderString(env exp.Env, e exp.El) (string, error) {
+func writeString(c *gen.Ctx, env exp.Env, e exp.El) (string, error) {
+	cc := *c
 	var b strings.Builder
-	err := RenderEl(bfr.Ctx{B: &b}, env, e)
+	cc.Ctx = bfr.Ctx{B: &b}
+	err := WriteEl(&cc, env, e)
 	if err != nil {
 		return "", err
 	}
@@ -356,7 +417,7 @@ func zeroStrings(t typ.Type) (zero, alt string, _ error) {
 	case typ.BaseDict, typ.KindObj, typ.KindRec:
 		zero, alt = "'null'", "'{}'"
 	default:
-		return "", "", fmt.Errorf("error unexpected type %s", t)
+		return "", "", cor.Errorf("error unexpected type %s", t)
 	}
 	return
 }

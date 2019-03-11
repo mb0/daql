@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/mb0/daql/gen"
+	"github.com/mb0/xelf/bfr"
 	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/typ"
@@ -64,7 +65,7 @@ func TestWriteFile(t *testing.T) {
 	}
 	for _, test := range tests {
 		var b strings.Builder
-		c := &gen.Ctx{B: &b, Pkg: "path/to/foo", Pkgs: pkgs}
+		c := &gen.Ctx{Ctx: bfr.Ctx{B: &b}, Pkg: "path/to/foo", Pkgs: pkgs}
 		err := WriteFile(c, test.els)
 		if err != nil {
 			t.Errorf("write %+v error: %v", test.els, err)

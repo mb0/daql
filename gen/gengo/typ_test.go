@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/mb0/daql/gen"
+	"github.com/mb0/xelf/bfr"
 	"github.com/mb0/xelf/typ"
 )
 
@@ -32,7 +33,7 @@ func TestWriteType(t *testing.T) {
 	}
 	for _, test := range tests {
 		var b strings.Builder
-		c := &gen.Ctx{B: &b}
+		c := &gen.Ctx{Ctx: bfr.Ctx{B: &b}}
 		err := WriteType(c, test.t)
 		if err != nil {
 			t.Errorf("test %s error: %v", test.s, err)

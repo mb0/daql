@@ -1,7 +1,6 @@
 package gengo
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/mb0/daql/gen"
@@ -110,7 +109,7 @@ func WriteLit(c *gen.Ctx, l lit.Lit) error {
 	case typ.KindFlag, typ.KindEnum:
 		valer, ok := l.(interface{ Val() interface{} })
 		if !ok {
-			return fmt.Errorf("expect flag or enum to implement val method got %T", l)
+			return cor.Errorf("expect flag or enum to implement val method got %T", l)
 		}
 		tref := Import(c, t.Ref)
 		if opt {
@@ -123,7 +122,7 @@ func WriteLit(c *gen.Ctx, l lit.Lit) error {
 			if t.Kind&typ.MaskRef == typ.KindEnum {
 				e, ok := cor.ConstByVal(t.Consts, v)
 				if !ok {
-					return fmt.Errorf("no constant with value %d", v)
+					return cor.Errorf("no constant with value %d", v)
 				}
 				c.WriteString(strings.ToLower(tref + e.Name))
 			} else {
@@ -137,11 +136,11 @@ func WriteLit(c *gen.Ctx, l lit.Lit) error {
 		case string: // must be enum key
 			cst, ok := cor.ConstByKey(t.Consts, v)
 			if !ok {
-				return fmt.Errorf("no constant with key %s", v)
+				return cor.Errorf("no constant with key %s", v)
 			}
 			c.WriteString(tref + cst.Name)
 		default:
-			return fmt.Errorf("unexpected constant value %T", valer.Val())
+			return cor.Errorf("unexpected constant value %T", valer.Val())
 		}
 		if opt {
 			c.WriteString("}[0]")
@@ -161,7 +160,7 @@ func writeCall(c *gen.Ctx, name string, l lit.Lit) error {
 func writeIdxer(c *gen.Ctx, l lit.Lit) error {
 	v, ok := l.(lit.Idxer)
 	if !ok {
-		return fmt.Errorf("expect idxer got %T", l)
+		return cor.Errorf("expect idxer got %T", l)
 	}
 	c.WriteByte('{')
 	n := v.Len()
@@ -184,7 +183,7 @@ func writeIdxer(c *gen.Ctx, l lit.Lit) error {
 func writeKeyer(c *gen.Ctx, l lit.Lit, el func(int, string, lit.Lit) error) error {
 	v, ok := l.(lit.Keyer)
 	if !ok {
-		return fmt.Errorf("expect keyer got %T", l)
+		return cor.Errorf("expect keyer got %T", l)
 	}
 	c.WriteByte('{')
 	keys := v.Keys()

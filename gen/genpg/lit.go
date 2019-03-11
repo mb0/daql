@@ -1,9 +1,8 @@
 package pg
 
 import (
-	"fmt"
-
-	"github.com/mb0/xelf/bfr"
+	"github.com/mb0/daql/gen"
+	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/lit"
 	"github.com/mb0/xelf/typ"
 )
@@ -41,11 +40,11 @@ func TypString(t typ.Type) (string, error) {
 		}
 		return "jsonb", nil
 	}
-	return "", fmt.Errorf("unexpected type %s", t)
+	return "", cor.Errorf("unexpected type %s", t)
 }
 
-// RenderLit renders the literal l to b or returns an error.
-func RenderLit(b bfr.Ctx, l lit.Lit) error {
+// WriteLit renders the literal l to b or returns an error.
+func WriteLit(b *gen.Ctx, l lit.Lit) error {
 	t := l.Typ()
 	if t.Kind&typ.FlagOpt != 0 && l.IsZero() {
 		return b.Fmt("NULL")
@@ -62,9 +61,9 @@ func RenderLit(b bfr.Ctx, l lit.Lit) error {
 		}
 		return b.Fmt("TRUE")
 	case typ.BaseNum, typ.KindInt, typ.KindReal, typ.KindFlag:
-		return l.WriteBfr(b)
+		return l.WriteBfr(b.Ctx)
 	case typ.BaseChar, typ.KindStr:
-		return l.WriteBfr(b)
+		return l.WriteBfr(b.Ctx)
 	case typ.KindEnum:
 		// TODO write string and cast with qualified enum name
 	case typ.KindRaw:

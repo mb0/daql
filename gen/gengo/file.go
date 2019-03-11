@@ -1,7 +1,6 @@
 package gengo
 
 import (
-	"fmt"
 	"go/format"
 	"strings"
 
@@ -57,7 +56,7 @@ func WriteFile(c *gen.Ctx, els []exp.El) error {
 				return err
 			}
 		default:
-			return fmt.Errorf("unsupported element %s", el)
+			return cor.Errorf("unsupported element %s", el)
 		}
 	}
 	// swap back
