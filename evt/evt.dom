@@ -1,5 +1,5 @@
 (schema 'evt'
-(+Audit :doc `
+(+Audit :backup :doc `
 Audit holds meta information for a published transaction at uniqe revision.
 `
 	+Rev     time :pk
@@ -17,7 +17,7 @@ data operation on a record identified by a topic and primary key.
 	+Cmd str
 	+Arg map|any
 )
-(+Event :doc `
+(+Event :backup :doc `
 Event represents action published to a ledger with a revision and unique id.
 `
 	+ID  int :pk :auto
@@ -29,16 +29,16 @@ Event represents action published to a ledger with a revision and unique id.
 (+Pub :doc `
 Pub is a request to publish a list of actions to a base revision.
 `
-	+Base    time
-	+Actions arr|@Action
-	+Created time?
-	+Extra   map|any
+	+Base     time
+	+Actions  arr|@Action
+	+Created? time
+	+Extra    map|any
 )
 (+Trans :doc `
 Trans is an unfinished publish request with additional audit info.
 `
 	+        @Pub
-	+Acct?   uuid?
+	+Acct?   uuid
 	+Arrived time
 )
 )

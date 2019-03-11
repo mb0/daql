@@ -30,12 +30,12 @@ type Event struct {
 type Pub struct {
 	Base    time.Time              `json:"base"`
 	Actions []Action               `json:"actions"`
-	Created *time.Time             `json:"created"`
+	Created time.Time              `json:"created,omitempty"`
 	Extra   map[string]interface{} `json:"extra"`
 }
 
 type Trans struct {
 	Pub
-	Acct    *[16]byte `json:"acct,omitempty"`
+	Acct    [16]byte  `json:"acct,omitempty"`
 	Arrived time.Time `json:"arrived"`
 }
