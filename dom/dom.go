@@ -43,7 +43,7 @@ func (Bit) Flag() []cor.Const { return bitConsts }
 type Field struct {
 	Name  string   `json:"name,omitempty"`
 	Type  typ.Type `json:"typ"`
-	Bits  Bit      `json:"bits"`
+	Bits  Bit      `json:"bits,omitempty"`
 	Extra Extra    `json:"extra,omitempty"`
 	*Display
 	key string
@@ -116,8 +116,8 @@ type Schema struct {
 	Name string `json:"name"`
 	Path string `json:"path,omitempty"`
 	Display
-	Use    Keys     `json:"use,omitempty"`
 	Models []*Model `json:"models"`
+	Use    Keys     `json:"use,omitempty"`
 	Extra  Extra    `json:"extra,omitempty"`
 }
 

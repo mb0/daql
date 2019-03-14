@@ -50,7 +50,7 @@ var schemaRules = utl.NodeRules{
 			tmp := make([]exp.El, 0, len(args)+1)
 			tmp = append(tmp, lit.Str(name))
 			tmp = append(tmp, args...)
-			e, err := resolveModel(c, env, &exp.Expr{modelForm, tmp}, typ.Void)
+			e, err := resolveModel(c, env, &exp.Expr{modelForm, tmp, typ.Void}, typ.Void)
 			if err != nil {
 				return nil, err
 			}
