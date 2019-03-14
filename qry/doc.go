@@ -5,9 +5,9 @@ The qry expression either takes plain arguments representing one unnamed task, t
 result as-is. Or declarations, that each represent a named task and whose results are combined into
 an object.
 
-A task can either be a expression that is resolved in the query environment or a query to a data
-source. Tasks have names and can be nested to build a query tree. Expression tasks may again have
-nested query expressions, those nested queries are always added to the outermost query plan.
+A task can either consist of an expression, that is resolved in the query environment, or a query to
+a data source. Tasks have names and can be nested to build a query tree. Expression tasks may again
+have nested query expressions, those nested queries are always added to the outermost query plan.
 
 There are different queries, that result either in a list of elements, a single element or the
 element count. Where element is most often an obj literal or field literal from within an obj.
@@ -21,6 +21,11 @@ others. This selection can be used to rename, filter out or add additional field
 for computed fields like sub queries and should also be able to return object elements from scalar
 queries.
 
+A director then sorts the queries by their dependencies and executes each in an appropriate backend.
+The director is responsible for merging all the query data together. The default director executes
+each query with the same backend. Specialized directors can batch and merge queries, or delegate to
+multiple backends.
+
 (qry
 	(() Selects any one record into a result. Result names must be unique within a qry.
 	      Naked selects use the last key part as name. In this case the record key.)
@@ -32,7 +37,7 @@ queries.
 	(() Selects can query all records, or use a limit and offset)
 	+all   *prod.cat
 	+top10 *prod.cat :lim 10
-	+page3 *prod.cat :off [20 10]
+	+page3 *prod.cat :off 20 :lim 10
 
 	(() Selects can use a where clause by name string or parameter)
 	+named ?prod.cat (eq .name 'name')
