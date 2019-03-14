@@ -21,10 +21,12 @@ others. This selection can be used to rename, filter out or add additional field
 for computed fields like sub queries and should also be able to return object elements from scalar
 queries.
 
-A director then sorts the queries by their dependencies and executes each in an appropriate backend.
-The director is responsible for merging all the query data together. The default director executes
-each query with the same backend. Specialized directors can batch and merge queries, or delegate to
-multiple backends.
+The qry expression resolves a plan with one or more tasks, that plan is then executed by a backend.
+The backend implementation is configurable in the query environment and directs the execution
+process. A simple in-memory backend might need to handle filtering, ordering and selection on its
+own, but can evaluate one task after the other. While a specialized sql backend can off-load most of
+the work by batching independent queries and merging nested queries. A caching backend could
+delegate to an in-memory backend for cached data and another sql backend as its data source.
 
 (qry
 	(() Selects any one record into a result. Result names must be unique within a qry.

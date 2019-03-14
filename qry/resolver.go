@@ -73,8 +73,9 @@ func resolvePlan(c *exp.Ctx, env exp.Env, x *exp.Expr, hint typ.Type) (exp.El, e
 			)
 		}
 	}
-	// we either need to compare them with the expected result literal
-	// or create a synthetic result literal
+	if len(p.Root) == 0 {
+		return nil, cor.Error("empty plan")
+	}
 	err = penv.ExecPlan(c, env, p)
 	if err != nil {
 		return nil, err

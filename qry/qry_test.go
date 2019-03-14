@@ -80,8 +80,8 @@ func init() {
 }
 
 var testQry = `(qry
-	+ ?prod.cat
-	+ ?prod.cat.name
+	+cat ?prod.cat
+	+name ?prod.cat.name
 	+all   *prod.cat
 	+top10 *prod.cat :lim 10
 	+page3 *prod.cat :off 20 :lim 10
@@ -128,7 +128,7 @@ func TestQry(t *testing.T) {
 			continue
 		}
 		c := &exp.Ctx{}
-		env := NewEnv(domEnv, &SimpleDirector{memBed})
+		env := NewEnv(domEnv, memBed)
 		l, err := c.Resolve(env, el, typ.Void)
 		if err != nil {
 			t.Errorf("resolve %s error %+v\n%v", el, err, c.Unres)

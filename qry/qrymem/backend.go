@@ -1,7 +1,6 @@
 package qrymem
 
 import (
-	"log"
 	"sort"
 	"strings"
 
@@ -34,7 +33,54 @@ func (b *Backend) Add(m *dom.Model, arg interface{}) error {
 	return nil
 }
 
-func (b *Backend) ExecQuery(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
+func (b *Backend) ExecPlan(c *exp.Ctx, env exp.Env, p *qry.Plan) error {
+	if p.Simple {
+		t := p.Root[0]
+		t.Result = p.Result
+		return b.execTask(c, env, t)
+	}
+	keyer, ok := p.Result.(lit.Keyer)
+	if !ok {
+		return cor.Errorf("want keyer plan result got %T", p.Result)
+	}
+	for _, t := range p.Root {
+		r, err := keyer.Key(strings.ToLower(t.Name))
+		if err != nil {
+			return err
+		}
+		t.Result, ok = r.(lit.Assignable)
+		if !ok {
+			return cor.Errorf("want assignable task result got %s from %T", r, keyer)
+		}
+		err = b.execTask(c, env, t)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (b *Backend) execTask(c *exp.Ctx, env exp.Env, t *qry.Task) error {
+	if t.Query != nil {
+		err := b.execQuery(c, env, t)
+		if err != nil {
+			return err
+		}
+	} else {
+		el, err := c.Resolve(env, t.Expr, t.Type)
+		if err != nil {
+			return err
+		}
+		err = t.Result.Assign(el.(lit.Lit))
+		if err != nil {
+			return err
+		}
+	}
+	t.Done = true
+	return nil
+}
+
+func (b *Backend) execQuery(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 	q := t.Query
 	model, rest := modelName(q)
 	m := b.tables[model]
@@ -136,7 +182,7 @@ func (m *Backend) collectSel(c *exp.Ctx, env exp.Env, tt *qry.Task, a lit.Assign
 			if !ok {
 				return cor.Errorf("expect assignable got %T", res)
 			}
-			err = m.ExecQuery(c, tenv, t)
+			err = m.execQuery(c, tenv, t)
 		} else {
 			res, err = lit.Select(l, key)
 		}
@@ -169,7 +215,6 @@ func orderResult(list lit.List, sel []qry.Ord) (res error) {
 			return true
 		}
 		less, ok := lit.Less(a, b)
-		log.Printf("less %v %s < %s == %v %v", ord, a, b, less, ok)
 		if !ok {
 			if res == nil {
 				res = cor.Errorf("not comparable %s %s", a, b)

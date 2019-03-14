@@ -14,12 +14,12 @@ var Builtin = exp.Builtin{
 	exp.Std, exp.Core,
 }
 
-func NewEnv(env exp.Env, dir Director) *PlanEnv {
+func NewEnv(env exp.Env, bend Backend) *PlanEnv {
 	if env == nil {
 		env = Builtin
 	}
 	s := &exp.ParamScope{exp.NewScope(env), nil}
-	return &PlanEnv{s, &Plan{}, dir}
+	return &PlanEnv{s, &Plan{}, bend}
 }
 
 func QryLookup(sym string) exp.Resolver {
@@ -32,7 +32,7 @@ func QryLookup(sym string) exp.Resolver {
 type PlanEnv struct {
 	Par exp.Env
 	*Plan
-	Director
+	Backend
 }
 
 func (p *PlanEnv) Parent() exp.Env              { return p.Par }

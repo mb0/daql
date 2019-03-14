@@ -47,10 +47,6 @@ type Query struct {
 	Sel []*Task
 }
 
-type Director interface {
-	ExecPlan(*exp.Ctx, exp.Env, *Plan) error
-}
-
 type Backend interface {
-	ExecQuery(*exp.Ctx, exp.Env, *Task) error
+	ExecPlan(*exp.Ctx, exp.Env, *Plan) error
 }
