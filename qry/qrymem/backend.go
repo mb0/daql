@@ -1,4 +1,4 @@
-package qry
+package qrymem
 
 import (
 	"log"
@@ -6,17 +6,18 @@ import (
 	"strings"
 
 	"github.com/mb0/daql/dom"
+	"github.com/mb0/daql/qry"
 	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/lit"
 	"github.com/mb0/xelf/typ"
 )
 
-type MemBackend struct {
+type Backend struct {
 	tables map[string]*memTable
 }
 
-func (b *MemBackend) Add(m *dom.Model, arg interface{}) error {
+func (b *Backend) Add(m *dom.Model, arg interface{}) error {
 	if b.tables == nil {
 		b.tables = make(map[string]*memTable)
 	}
@@ -33,7 +34,7 @@ func (b *MemBackend) Add(m *dom.Model, arg interface{}) error {
 	return nil
 }
 
-func (b *MemBackend) ExecQuery(c *exp.Ctx, env exp.Env, t *Task) (err error) {
+func (b *Backend) ExecQuery(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 	q := t.Query
 	model, rest := modelName(q)
 	m := b.tables[model]
@@ -59,7 +60,7 @@ func (b *MemBackend) ExecQuery(c *exp.Ctx, env exp.Env, t *Task) (err error) {
 	result := make(lit.List, 0, len(m.data))
 	for _, l := range m.data {
 		if whr != nil {
-			lenv := &LitEnv{env, l}
+			lenv := &qry.LitEnv{env, l}
 			res, err := andForm.Resolve(c, lenv, whr, typ.Bool)
 			if err != nil {
 				return err
@@ -84,7 +85,6 @@ func (b *MemBackend) ExecQuery(c *exp.Ctx, env exp.Env, t *Task) (err error) {
 		result = append(result, z)
 	}
 	if len(q.Ord) != 0 {
-		// TODO sort result by ord keys
 		err = orderResult(result, q.Ord)
 		if err != nil {
 			return err
@@ -111,7 +111,8 @@ func (b *MemBackend) ExecQuery(c *exp.Ctx, env exp.Env, t *Task) (err error) {
 	return t.Result.Assign(result)
 }
 
-func (m *MemBackend) collectSel(c *exp.Ctx, env exp.Env, tt *Task, a lit.Assignable, l lit.Lit) (err error) {
+func (m *Backend) collectSel(c *exp.Ctx, env exp.Env, tt *qry.Task, a lit.Assignable, l lit.Lit,
+) (err error) {
 	sel := tt.Query.Sel
 	if len(sel) == 0 { // return subject
 		return lit.AssignTo(l, a)
@@ -120,7 +121,7 @@ func (m *MemBackend) collectSel(c *exp.Ctx, env exp.Env, tt *Task, a lit.Assigna
 	if !ok {
 		return cor.Errorf("expect keyer got %s", a.Typ())
 	}
-	tenv := &TaskEnv{env, tt, l}
+	tenv := &qry.TaskEnv{env, tt, l}
 	for _, t := range sel {
 		key := strings.ToLower(t.Name)
 		var res exp.El
@@ -149,7 +150,7 @@ func (m *MemBackend) collectSel(c *exp.Ctx, env exp.Env, tt *Task, a lit.Assigna
 	}
 	return nil
 }
-func orderResult(list lit.List, sel []Ord) (res error) {
+func orderResult(list lit.List, sel []qry.Ord) (res error) {
 	// TODO order on more than one field
 	ord := sel[0]
 	sort.SliceStable(list, func(i, j int) bool {
@@ -188,7 +189,7 @@ type memTable struct {
 	data lit.List
 }
 
-func (m *memTable) execCount(c *exp.Ctx, env exp.Env, t *Task) (err error) {
+func (m *memTable) execCount(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 	// we can ignore order and selection completely
 	whr, null, err := prepareWhr(env, t.Query)
 	if err != nil {
@@ -203,7 +204,7 @@ func (m *memTable) execCount(c *exp.Ctx, env exp.Env, t *Task) (err error) {
 	var result int
 	for _, l := range m.data {
 		// skip if it does not resolve to true
-		lenv := &LitEnv{env, l}
+		lenv := &qry.LitEnv{env, l}
 		res, err := andForm.Resolve(c, lenv, whr, typ.Bool)
 		if err != nil {
 			return err
@@ -233,12 +234,11 @@ func init() {
 	andForm = exp.Core("and").(*exp.Form)
 }
 
-func prepareWhr(env exp.Env, q *Query) (x *exp.Expr, null bool, _ error) {
+func prepareWhr(env exp.Env, q *qry.Query) (x *exp.Expr, null bool, _ error) {
 	if len(q.Whr) == 0 {
 		return nil, false, nil
 	}
 	x = &exp.Expr{andForm, q.Whr, typ.Bool}
-	// TODO use an appropriate environment
 	res, err := exp.Resolve(env, x)
 	if err != nil {
 		if err != exp.ErrUnres {
@@ -249,7 +249,7 @@ func prepareWhr(env exp.Env, q *Query) (x *exp.Expr, null bool, _ error) {
 	return nil, res != lit.True, nil
 }
 
-func modelName(q *Query) (model, rest string) {
+func modelName(q *qry.Query) (model, rest string) {
 	model = q.Ref[1:]
 	s := strings.SplitN(model, ".", 3)
 	if len(s) < 3 {

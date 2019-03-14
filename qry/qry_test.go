@@ -1,17 +1,19 @@
-package qry
+package qry_test
 
 import (
 	"log"
 	"testing"
 
 	"github.com/mb0/daql/dom"
+	. "github.com/mb0/daql/qry"
+	"github.com/mb0/daql/qry/qrymem"
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/typ"
 )
 
 var (
 	domEnv exp.Env
-	memBed *MemBackend
+	memBed *qrymem.Backend
 )
 
 type Cat struct {
@@ -42,7 +44,7 @@ func init() {
 	if err != nil {
 		log.Fatalf("parse test schema error: %v", err)
 	}
-	memBed = &MemBackend{}
+	memBed = &qrymem.Backend{}
 	err = memBed.Add(s.Model("cat"), &[]Cat{
 		{25, "y"},
 		{2, "b"},
@@ -113,6 +115,10 @@ func TestQry(t *testing.T) {
 		{`(qry ?prod.cat (eq .name 'c') (::
 			+prods *prod.prod (eq .cat ..id) :asc .name (:: +id +name)
 		))`, `{id:3 name:'c' prods:[{id:1 name:'A'} {id:3 name:'C'}]}`},
+		{`(qry *prod.cat (or (eq .name 'b') (eq .name 'c')) (::
+			+prods *prod.prod (eq .cat ..id) :asc .name (:: +id +name)
+		))`, `[{id:2 name:'b' prods:[{id:2 name:'B'} {id:4 name:'D'}]} ` +
+			`{id:3 name:'c' prods:[{id:1 name:'A'} {id:3 name:'C'}]}]`},
 		{testQry, ``},
 	}
 	for _, test := range tests {
