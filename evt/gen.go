@@ -11,6 +11,7 @@ import (
 	"github.com/mb0/daql/dom"
 	"github.com/mb0/daql/gen"
 	"github.com/mb0/daql/gen/gengo"
+	"github.com/mb0/xelf/bfr"
 	"github.com/mb0/xelf/exp"
 )
 
@@ -30,7 +31,7 @@ func main() {
 	}
 	out := bufio.NewWriter(os.Stdout)
 	b := &gen.Ctx{
-		B:   out,
+		Ctx: bfr.Ctx{B: out},
 		Pkg: "github.com/mb0/daql/evt",
 		Pkgs: map[string]string{
 			"cor": "github.com/mb0/xelf/cor",
