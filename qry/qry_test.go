@@ -85,15 +85,15 @@ var testQry = `(qry
 	+all   *prod.cat
 	+top10 *prod.cat :lim 10
 	+page3 *prod.cat :off 20 :lim 10
-	+named ?prod.cat (eq name 'a')
-	+param ?prod.prod (eq name 'A') :desc cat :asc name
+	+named ?prod.cat (eq .name 'a')
+	+param ?prod.prod (eq .name 'A') :desc cat :asc .name
 	+numc  #prod.prod (eq cat 3)
 	+infoLabel *prod.label (:: +id +label ('Label: ' .name))
 	+leanLabel *prod.label (:: +tmpl)
 	+nest ?prod.cat (eq .name 'a') (::
 		+prods *prod.prod (eq .cat ..id) :asc .name (:: +id +name)
 	)
-	(() +top10prods *prod.prod (in .cat /top10/id) :asc .name)
+	+top10prods *prod.prod (in .cat /top10/id) :asc .name
 )`
 
 func TestQry(t *testing.T) {

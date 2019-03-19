@@ -1,7 +1,6 @@
 package qry
 
 import (
-	"log"
 	"strings"
 
 	"github.com/mb0/daql/dom"
@@ -199,8 +198,6 @@ func resolveQuery(c *exp.Ctx, env exp.Env, t *Task, ref string, lo *exp.Layout) 
 		if err != nil {
 			return err
 		}
-	} else {
-		log.Printf("no selection for %v decls %v", q, args)
 	}
 	// TODO check that order only accesses result fields
 	t.Query = q
@@ -282,7 +279,6 @@ func resolveSel(c *exp.Ctx, env exp.Env, q *Query, args []exp.El) (typ.Type, err
 	if q.Type.Kind&typ.MaskElem == typ.KindObj && q.Type.Info != nil {
 		ps = q.Type.Params
 	}
-	log.Printf("resolve sel %s", q.Type)
 	// start with all fields unless we start with "-"
 	res := make([]*Task, 0, len(ps)+len(args))
 	for _, p := range ps {
@@ -372,7 +368,6 @@ func resolveSel(c *exp.Ctx, env exp.Env, q *Query, args []exp.El) (typ.Type, err
 		ps = append(ps, typ.Param{Name: t.Name, Type: t.Type})
 	}
 	q.Sel = res
-	log.Printf("got obj %s", typ.Obj(ps))
 	return typ.Obj(ps), nil
 }
 

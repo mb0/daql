@@ -40,12 +40,20 @@ func (*PlanEnv) Supports(x byte) bool           { return x == '/' }
 func (*PlanEnv) Def(string, exp.Resolver) error { return exp.ErrNoDefEnv }
 func (s *PlanEnv) Get(sym string) exp.Resolver {
 	// resolve from added tasks
-	if sym[0] == '/' {
-		sym = sym[1:]
+	if sym[0] != '/' {
+		return nil
 	}
+	if len(sym) == 1 {
+		return exp.LitResolver{s.Result}
+	}
+	path, err := lit.ReadPath(sym[1:])
+	if err != nil {
+		return nil
+	}
+	sym = path[0].Key
 	for _, t := range s.Root {
 		if t.Name == sym {
-			return (*TaskResolver)(t)
+			return &TaskResolver{t, path[1:]}
 		}
 	}
 	return nil
@@ -69,7 +77,7 @@ func (s *TaskEnv) Get(sym string) exp.Resolver {
 	if s.Query != nil {
 		for _, t := range s.Query.Sel {
 			if t.Name == sym {
-				return (*TaskResolver)(t)
+				return &TaskResolver{t, nil}
 			}
 		}
 		if s.Param != nil {
@@ -106,15 +114,28 @@ func FindEnv(env exp.Env) *PlanEnv {
 	return nil
 }
 
-type TaskResolver Task
+type TaskResolver struct {
+	*Task
+	Rest lit.Path
+}
 
 func (r *TaskResolver) Resolve(c *exp.Ctx, env exp.Env, e exp.El, hint typ.Type) (exp.El, error) {
-	t := (*Task)(r)
-	if t.Done {
-		return t.Result, nil
+	if r.Done {
+		if len(r.Rest) != 0 {
+			return lit.SelectPath(r.Result, r.Rest)
+		}
+		return r.Result, nil
 	}
 	if e.Typ().Kind == typ.ExpSym {
-		e.(*exp.Sym).Type = t.Type
+		t := r.Type
+		if len(r.Rest) != 0 {
+			l, err := lit.SelectPath(t, r.Rest)
+			if err != nil {
+				return nil, err
+			}
+			t = l.(typ.Type)
+		}
+		e.(*exp.Sym).Type = t
 	}
 	return e, exp.ErrUnres
 }
