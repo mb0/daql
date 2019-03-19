@@ -58,10 +58,14 @@ type TaskEnv struct {
 }
 
 func (s *TaskEnv) Parent() exp.Env      { return s.Par }
-func (s *TaskEnv) Supports(x byte) bool { return false }
+func (s *TaskEnv) Supports(x byte) bool { return x == '.' }
 
 func (s *TaskEnv) Def(sym string, r exp.Resolver) error { return exp.ErrNoDefEnv }
 func (s *TaskEnv) Get(sym string) exp.Resolver {
+	if sym[0] != '.' {
+		return nil
+	}
+	sym = sym[1:]
 	if s.Query != nil {
 		for _, t := range s.Query.Sel {
 			if t.Name == sym {
@@ -98,23 +102,6 @@ func FindEnv(env exp.Env) *PlanEnv {
 		if env != nil {
 			env = env.Parent()
 		}
-	}
-	return nil
-}
-
-type LitEnv struct {
-	Par exp.Env
-	Lit lit.Lit
-}
-
-func (e *LitEnv) Parent() exp.Env      { return e.Par }
-func (e *LitEnv) Supports(x byte) bool { return false }
-
-func (s *LitEnv) Def(sym string, r exp.Resolver) error { return exp.ErrNoDefEnv }
-func (s *LitEnv) Get(sym string) exp.Resolver {
-	l, err := lit.Select(s.Lit, sym)
-	if err == nil {
-		return exp.LitResolver{l}
 	}
 	return nil
 }

@@ -106,7 +106,7 @@ func (b *Backend) execQuery(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 	result := make(lit.List, 0, len(m.data))
 	for _, l := range m.data {
 		if whr != nil {
-			lenv := &qry.LitEnv{env, l}
+			lenv := &exp.DataScope{env, l}
 			res, err := andForm.Resolve(c, lenv, whr, typ.Bool)
 			if err != nil {
 				return err
@@ -249,7 +249,7 @@ func (m *memTable) execCount(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 	var result int
 	for _, l := range m.data {
 		// skip if it does not resolve to true
-		lenv := &qry.LitEnv{env, l}
+		lenv := &exp.DataScope{env, l}
 		res, err := andForm.Resolve(c, lenv, whr, typ.Bool)
 		if err != nil {
 			return err

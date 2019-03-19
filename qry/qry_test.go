@@ -93,7 +93,7 @@ var testQry = `(qry
 	+nest ?prod.cat (eq .name 'a') (::
 		+prods *prod.prod (eq .cat ..id) :asc .name (:: +id +name)
 	)
-	+top10prods *prod.prod (in .cat /top10/id) :asc .name
+	(() +top10prods *prod.prod (in .cat /top10/id) :asc .name)
 )`
 
 func TestQry(t *testing.T) {
