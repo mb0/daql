@@ -104,7 +104,7 @@ const (
 )
 
 func writeSuffix(b *gen.Ctx, l lit.Lit, fix string) error {
-	err := l.WriteBfr(b.Ctx)
+	err := l.WriteBfr(&b.Ctx)
 	if err != nil {
 		return err
 	}
@@ -113,11 +113,11 @@ func writeSuffix(b *gen.Ctx, l lit.Lit, fix string) error {
 
 func writeJSONB(b *gen.Ctx, l lit.Lit) error {
 	var bb strings.Builder
-	err := l.WriteBfr(bfr.Ctx{B: &bb, JSON: true})
+	err := l.WriteBfr(&bfr.Ctx{B: &bb, JSON: true})
 	if err != nil {
 		return err
 	}
-	writeQuote(b, bb.String())
+	WriteQuote(b, bb.String())
 	return b.Fmt("::jsonb")
 }
 
@@ -128,13 +128,13 @@ func writeArray(b *gen.Ctx, l lit.Arr) error {
 		if i > 0 {
 			bb.WriteByte(',')
 		}
-		return e.WriteBfr(bfr.Ctx{B: &bb, JSON: true})
+		return e.WriteBfr(&bfr.Ctx{B: &bb, JSON: true})
 	})
 	if err != nil {
 		return err
 	}
 	bb.WriteByte('}')
-	writeQuote(b, bb.String())
+	WriteQuote(b, bb.String())
 	t, err := TypString(l.Element())
 	if err != nil {
 		return err
@@ -145,8 +145,8 @@ func writeArray(b *gen.Ctx, l lit.Arr) error {
 	return nil
 }
 
-// writeQuote quotes a string as a postgres string, all single quotes are use sql escaping.
-func writeQuote(b bfr.B, text string) {
+// WriteQuote quotes a string as a postgres string, all single quotes are use sql escaping.
+func WriteQuote(b bfr.B, text string) {
 	b.WriteByte('\'')
 	b.WriteString(strings.Replace(text, "'", "''", -1))
 	b.WriteByte('\'')

@@ -61,9 +61,9 @@ func WriteLit(b *gen.Ctx, l lit.Lit) error {
 		}
 		return b.Fmt("TRUE")
 	case typ.BaseNum, typ.KindInt, typ.KindReal, typ.KindFlag:
-		return l.WriteBfr(b.Ctx)
+		return l.WriteBfr(&b.Ctx)
 	case typ.BaseChar, typ.KindStr:
-		return l.WriteBfr(b.Ctx)
+		return l.WriteBfr(&b.Ctx)
 	case typ.KindEnum:
 		// TODO write string and cast with qualified enum name
 	case typ.KindRaw:

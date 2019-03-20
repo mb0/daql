@@ -36,7 +36,7 @@ func WriteLit(c *gen.Ctx, l lit.Lit) error {
 		if opt {
 			return writeCall(c, "cor.Str", l)
 		} else {
-			return l.WriteBfr(bfr.Ctx{B: c.B, JSON: true})
+			return l.WriteBfr(&bfr.Ctx{B: c.B, JSON: true})
 		}
 	case typ.KindRaw:
 		if !opt {
@@ -152,7 +152,7 @@ func WriteLit(c *gen.Ctx, l lit.Lit) error {
 func writeCall(c *gen.Ctx, name string, l lit.Lit) error {
 	c.WriteString(Import(c, name))
 	c.WriteByte('(')
-	err := l.WriteBfr(bfr.Ctx{B: c.B, JSON: true})
+	err := l.WriteBfr(&bfr.Ctx{B: c.B, JSON: true})
 	c.WriteByte(')')
 	return err
 }
