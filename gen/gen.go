@@ -7,7 +7,7 @@ import (
 	"github.com/mb0/xelf/bfr"
 )
 
-// Ctx is the code generation context holding the buffer and addition information.
+// Ctx is the code generation context holding the buffer and additional information.
 type Ctx struct {
 	bfr.Ctx
 	Pkg    string
