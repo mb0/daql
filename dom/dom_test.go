@@ -69,7 +69,7 @@ func TestDom(t *testing.T) {
 					{Name: "A", Type: typ.Str},
 				}},
 				{Name: "Bar", Kind: typ.KindRec, Fields: []*Field{
-					{Name: "B", Type: typ.Rec("test.Foo")},
+					{Name: "B", Type: typ.Rec("test.foo")},
 				}},
 			}}},
 	}

@@ -80,7 +80,7 @@ type Model struct {
 
 func (m *Model) Ref() string {
 	if m.ref == "" {
-		m.ref = m.schema + "." + m.Name
+		m.ref = m.schema + "." + m.Key()
 	}
 	return m.ref
 }
