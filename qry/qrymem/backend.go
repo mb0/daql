@@ -159,15 +159,12 @@ func (b *Backend) execQuery(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 
 func (m *Backend) collectSel(c *exp.Ctx, env exp.Env, tt *qry.Task, a lit.Assignable, l lit.Lit,
 ) (err error) {
-	sel := tt.Query.Sel
-	if len(sel) == 0 { // return subject
-		return lit.AssignTo(l, a)
-	}
 	keyer, ok := a.(lit.Keyer)
 	if !ok {
 		return cor.Errorf("expect keyer got %s", a.Typ())
 	}
 	tenv := &qry.TaskEnv{env, tt, l}
+	sel := tt.Query.Sel
 	for _, t := range sel {
 		key := strings.ToLower(t.Name)
 		var res exp.El
@@ -243,21 +240,22 @@ func (m *memTable) execCount(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 	if null {
 		return nil
 	}
-	if whr == nil {
-		return t.Result.Assign(lit.Int(len(m.data)))
-	}
 	var result int
-	for _, l := range m.data {
-		// skip if it does not resolve to true
-		lenv := &exp.DataScope{env, l}
-		res, err := andForm.Resolve(c, lenv, whr, typ.Bool)
-		if err != nil {
-			return err
+	if whr == nil {
+		result = len(m.data)
+	} else {
+		for _, l := range m.data {
+			// skip if it does not resolve to true
+			lenv := &exp.DataScope{env, l}
+			res, err := andForm.Resolve(c, lenv, whr, typ.Bool)
+			if err != nil {
+				return err
+			}
+			if res != lit.True {
+				continue
+			}
+			result++
 		}
-		if res != lit.True {
-			continue
-		}
-		result++
 	}
 	q := t.Query
 	if q.Off > 0 {

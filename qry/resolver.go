@@ -75,6 +75,9 @@ func resolvePlan(c *exp.Ctx, env exp.Env, x *exp.Expr, hint typ.Type) (exp.El, e
 	if len(p.Root) == 0 {
 		return nil, cor.Error("empty plan")
 	}
+	if !c.Exec {
+		return x, exp.ErrExec
+	}
 	err = penv.ExecPlan(c, env, p)
 	if err != nil {
 		return nil, err
@@ -149,6 +152,11 @@ func resolveTask(c *exp.Ctx, env exp.Env, d exp.Decl) (*Task, error) {
 	return t, nil
 }
 
+var andForm *exp.Form
+
+func init() {
+	andForm = exp.Core("and").(*exp.Form)
+}
 func resolveQuery(c *exp.Ctx, env exp.Env, t *Task, ref string, lo *exp.Layout) error {
 	q := &Query{Ref: ref}
 	name := ref[1:]
@@ -192,12 +200,9 @@ func resolveQuery(c *exp.Ctx, env exp.Env, t *Task, ref string, lo *exp.Layout) 
 	if err != nil {
 		return err
 	}
-	rt := q.Type
-	if len(sel) > 0 {
-		rt, err = resolveSel(c, tenv, q, sel)
-		if err != nil {
-			return err
-		}
+	rt, err := resolveSel(c, tenv, q, sel)
+	if err != nil {
+		return err
 	}
 	// TODO check that order only accesses result fields
 	t.Query = q
@@ -205,11 +210,25 @@ func resolveQuery(c *exp.Ctx, env exp.Env, t *Task, ref string, lo *exp.Layout) 
 	switch ref[0] {
 	case '?':
 		t.Type = typ.Opt(rt)
+		if q.Lim > 1 {
+			return cor.Errorf("unexpected limit %d for single result", q.Lim)
+		}
+		q.Lim = 1
 	case '*':
 		t.Type = typ.Arr(rt)
 	case '#':
 		t.Type = typ.Int
 	}
+	// simplify where clause
+	if len(q.Whr) != 0 {
+		x := &exp.Expr{andForm, q.Whr, typ.Bool}
+		res, err := exp.Resolve(env, x)
+		if err != nil && err != exp.ErrUnres {
+			return err
+		}
+		q.Whr = exp.Dyn{res}
+	}
+
 	return nil
 }
 
@@ -283,6 +302,10 @@ func resolveSel(c *exp.Ctx, env exp.Env, q *Query, args []exp.El) (typ.Type, err
 	res := make([]*Task, 0, len(ps)+len(args))
 	for _, p := range ps {
 		res = append(res, &Task{Name: p.Name, Type: p.Type})
+	}
+	if len(args) == 0 {
+		q.Sel = res
+		return q.Type, nil
 	}
 	for i, arg := range args {
 		d, ok := arg.(exp.Decl)
