@@ -1,5 +1,5 @@
-// Package pg provides conversions to postgres literals, expressions.
-package pg
+// Package genpg provides conversions to postgres literals, expressions.
+package genpg
 
 import (
 	"strings"
@@ -32,7 +32,11 @@ func WriteEl(b *gen.Ctx, env exp.Env, e exp.El) error {
 // the reference.
 func WriteRef(b *gen.Ctx, env exp.Env, r *exp.Sym) error {
 	// TODO we need check the name, but for now work with the key as is
-	b.WriteString(r.Name)
+	name := r.Name
+	if name[0] == '.' {
+		name = name[1:]
+	}
+	b.WriteString(name)
 	return nil
 }
 
@@ -142,7 +146,7 @@ func writeArray(b *gen.Ctx, l lit.Arr) error {
 }
 
 // writeQuote quotes a string as a postgres string, all single quotes are use sql escaping.
-func writeQuote(b *gen.Ctx, text string) {
+func writeQuote(b bfr.B, text string) {
 	b.WriteByte('\'')
 	b.WriteString(strings.Replace(text, "'", "''", -1))
 	b.WriteByte('\'')

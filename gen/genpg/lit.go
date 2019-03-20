@@ -1,4 +1,4 @@
-package pg
+package genpg
 
 import (
 	"github.com/mb0/daql/gen"
