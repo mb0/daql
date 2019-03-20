@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/mb0/daql/dom"
+	"github.com/mb0/daql/dom/domtest"
 	. "github.com/mb0/daql/qry"
 	"github.com/mb0/daql/qry/qrymem"
 	"github.com/mb0/xelf/exp"
@@ -16,64 +17,23 @@ var (
 	memBed *qrymem.Backend
 )
 
-type Cat struct {
-	ID   int
-	Name string
-}
-
-type Prod struct {
-	ID   int
-	Name string
-	Cat  int
-}
-
-type Label struct {
-	ID   int
-	Name string
-	Tmpl []byte
-}
-
 func init() {
-	schema := `(schema 'prod'
-		(+Cat   +ID int :pk +Name str)
-		(+Prod  +ID int :pk +Name str +Cat  int)
-		(+Label	+ID int :pk +Name str +Tmpl raw)
-	)`
-	domEnv = dom.NewEnv(Builtin, &dom.Project{})
-	s, err := dom.ExecuteString(domEnv, schema)
+	f, err := domtest.ProdFixture()
 	if err != nil {
-		log.Fatalf("parse test schema error: %v", err)
+		log.Fatalf("parse prod fixture error: %v", err)
 	}
+	domEnv = dom.NewEnv(Builtin, &f.Project)
 	memBed = &qrymem.Backend{}
-	err = memBed.Add(s.Model("cat"), &[]Cat{
-		{25, "y"},
-		{2, "b"},
-		{3, "c"},
-		{1, "a"},
-		{4, "d"},
-		{26, "z"},
-		{24, "x"},
-	})
+	s := f.Schema("prod")
+	err = memBed.Add(s.Model("cat"), &f.Cat)
 	if err != nil {
 		log.Fatalf("add cats error: %v", err)
 	}
-	err = memBed.Add(s.Model("prod"), &[]Prod{
-		{25, "Y", 1},
-		{2, "B", 2},
-		{3, "C", 3},
-		{1, "A", 3},
-		{4, "D", 2},
-		{26, "Z", 1},
-	})
+	err = memBed.Add(s.Model("prod"), &f.Prod)
 	if err != nil {
-		log.Fatalf("add cats error: %v", err)
+		log.Fatalf("add prods error: %v", err)
 	}
-	err = memBed.Add(s.Model("label"), &[]Label{
-		{1, "M", []byte("foo")},
-		{2, "N", []byte("bar")},
-		{3, "O", []byte("spam")},
-		{3, "P", []byte("egg")},
-	})
+	err = memBed.Add(s.Model("label"), &f.Label)
 	if err != nil {
 		log.Fatalf("add cats error: %v", err)
 	}
@@ -127,8 +87,8 @@ func TestQry(t *testing.T) {
 			t.Errorf("parse %s error %+v", test.raw, err)
 			continue
 		}
-		c := &exp.Ctx{}
 		env := NewEnv(domEnv, memBed)
+		c := &exp.Ctx{Exec: true}
 		l, err := c.Resolve(env, el, typ.Void)
 		if err != nil {
 			t.Errorf("resolve %s error %+v\n%v", el, err, c.Unres)
