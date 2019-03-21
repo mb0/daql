@@ -16,20 +16,18 @@ type Backend struct {
 	tables map[string]*memTable
 }
 
-func (b *Backend) Add(m *dom.Model, arg interface{}) error {
+func (b *Backend) Add(m *dom.Model, list lit.List) error {
 	if b.tables == nil {
 		b.tables = make(map[string]*memTable)
 	}
-	ref := strings.ToLower(m.Ref())
-	a, err := lit.Proxy(arg)
-	if err != nil {
-		return err
+	for i, v := range list {
+		v, err := lit.Convert(v, m.Typ(), 0)
+		if err != nil {
+			return err
+		}
+		list[i] = v
 	}
-	l, err := lit.Convert(a, typ.List, 0)
-	if err != nil {
-		return err
-	}
-	b.tables[ref] = &memTable{m.Typ(), l.(lit.List)}
+	b.tables[m.Ref()] = &memTable{m.Typ(), list}
 	return nil
 }
 
@@ -121,14 +119,20 @@ func (b *Backend) execQuery(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 			if err != nil {
 				return err
 			}
+			z, err := lit.Convert(l, rt, 0)
+			if err != nil {
+				return err
+			}
+			result = append(result, z)
+		} else {
+			// TODO use proxy type if available
+			z := lit.ZeroProxy(rt)
+			err = b.collectSel(c, env, t, z, l)
+			if err != nil {
+				return err
+			}
+			result = append(result, z)
 		}
-		// TODO use proxy type if available
-		z := lit.ZeroProxy(rt)
-		err = b.collectSel(c, env, t, z, l)
-		if err != nil {
-			return err
-		}
-		result = append(result, z)
 	}
 	if len(q.Ord) != 0 {
 		err = orderResult(result, q.Ord)

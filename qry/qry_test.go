@@ -9,6 +9,7 @@ import (
 	. "github.com/mb0/daql/qry"
 	"github.com/mb0/daql/qry/qrymem"
 	"github.com/mb0/xelf/exp"
+	"github.com/mb0/xelf/lit"
 	"github.com/mb0/xelf/typ"
 )
 
@@ -25,17 +26,11 @@ func init() {
 	domEnv = dom.NewEnv(Builtin, &f.Project)
 	memBed = &qrymem.Backend{}
 	s := f.Schema("prod")
-	err = memBed.Add(s.Model("cat"), &f.Cat)
-	if err != nil {
-		log.Fatalf("add cats error: %v", err)
-	}
-	err = memBed.Add(s.Model("prod"), &f.Prod)
-	if err != nil {
-		log.Fatalf("add prods error: %v", err)
-	}
-	err = memBed.Add(s.Model("label"), &f.Label)
-	if err != nil {
-		log.Fatalf("add cats error: %v", err)
+	for _, kl := range f.ProdFix.List {
+		err = memBed.Add(s.Model(kl.Key), kl.Lit.(lit.List))
+		if err != nil {
+			log.Fatalf("add %s error: %v", kl.Key, err)
+		}
 	}
 }
 
