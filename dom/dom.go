@@ -91,6 +91,9 @@ func (m *Model) Key() string {
 	}
 	return m.key
 }
+func (m *Model) Qual() string {
+	return m.schema
+}
 
 func (m *Model) Typ() typ.Type {
 	if m == nil {
