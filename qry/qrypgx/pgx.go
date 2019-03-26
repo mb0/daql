@@ -5,6 +5,7 @@ import (
 
 	"github.com/jackc/pgx"
 	"github.com/mb0/daql/dom"
+	"github.com/mb0/daql/gen"
 	"github.com/mb0/daql/gen/genpg"
 	"github.com/mb0/xelf/bfr"
 	"github.com/mb0/xelf/cor"
@@ -95,9 +96,9 @@ func CreateModel(tx *pgx.Tx, s *dom.Schema, m *dom.Model) error {
 	return cor.Errorf("unexpected model kind %s", m.Kind)
 }
 
-func createModel(tx *pgx.Tx, m *dom.Model, f func(*bfr.Ctx, *dom.Model) error) error {
+func createModel(tx *pgx.Tx, m *dom.Model, f func(*gen.Ctx, *dom.Model) error) error {
 	var b strings.Builder
-	err := f(&bfr.Ctx{B: &b}, m)
+	err := f(&gen.Ctx{Ctx: bfr.Ctx{B: &b}}, m)
 	if err != nil {
 		return err
 	}

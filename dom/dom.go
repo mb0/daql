@@ -100,16 +100,25 @@ func (m *Model) Typ() typ.Type {
 		return typ.Void
 	}
 	if m.typ == typ.Void {
-		fs := make([]typ.Param, 0, len(m.Fields))
-		for _, f := range m.Fields {
-			name := f.Name
-			if f.Bits&BitOpt != 0 {
-				name += "?"
+		switch m.Kind {
+		case typ.KindFlag:
+			m.typ = typ.Flag(m.Ref())
+			m.typ.Consts = m.Consts
+		case typ.KindEnum:
+			m.typ = typ.Enum(m.Ref())
+			m.typ.Consts = m.Consts
+		case typ.KindRec:
+			fs := make([]typ.Param, 0, len(m.Fields))
+			for _, f := range m.Fields {
+				name := f.Name
+				if f.Bits&BitOpt != 0 {
+					name += "?"
+				}
+				fs = append(fs, typ.Param{Name: name, Type: f.Type})
 			}
-			fs = append(fs, typ.Param{Name: name, Type: f.Type})
+			m.typ = typ.Rec(m.Ref())
+			m.typ.Params = fs
 		}
-		m.typ = typ.Rec(m.Ref())
-		m.typ.Params = fs
 	}
 	return m.typ
 }

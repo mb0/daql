@@ -4,12 +4,14 @@ package gen
 import (
 	"sort"
 
+	"github.com/mb0/daql/dom"
 	"github.com/mb0/xelf/bfr"
 )
 
 // Ctx is the code generation context holding the buffer and additional information.
 type Ctx struct {
 	bfr.Ctx
+	*dom.Project
 	Pkg    string
 	Target string
 	Header string

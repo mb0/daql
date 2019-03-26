@@ -35,4 +35,4 @@ appropriate.
 */
 package evt
 
-//go:generate sh -c "go run gen.go evt.dom > evt.go"
+//go:generate sh -c "go run gen.go evt.dom"

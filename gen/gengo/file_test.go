@@ -4,24 +4,39 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mb0/daql/dom"
 	"github.com/mb0/daql/gen"
 	"github.com/mb0/xelf/bfr"
-	"github.com/mb0/xelf/cor"
-	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/typ"
 )
 
+const fooRaw = `(schema 'foo'
+	(+Align flag
+		+A
+		+B
+		(+C 3))
+	(+Kind enum
+		+A
+		+B
+		+C)
+	(+Node1 +Name? str)
+	(+Node2 +Start time)
+	(+Node3 +Kind  (flag 'bar.Kind'))
+	(+Node4 +Kind  @Kind)
+)`
+
 func TestWriteFile(t *testing.T) {
-	align := typ.Flag("foo.Align")
-	align.Consts = []cor.Const{{"A", 1}, {"B", 2}, {"C", 3}}
-	kind := typ.Enum("foo.Kind")
-	kind.Consts = []cor.Const{{"A", 1}, {"B", 2}, {"C", 3}}
+	env := dom.NewEnv(dom.Env, &dom.Project{})
+	s, err := dom.ExecuteString(env, fooRaw)
+	if err != nil {
+		t.Fatalf("schema error %v", err)
+	}
 	tests := []struct {
-		els  []exp.El
-		want string
+		model string
+		want  string
 	}{
-		{nil, "package foo\n"},
-		{[]exp.El{align},
+		{"", "package foo\n"},
+		{"align",
 			"package foo\n\ntype Align uint64\n\n" +
 				"const (\n" +
 				"\tAlignA Align = 1 << iota\n" +
@@ -29,7 +44,7 @@ func TestWriteFile(t *testing.T) {
 				"\tAlignC = AlignA | AlignB\n" +
 				")\n",
 		},
-		{[]exp.El{kind},
+		{"kind",
 			"package foo\n\ntype Kind string\n\n" +
 				"const (\n" +
 				"\tKindA Kind = \"a\"\n" +
@@ -37,24 +52,16 @@ func TestWriteFile(t *testing.T) {
 				"\tKindC Kind = \"c\"\n" +
 				")\n",
 		},
-		{[]exp.El{rec("foo.Node", []typ.Param{
-			{Name: "Name?", Type: typ.Str},
-		})}, "package foo\n\ntype Node struct {\n" +
+		{"node1", "package foo\n\ntype Node1 struct {\n" +
 			"\tName string `json:\"name,omitempty\"`\n" + "}\n",
 		},
-		{[]exp.El{rec("foo.Node", []typ.Param{
-			{Name: "Start", Type: typ.Time},
-		})}, "package foo\n\nimport (\n\t\"time\"\n)\n\ntype Node struct {\n" +
+		{"node2", "package foo\n\nimport (\n\t\"time\"\n)\n\ntype Node2 struct {\n" +
 			"\tStart time.Time `json:\"start\"`\n" + "}\n",
 		},
-		{[]exp.El{rec("foo.Node", []typ.Param{
-			{Name: "Kind", Type: typ.Enum("bar.Kind")},
-		})}, "package foo\n\nimport (\n\t\"path/to/bar\"\n)\n\ntype Node struct {\n" +
+		{"node3", "package foo\n\nimport (\n\t\"path/to/bar\"\n)\n\ntype Node3 struct {\n" +
 			"\tKind bar.Kind `json:\"kind\"`\n" + "}\n",
 		},
-		{[]exp.El{rec("foo.Node", []typ.Param{
-			{Name: "Kind", Type: typ.Enum("foo.Kind")},
-		})}, "package foo\n\ntype Node struct {\n" +
+		{"node4", "package foo\n\ntype Node4 struct {\n" +
 			"\tKind Kind `json:\"kind\"`\n" + "}\n",
 		},
 	}
@@ -66,13 +73,17 @@ func TestWriteFile(t *testing.T) {
 	for _, test := range tests {
 		var b strings.Builder
 		c := &gen.Ctx{Ctx: bfr.Ctx{B: &b}, Pkg: "path/to/foo", Pkgs: pkgs}
-		err := WriteFile(c, test.els)
+		ss := &dom.Schema{Name: s.Name}
+		if m := s.Model(test.model); m != nil {
+			ss.Models = []*dom.Model{m}
+		}
+		err := WriteFile(c, ss)
 		if err != nil {
-			t.Errorf("write %+v error: %v", test.els, err)
+			t.Errorf("write %s error: %v", test.model, err)
 			continue
 		}
 		if got := b.String(); got != test.want {
-			t.Errorf("for %+v want %s got %s", test.els, test.want, got)
+			t.Errorf("for %s want %s got %s", test.model, test.want, got)
 		}
 	}
 }

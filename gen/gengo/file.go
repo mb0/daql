@@ -4,10 +4,10 @@ import (
 	"go/format"
 	"strings"
 
+	"github.com/mb0/daql/dom"
 	"github.com/mb0/daql/gen"
 	"github.com/mb0/xelf/bfr"
 	"github.com/mb0/xelf/cor"
-	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/typ"
 	"github.com/pkg/errors"
 )
@@ -48,22 +48,18 @@ func Import(c *gen.Ctx, name string) string {
 // WriteFile writes the elements to a go file with package and import declarations.
 //
 // For now only flag, enum and rec type definitions are supported
-func WriteFile(c *gen.Ctx, els []exp.El) error {
+func WriteFile(c *gen.Ctx, s *dom.Schema) error {
 	b := bfr.Get()
 	defer bfr.Put(b)
 	// swap new buffer with context buffer
 	f := c.B
 	c.B = b
-	for _, el := range els {
+	for _, m := range s.Models {
 		c.WriteString("\n")
-		switch v := el.(type) {
-		case typ.Type:
-			err := DeclareType(c, v)
-			if err != nil {
-				return err
-			}
-		default:
-			return cor.Errorf("unsupported element %s", el)
+
+		err := DeclareType(c, m)
+		if err != nil {
+			return err
 		}
 	}
 	// swap back
@@ -97,28 +93,28 @@ func WriteFile(c *gen.Ctx, els []exp.El) error {
 
 // DeclareType writes a type declaration for flag, enum and rec types.
 // For flag and enum types the declaration includes the constant declarations.
-func DeclareType(c *gen.Ctx, t typ.Type) (err error) {
-	ref := refDecl(t)
-	switch k := t.Kind; k & typ.MaskRef {
+func DeclareType(c *gen.Ctx, m *dom.Model) (err error) {
+	t := m.Typ()
+	switch m.Kind {
 	case typ.KindFlag:
 		c.WriteString("type ")
-		c.WriteString(ref)
+		c.WriteString(m.Name)
 		c.WriteString(" uint64\n\n")
-		writeFlagConsts(c, t, ref)
+		writeFlagConsts(c, t, m.Name)
 	case typ.KindEnum:
 		c.WriteString("type ")
-		c.WriteString(ref)
+		c.WriteString(m.Name)
 		c.WriteString(" string\n\n")
-		writeEnumConsts(c, t, ref)
+		writeEnumConsts(c, t, m.Name)
 	case typ.KindRec:
 		c.WriteString("type ")
-		c.WriteString(ref)
+		c.WriteString(m.Name)
 		c.WriteByte(' ')
 		t.Kind &^= typ.FlagRef
 		err = WriteType(c, t)
 		c.WriteByte('\n')
 	default:
-		err = errors.Errorf("type %s cannot be declared", t)
+		err = errors.Errorf("model kind %s cannot be declared", m.Kind)
 	}
 	return err
 }
