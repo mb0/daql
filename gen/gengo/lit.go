@@ -59,7 +59,7 @@ func WriteLit(c *gen.Ctx, l lit.Lit) error {
 		}
 		return writeCall(c, "cor.Span", l)
 	case typ.BaseList:
-		c.WriteString("[]interface{}")
+		c.WriteString(Import(c, "lit.List"))
 		return writeIdxer(c, l)
 	case typ.KindArr:
 		c.WriteString("[]")
@@ -69,14 +69,19 @@ func WriteLit(c *gen.Ctx, l lit.Lit) error {
 		}
 		return writeIdxer(c, l)
 	case typ.BaseDict:
-		c.WriteString("map[string]interface{}")
+		c.WriteString(Import(c, "&lit.Dict"))
 		return writeKeyer(c, l, func(i int, k string, e lit.Lit) error {
+			c.WriteByte('{')
 			err := WriteLit(c, lit.Str(k))
 			if err != nil {
 				return err
 			}
-			c.WriteString(": ")
-			return WriteLit(c, e)
+			c.WriteString(", ")
+			err = WriteLit(c, e)
+			if err != nil {
+				return err
+			}
+			return c.WriteByte('}')
 		})
 	case typ.KindMap:
 		c.WriteString("map[string]")

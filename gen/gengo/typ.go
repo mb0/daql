@@ -12,8 +12,7 @@ import (
 func WriteType(c *gen.Ctx, t typ.Type) error {
 	k := t.Kind
 	if k == typ.KindAny {
-		_, err := c.WriteString("interface{}")
-		return err
+		return c.Fmt(Import(c, "lit.Lit"))
 	}
 	var r string
 	switch k & typ.MaskRef {
@@ -36,14 +35,12 @@ func WriteType(c *gen.Ctx, t typ.Type) error {
 	case typ.KindSpan:
 		r = Import(c, "time.Duration")
 	case typ.BaseList:
-		_, err := c.WriteString("[]interface{}")
-		return err
+		return c.Fmt(Import(c, "lit.List"))
 	case typ.KindArr:
 		c.WriteString("[]")
 		return WriteType(c, t.Next())
 	case typ.BaseDict:
-		c.WriteString("map[string]interface{}")
-		return nil
+		return c.Fmt(Import(c, "*lit.Dict"))
 	case typ.KindMap:
 		c.WriteString("map[string]")
 		return WriteType(c, t.Next())
@@ -82,7 +79,8 @@ func WriteType(c *gen.Ctx, t typ.Type) error {
 		c.WriteByte('}')
 		return nil
 	case typ.KindFlag, typ.KindEnum, typ.KindRec:
-		r = Import(c, t.Ref)
+		// TODO lookup cased name from dom schema
+		r = Import(c, refName(t))
 	}
 	if r == "" {
 		return errors.Errorf("type %s cannot be represented in go", t)

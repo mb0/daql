@@ -35,6 +35,7 @@ func main() {
 		Pkg: "github.com/mb0/daql/evt",
 		Pkgs: map[string]string{
 			"cor": "github.com/mb0/xelf/cor",
+			"lit": "github.com/mb0/xelf/lit",
 			"evt": "github.com/mb0/daql/evt",
 		},
 		Header: "// generated code\n\n",

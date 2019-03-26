@@ -17,6 +17,10 @@ import (
 // context package it returns the 'Decl' part. Otherwise it adds the package path to the import
 // list and returns a substring starting with last package path segment: 'pkg.Decl'.
 func Import(c *gen.Ctx, name string) string {
+	ptr := name[0] == '*'
+	if ptr {
+		name = name[1:]
+	}
 	idx := strings.LastIndexByte(name, '.')
 	var ns string
 	if idx > -1 {
@@ -29,11 +33,14 @@ func Import(c *gen.Ctx, name string) string {
 		if ns != c.Pkg {
 			c.Imports.Add(ns)
 		} else {
-			return name[idx+1:]
+			name = name[idx+1:]
 		}
 	}
 	if idx := strings.LastIndexByte(name, '/'); idx != -1 {
-		return name[idx+1:]
+		name = name[idx+1:]
+	}
+	if ptr {
+		name = "*" + name
 	}
 	return name
 }
@@ -91,7 +98,7 @@ func WriteFile(c *gen.Ctx, els []exp.El) error {
 // DeclareType writes a type declaration for flag, enum and rec types.
 // For flag and enum types the declaration includes the constant declarations.
 func DeclareType(c *gen.Ctx, t typ.Type) (err error) {
-	ref := refName(t)
+	ref := refDecl(t)
 	switch k := t.Kind; k & typ.MaskRef {
 	case typ.KindFlag:
 		c.WriteString("type ")
@@ -105,7 +112,7 @@ func DeclareType(c *gen.Ctx, t typ.Type) (err error) {
 		writeEnumConsts(c, t, ref)
 	case typ.KindRec:
 		c.WriteString("type ")
-		c.WriteString(refName(t))
+		c.WriteString(ref)
 		c.WriteByte(' ')
 		t.Kind &^= typ.FlagRef
 		err = WriteType(c, t)
@@ -126,7 +133,7 @@ func pkgName(pkg string) string {
 	return pkg
 }
 
-func refName(t typ.Type) string {
+func refDecl(t typ.Type) string {
 	if t.Info == nil {
 		return ""
 	}
@@ -135,9 +142,22 @@ func refName(t typ.Type) string {
 		n = n[i+1:]
 	}
 	if len(n) > 0 {
-		if c := n[0]; c < 'A' || -c > 'Z' {
+		if c := n[0]; c < 'A' || c > 'Z' {
 			n = strings.ToUpper(n[:1]) + n[1:]
 		}
+	}
+	return n
+}
+func refName(t typ.Type) string {
+	if t.Info == nil {
+		return ""
+	}
+	n, fst := t.Ref, 0
+	if i := strings.LastIndexByte(n, '.'); i >= 0 {
+		fst = i + 1
+	}
+	if c := n[fst]; c < 'A' || c > 'Z' {
+		n = n[:fst] + strings.ToUpper(n[fst:fst+1]) + n[fst+1:]
 	}
 	return n
 }

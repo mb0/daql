@@ -16,9 +16,9 @@ func TestWriteType(t *testing.T) {
 		s       string
 		imports []string
 	}{
-		{typ.Any, "interface{}", nil},
-		{typ.List, "[]interface{}", nil},
-		{typ.Dict, "map[string]interface{}", nil},
+		{typ.Any, "lit.Lit", []string{"xelf/lit"}},
+		{typ.List, "lit.List", []string{"xelf/lit"}},
+		{typ.Dict, "*lit.Dict", []string{"xelf/lit"}},
 		{typ.Bool, "bool", nil},
 		{typ.Span, "time.Duration", []string{"time"}},
 		{typ.Arr(typ.Time), "[]time.Time", []string{"time"}},
@@ -33,7 +33,9 @@ func TestWriteType(t *testing.T) {
 	}
 	for _, test := range tests {
 		var b strings.Builder
-		c := &gen.Ctx{Ctx: bfr.Ctx{B: &b}}
+		c := &gen.Ctx{Ctx: bfr.Ctx{B: &b}, Pkgs: map[string]string{
+			"lit": "xelf/lit",
+		}}
 		err := WriteType(c, test.t)
 		if err != nil {
 			t.Errorf("test %s error: %v", test.s, err)
