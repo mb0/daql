@@ -38,7 +38,12 @@ type Router interface{ Route(*Msg) }
 // any send must be in sequence with incoming messages and clean up signed-off connections, as not
 // to potentially send to a closed channel.
 type Conn interface {
+	// ID is an internal connection identifier, the hub has id 0, transient connections have a
+	// negative and normal client connections positive ids.
 	ID() int64
+	// Chan returns the receiver channel. The hub closes this channel after a sign-off message
+	// from this conn was routed. Anyone sending to this channel must do so in sequence with
+	// possible sign-off messages for this reason.
 	Chan() chan<- *Msg
 }
 
@@ -50,7 +55,7 @@ type Conn interface {
 // hold on to. The acceptors that send messages to hub for routing are also responsible for sender
 // sign-on and validation.
 type Hub struct {
-	sync.RWMutex
+	sync.Mutex
 	cmap map[int64]Conn
 	mque chan *Msg
 }
@@ -78,6 +83,7 @@ func (h *Hub) Run(r Router) {
 		if m.Subj == SubjSignoff {
 			h.Lock()
 			delete(h.cmap, m.From.ID())
+			close(m.From.Chan())
 			h.Unlock()
 		}
 	}
