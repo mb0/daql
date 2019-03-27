@@ -8,12 +8,15 @@ Audit holds meta information for a published transaction at uniqe revision.
 	+Acct?   uuid
 	+Extra?  dict
 )
+(+Sig
+	+Top str
+	+Key str
+)
 (+Action :doc `
 Action is an unpublished event represented by a command string and argument map. It usually is a
 data operation on a record identified by a topic and primary key.
 `
-	+Top  str
-	+Key  str
+	+     Sig
 	+Cmd  str
 	+Arg? dict
 )
@@ -25,6 +28,10 @@ Event represents action published to a ledger with a revision and unique id.
 	+    @Action
 	-
 	:idx ['top' 'key']
+)
+(+Update
+	+Rev time
+	+Evs arr|@Event?
 )
 (+Pub :doc `
 Pub is a request to publish a list of actions to a base revision.

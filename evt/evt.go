@@ -15,9 +15,13 @@ type Audit struct {
 	Extra   *lit.Dict `json:"extra,omitempty"`
 }
 
+type Sig struct {
+	Top string `json:"top"`
+	Key string `json:"key"`
+}
+
 type Action struct {
-	Top string    `json:"top"`
-	Key string    `json:"key"`
+	Sig
 	Cmd string    `json:"cmd"`
 	Arg *lit.Dict `json:"arg,omitempty"`
 }
@@ -26,6 +30,11 @@ type Event struct {
 	ID  int64     `json:"id"`
 	Rev time.Time `json:"rev"`
 	Action
+}
+
+type Update struct {
+	Rev time.Time `json:"rev"`
+	Evs []*Event  `json:"evs"`
 }
 
 type Pub struct {
