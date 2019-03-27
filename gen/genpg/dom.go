@@ -76,7 +76,7 @@ func writeField(b *gen.Ctx, f *dom.Field) error {
 			split := strings.Split(f.Type.Key(), ".")
 			key = split[len(split)-1]
 		case typ.KindRec:
-			return embedField(b, f)
+			return embedField(b, f.Type)
 		default:
 			return cor.Errorf("unexpected embedded field type %s", f.Type)
 		}
@@ -105,14 +105,19 @@ func writeField(b *gen.Ctx, f *dom.Field) error {
 	return nil
 }
 
-func embedField(b *gen.Ctx, f *dom.Field) error {
+func embedField(b *gen.Ctx, t typ.Type) error {
 	// TODO query embedded dom model instead
-	for i, p := range f.Type.Params {
+	for i, p := range t.Params {
 		if i > 0 {
 			b.WriteByte(',')
 			if !b.Break() {
 				b.WriteByte(' ')
 			}
+		}
+		key := p.Key()
+		if key == "" {
+			embedField(b, p.Type)
+			continue
 		}
 		b.WriteString(p.Key())
 		b.WriteByte(' ')
