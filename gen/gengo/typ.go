@@ -11,8 +11,11 @@ import (
 // WriteType writes the native go type for t to c or returns an error.
 func WriteType(c *gen.Ctx, t typ.Type) error {
 	k := t.Kind
-	if k == typ.KindAny {
+	switch k {
+	case typ.KindAny:
 		return c.Fmt(Import(c, "lit.Lit"))
+	case typ.ExpDyn:
+		return c.Fmt(Import(c, "exp.Dyn"))
 	}
 	var r string
 	switch k & typ.MaskRef {

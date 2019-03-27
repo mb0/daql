@@ -42,6 +42,7 @@ func writeGo(pr *dom.Project, s *dom.Schema) {
 		Pkgs: map[string]string{
 			"cor": "github.com/mb0/xelf/cor",
 			"lit": "github.com/mb0/xelf/lit",
+			"exp": "github.com/mb0/xelf/exp",
 			"evt": "github.com/mb0/daql/evt",
 		},
 		Header: "// generated code\n\n",

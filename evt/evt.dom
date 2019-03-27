@@ -20,6 +20,12 @@ data operation on a record identified by a topic and primary key.
 	+Cmd  str
 	+Arg? dict
 )
+(+Sub
+	+Top  str
+	+Rev  time
+	+Whr? dyn
+	+Arg? dict
+)
 (+Event :backup :doc `
 Event represents action published to a ledger with a revision and unique id.
 `

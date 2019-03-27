@@ -3,6 +3,7 @@
 package evt
 
 import (
+	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/lit"
 	"time"
 )
@@ -23,6 +24,13 @@ type Sig struct {
 type Action struct {
 	Sig
 	Cmd string    `json:"cmd"`
+	Arg *lit.Dict `json:"arg,omitempty"`
+}
+
+type Sub struct {
+	Top string    `json:"top"`
+	Rev time.Time `json:"rev"`
+	Whr exp.Dyn   `json:"whr,omitempty"`
 	Arg *lit.Dict `json:"arg,omitempty"`
 }
 
