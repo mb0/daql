@@ -1,59 +1,46 @@
 package wshub
 
 import (
-	"log"
 	"net/http"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/mb0/daql/hub"
+	"github.com/mb0/daql/log"
 )
 
-func Serve(h *hub.Hub) http.HandlerFunc {
-	upgr := &websocket.Upgrader{}
-	return func(w http.ResponseWriter, r *http.Request) {
-		wc, err := upgr.Upgrade(w, r, nil)
-		if err != nil {
-			// TODO introduce an abstract logger interface to daql
-			log.Printf("hub ws upgrade failed, err: %v", err)
-			return
-		}
-		c := &conn{id: hub.NextID(), wc: wc, route: h.Chan(), send: make(chan *hub.Msg, 32)}
-		t := time.NewTicker(60 * time.Second)
-		defer t.Stop()
-		hub.Signon(h, c)
-		go write(c, t)
-		err = c.read()
-		hub.Signoff(h, c)
-		if err != nil {
-			// TODO introduce an abstract logger interface to daql
-			log.Printf("hub ws read failed, err: %v", err)
-		}
+type Server struct {
+	*hub.Hub
+	*websocket.Upgrader
+	Log log.Logger
+}
+
+func (s *Server) HandleHTTP(w http.ResponseWriter, r *http.Request) {
+	s.init()
+	wc, err := s.Upgrade(w, r, nil)
+	if err != nil {
+		s.Log.Error("wshub upgrade failed", "err", err)
+		return
+	}
+	route := s.Chan()
+	t := time.NewTicker(60 * time.Second)
+	defer t.Stop()
+	c := newConn(hub.NextID(), wc, nil)
+	c.tick = t.C
+	route <- &hub.Msg{From: s.Hub, Subj: hub.SubjSignon}
+	go c.writeAll(0, s.Log)
+	err = c.readAll(route)
+	route <- &hub.Msg{From: s.Hub, Subj: hub.SubjSignoff}
+	if err != nil {
+		s.Log.Error("wshub read failed", "err", err)
 	}
 }
 
-func write(c *conn, t *time.Ticker) {
-	defer c.wc.Close()
-Outer:
-	for {
-		select {
-		case msg, ok := <-c.send:
-			if !ok {
-				break Outer
-			}
-			err := c.writeMsg(msg)
-			if err != nil {
-				// TODO log marshal errors but ignore network errors.
-				return
-			}
-		case <-t.C:
-			c.wc.SetWriteDeadline(time.Now().Add(writeTimeout))
-			err := c.wc.WriteMessage(websocket.PingMessage, []byte{})
-			if err != nil {
-				return // ignore error
-			}
-		}
+func (s *Server) init() {
+	if s.Upgrader == nil {
+		s.Upgrader = &websocket.Upgrader{}
 	}
-	c.wc.SetWriteDeadline(time.Now().Add(writeTimeout))
-	c.wc.WriteMessage(websocket.CloseMessage, []byte{})
+	if s.Log == nil {
+		s.Log = log.Root
+	}
 }

@@ -42,6 +42,3 @@ func Req(h Hub, req *Msg, timeout time.Duration) (*Msg, error) {
 	}
 	return nil, cor.Error("timeout")
 }
-
-func Signon(h *Hub, c Conn)  { h.Chan() <- &Msg{From: c, Subj: SubjSignon} }
-func Signoff(h *Hub, c Conn) { h.Chan() <- &Msg{From: c, Subj: SubjSignoff} }
