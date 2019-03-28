@@ -34,16 +34,13 @@ type Router interface{ Route(*Msg) }
 // Conn is the common interface providing an ID and channel for participants connected to a hub.
 //
 // Connections can represent one-off calls, connected clients of any kind, the hub itself or
-// services like chat rooms. Connections can hold on to received message sender connections, however
-// any send must be in sequence with incoming messages and clean up signed-off connections, as not
-// to potentially send to a closed channel.
+// services like chat rooms. Connections can hold on to received message sender connections.
 type Conn interface {
 	// ID is an internal connection identifier, the hub has id 0, transient connections have a
-	// negative and normal client connections positive ids.
+	// negative and normal connections positive ids.
 	ID() int64
-	// Chan returns the receiver channel. The hub closes this channel after a sign-off message
-	// from this conn was routed. Anyone sending to this channel must do so in sequence with
-	// possible sign-off messages for this reason.
+	// Chan returns an unchanging receiver channel. The hub send a nil message to this
+	// channel after a sign-off message from this conn was routed.
 	Chan() chan<- *Msg
 }
 
@@ -74,6 +71,9 @@ func (h *Hub) Chan() chan<- *Msg { return h.mque }
 // Run starts routing received messages with the given router. It is usually run in a go routine.
 func (h *Hub) Run(r Router) {
 	for m := range h.mque {
+		if m == nil {
+			break
+		}
 		if m.Subj == SubjSignon {
 			h.Lock()
 			h.cmap[m.From.ID()] = m.From
@@ -83,7 +83,7 @@ func (h *Hub) Run(r Router) {
 		if m.Subj == SubjSignoff {
 			h.Lock()
 			delete(h.cmap, m.From.ID())
-			close(m.From.Chan())
+			m.From.Chan() <- nil
 			h.Unlock()
 		}
 	}

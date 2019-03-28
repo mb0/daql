@@ -34,6 +34,9 @@ func Req(h Hub, req *Msg, timeout time.Duration) (*Msg, error) {
 	h.Chan() <- req
 	select {
 	case res := <-ch:
+		if res == nil {
+			return nil, cor.Error("conn closed")
+		}
 		return res, nil
 	case <-time.After(timeout):
 	}
