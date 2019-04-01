@@ -3,6 +3,7 @@ package dom
 import (
 	"strings"
 
+	"github.com/mb0/xelf/bfr"
 	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/lit"
 	"github.com/mb0/xelf/typ"
@@ -41,9 +42,10 @@ type Index struct {
 
 // Node represents the common name and version of a model, schema or project.
 type Node struct {
-	Vers int64  `json:"vers,omitempty"`
-	Name string `json:"name,omitempty"`
-	key  string
+	Vers  int64     `json:"vers,omitempty"`
+	Extra *lit.Dict `json:"extra,omitempty"`
+	Name  string    `json:"name,omitempty"`
+	key   string
 }
 
 func (n *Node) Key() string {
@@ -57,9 +59,8 @@ func (n *Node) Key() string {
 type Model struct {
 	Node
 	typ.Type
-	Elems  []*Elem   `json:"elems,omitempty"`
-	Rec    *Record   `json:"rec,omitempty"`
-	Extra  *lit.Dict `json:"extra,omitempty"`
+	Elems  []*Elem `json:"elems,omitempty"`
+	Rec    *Record `json:"rec,omitempty"`
 	schema string
 }
 
@@ -78,17 +79,15 @@ func (m *Model) Qual() string {
 // Schema is a namespace for models.
 type Schema struct {
 	Node
-	Path   string    `json:"path,omitempty"`
-	Use    Keys      `json:"use,omitempty"`
-	Models []*Model  `json:"models"`
-	Extra  *lit.Dict `json:"extra,omitempty"`
+	Path   string   `json:"path,omitempty"`
+	Use    Keys     `json:"use,omitempty"`
+	Models []*Model `json:"models"`
 }
 
 // Project is a collection of schemas.
 type Project struct {
 	Node
 	Schemas []*Schema `json:"schemas"`
-	Extra   *lit.Dict `json:"extra,omitempty"`
 }
 
 // Schema returns a schema for key or nil.
@@ -156,4 +155,248 @@ var bitConsts = []cor.Const{
 	{"Ordr", BitOrdr},
 	{"Auto", BitAuto},
 	{"RO", BitRO},
+}
+
+func setNode(n *Node, x lit.Keyed) error {
+	switch x.Key {
+	case "name":
+		n.Name = x.Lit.(lit.Charer).Char()
+	case "vers":
+		n.Vers = int64(x.Lit.(lit.Numer).Num())
+	default:
+		if n.Extra == nil {
+			n.Extra = &lit.Dict{}
+		}
+		_, err := n.Extra.SetKey(x.Key, x.Lit)
+		return err
+	}
+	return nil
+}
+
+func addElemFromDict(m *Model, d *lit.Dict) error {
+	var el Elem
+	var p typ.Param
+	var c cor.Const
+	for _, x := range d.List {
+		switch x.Key {
+		case "name":
+			p.Name = x.Lit.(lit.Charer).Char()
+			c.Name = p.Name
+		case "val":
+			c.Val = int64(x.Lit.(lit.Numer).Num())
+		case "typ":
+			t, err := typ.ParseSym(x.Lit.(lit.Charer).Char(), nil)
+			if err != nil {
+				return err
+			}
+			p.Type = t
+		case "bits":
+			el.Bits = Bit(x.Lit.(lit.Numer).Num())
+		default:
+			if el.Extra == nil {
+				el.Extra = &lit.Dict{}
+			}
+			_, err := el.Extra.SetKey(x.Key, x.Lit)
+			return err
+		}
+	}
+	if m.Kind&typ.MaskPrim != 0 {
+		m.Consts = append(m.Consts, c)
+	} else {
+		m.Params = append(m.Params, p)
+	}
+	m.Elems = append(m.Elems, &el)
+	return nil
+}
+
+func (m *Model) FromDict(d *lit.Dict) (err error) {
+	if m.Info == nil {
+		m.Type.Kind = typ.KindRec
+		m.Info = &typ.Info{}
+	}
+	for _, x := range d.List {
+		switch x.Key {
+		case "typ":
+			t, err := typ.ParseSym(x.Lit.(lit.Charer).Char(), nil)
+			if err != nil {
+				return err
+			}
+			m.Type.Kind = t.Kind
+		case "elems":
+			idx, ok := x.Lit.(lit.Idxer)
+			if !ok {
+				return cor.Errorf("expect indexer got %T", x.Lit)
+			}
+			if len(m.Elems) == 0 {
+				n := idx.Len()
+				m.Elems = make([]*Elem, 0, n)
+				m.Params = make([]typ.Param, 0, n)
+			}
+			err = idx.IterIdx(func(i int, el lit.Lit) error {
+				return addElemFromDict(m, el.(*lit.Dict))
+			})
+		default:
+			err = setNode(&m.Node, x)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func (m *Model) String() string { return bfr.String(m) }
+func (m *Model) WriteBfr(b *bfr.Ctx) error {
+	b.WriteString("{name:")
+	b.Quote(m.Name)
+	b.WriteString(" typ:")
+	b.Quote(m.Kind.String())
+	b.WriteString(" elems:[")
+	for i, e := range m.Elems {
+		if i > 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteString("{name:")
+		if len(m.Params) > 0 {
+			p := m.Params[i]
+			b.Quote(p.Name)
+			b.WriteString(" typ:")
+			if p.Info != nil && p.Ref != "" {
+				b.Quote("@" + p.Ref)
+			} else {
+				b.Quote(p.Type.String())
+			}
+		} else if len(m.Consts) > 0 {
+			c := m.Consts[i]
+			b.Quote(c.Name)
+			b.Fmt(" val:%d", c.Val)
+		}
+		if e.Bits != 0 {
+			b.Fmt(" bits:%d", e.Bits)
+		}
+		err := writeExtra(b, e.Extra)
+		if err != nil {
+			return err
+		}
+		b.WriteByte('}')
+	}
+	b.WriteByte(']')
+	err := writeExtra(b, m.Extra)
+	b.WriteByte('}')
+	return err
+}
+
+func (s *Schema) FromDict(d *lit.Dict) (err error) {
+	for _, x := range d.List {
+		switch x.Key {
+		case "models":
+			idx, ok := x.Lit.(lit.Idxer)
+			if !ok {
+				return cor.Errorf("expect indexer got %T", x.Lit)
+			}
+			if len(s.Models) == 0 {
+				s.Models = make([]*Model, 0, idx.Len())
+			}
+			err = idx.IterIdx(func(i int, el lit.Lit) error {
+				var m Model
+				m.schema = s.Key()
+				err := m.FromDict(el.(*lit.Dict))
+				m.Ref = m.schema + "." + m.Name
+				s.Models = append(s.Models, &m)
+				return err
+			})
+		default:
+			err = setNode(&s.Node, x)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+
+}
+func (s *Schema) String() string { return bfr.String(s) }
+func (s *Schema) WriteBfr(b *bfr.Ctx) error {
+	b.WriteString("{name:")
+	b.Quote(s.Name)
+	if len(s.Models) > 0 {
+		b.WriteString(" models:[")
+		for i, m := range s.Models {
+			if i > 0 {
+				b.WriteByte(' ')
+			}
+			err := m.WriteBfr(b)
+			if err != nil {
+				return err
+			}
+		}
+		b.WriteByte(']')
+	}
+	err := writeExtra(b, s.Extra)
+	b.WriteByte('}')
+	return err
+}
+
+func (p *Project) FromDict(d *lit.Dict) (err error) {
+	for _, x := range d.List {
+		switch x.Key {
+		case "schemas":
+			idx, ok := x.Lit.(lit.Idxer)
+			if !ok {
+				return cor.Errorf("expect indexer got %T", x.Lit)
+			}
+			if len(p.Schemas) == 0 {
+				p.Schemas = make([]*Schema, 0, idx.Len())
+			}
+			err = idx.IterIdx(func(i int, el lit.Lit) error {
+				var s Schema
+				err := s.FromDict(el.(*lit.Dict))
+				p.Schemas = append(p.Schemas, &s)
+				return err
+			})
+		default:
+			err = setNode(&p.Node, x)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+
+}
+func (p *Project) String() string { return bfr.String(p) }
+func (p *Project) WriteBfr(b *bfr.Ctx) error {
+	b.WriteString("{name:")
+	b.Quote(p.Name)
+	if p.Vers != 0 {
+		b.Fmt(" vers:%d", p.Vers)
+	}
+	b.WriteString(" schemas:[")
+	for i, s := range p.Schemas {
+		if i > 0 {
+			b.WriteByte(' ')
+		}
+		err := s.WriteBfr(b)
+		if err != nil {
+			return err
+		}
+	}
+	b.WriteString("]")
+	err := writeExtra(b, p.Extra)
+	b.WriteByte('}')
+	return err
+}
+
+func writeExtra(b *bfr.Ctx, extra *lit.Dict) error {
+	if extra != nil && len(extra.List) > 0 {
+		for _, x := range extra.List {
+			b.WriteByte(' ')
+			b.WriteString(x.Key)
+			b.WriteByte(':')
+			err := x.Lit.WriteBfr(b)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

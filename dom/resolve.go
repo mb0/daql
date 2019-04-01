@@ -44,7 +44,7 @@ func resolveModel(c *exp.Ctx, env exp.Env, x *exp.Expr, h typ.Type) (exp.El, err
 
 var schemaRules = utl.NodeRules{
 	Tags: utl.TagRules{
-		IdxKeyer: utl.OffsetKeyer(1),
+		IdxKeyer: utl.OffsetKeyer(2),
 		KeyRule: utl.KeyRule{
 			KeySetter: utl.ExtraMapSetter("extra"),
 		},
@@ -73,7 +73,7 @@ var schemaRules = utl.NodeRules{
 
 var modelRules = utl.NodeRules{
 	Tags: utl.TagRules{
-		IdxKeyer: utl.OffsetKeyer(1),
+		IdxKeyer: utl.OffsetKeyer(2),
 		KeyRule: utl.KeyRule{
 			KeySetter: utl.ExtraMapSetter("extra"),
 		},

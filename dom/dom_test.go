@@ -1,7 +1,6 @@
 package dom
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/mb0/xelf/cor"
@@ -12,17 +11,21 @@ import (
 func TestDom(t *testing.T) {
 	tests := []struct {
 		raw  string
+		str  string
 		want *Schema
 	}{
-		{`(schema 'test')`, &Schema{Node: Node{Name: "test"}}},
-		{`(schema 'test' :label 'Test Schema')`, &Schema{
-			Node: Node{Name: "test"},
-			Extra: &lit.Dict{List: []lit.Keyed{
+		{`(schema 'test')`, `{name:'test'}`, &Schema{Node: Node{Name: "test"}}},
+		{`(schema 'test' :label 'Test Schema')`, `{name:'test' label:'Test Schema'}`,
+			&Schema{Node: Node{Name: "test", Extra: &lit.Dict{List: []lit.Keyed{
 				{"label", lit.Str("Test Schema")},
-			},
-			}}},
+			}}}},
+		},
 
 		{`(schema 'test' (+Dir flag +North +East +South +West))`,
+			`{name:'test' models:[{name:'Dir' typ:'flag' elems:[` +
+				`{name:'North' val:1} {name:'East' val:2} ` +
+				`{name:'South' val:4} {name:'West' val:8}]` +
+				`}]}`,
 			&Schema{Node: Node{Name: "test"}, Models: []*Model{{
 				Node: Node{Name: "Dir"},
 				Type: typ.Type{typ.KindFlag, &typ.Info{
@@ -35,6 +38,10 @@ func TestDom(t *testing.T) {
 				Elems: []*Elem{{}, {}, {}, {}},
 			}}}},
 		{`(schema 'test' (+Dir enum +North +East +South +West))`,
+			`{name:'test' models:[{name:'Dir' typ:'enum' elems:[` +
+				`{name:'North' val:1} {name:'East' val:2} ` +
+				`{name:'South' val:3} {name:'West' val:4}]` +
+				`}]}`,
 			&Schema{Node: Node{Name: "test"}, Models: []*Model{{
 				Node: Node{Name: "Dir"},
 				Type: typ.Type{typ.KindEnum, &typ.Info{
@@ -47,11 +54,15 @@ func TestDom(t *testing.T) {
 				Elems: []*Elem{{}, {}, {}, {}},
 			}}}},
 		{`(schema 'test' (+Named :prop "something" +Name str))`,
+			`{name:'test' models:[{name:'Named' typ:'rec' ` +
+				`elems:[{name:'Name' typ:'str'}] ` +
+				`prop:'something'}]}`,
 			&Schema{Node: Node{Name: "test"}, Models: []*Model{{
-				Node: Node{Name: "Named"},
-				Extra: &lit.Dict{List: []lit.Keyed{
-					{"prop", lit.Str("something")},
-				}},
+				Node: Node{Name: "Named",
+					Extra: &lit.Dict{List: []lit.Keyed{
+						{"prop", lit.Str("something")},
+					}},
+				},
 				Type: typ.Type{typ.KindRec, &typ.Info{
 					Ref:    "test.Named",
 					Params: []typ.Param{{Name: "Name", Type: typ.Str}},
@@ -59,6 +70,8 @@ func TestDom(t *testing.T) {
 				Elems: []*Elem{{}},
 			}}}},
 		{`(schema 'test' (+Point +X int +Y int))`,
+			`{name:'test' models:[{name:'Point' typ:'rec' ` +
+				`elems:[{name:'X' typ:'int'} {name:'Y' typ:'int'}]}]}`,
 			&Schema{Node: Node{Name: "test"}, Models: []*Model{{
 				Node: Node{Name: "Point"},
 				Type: typ.Type{typ.KindRec, &typ.Info{
@@ -71,6 +84,8 @@ func TestDom(t *testing.T) {
 				Elems: []*Elem{{}, {}},
 			}}}},
 		{`(schema 'test' (+Named +ID uuid :pk +Name str))`,
+			`{name:'test' models:[{name:'Named' typ:'rec' elems:[` +
+				`{name:'ID' typ:'uuid' bits:2} {name:'Name' typ:'str'}]}]}`,
 			&Schema{Node: Node{Name: "test"}, Models: []*Model{{
 				Node: Node{Name: "Named"},
 				Type: typ.Type{typ.KindRec, &typ.Info{
@@ -82,7 +97,9 @@ func TestDom(t *testing.T) {
 				},
 				Elems: []*Elem{{Bits: BitPK}, {}},
 			}}}},
-		{`(schema 'test' (+Foo +A str) (+Bar +B str))`,
+		{`(schema 'test' (+Foo +A str) (+Bar +B str))`, `{name:'test' models:[` +
+			`{name:'Foo' typ:'rec' elems:[{name:'A' typ:'str'}]} ` +
+			`{name:'Bar' typ:'rec' elems:[{name:'B' typ:'str'}]}]}`,
 			&Schema{Node: Node{Name: "test"}, Models: []*Model{{
 				Node: Node{Name: "Foo"},
 				Type: typ.Type{typ.KindRec, &typ.Info{
@@ -101,7 +118,9 @@ func TestDom(t *testing.T) {
 				}},
 				Elems: []*Elem{{}},
 			}}}},
-		{`(schema 'test' (+Foo +A str) (+Bar +B @Foo))`,
+		{`(schema 'test' (+Foo +A str) (+Bar +B @Foo))`, `{name:'test' models:[` +
+			`{name:'Foo' typ:'rec' elems:[{name:'A' typ:'str'}]} ` +
+			`{name:'Bar' typ:'rec' elems:[{name:'B' typ:'@test.Foo'}]}]}`,
 			&Schema{Node: Node{Name: "test"}, Models: []*Model{{
 				Node: Node{Name: "Foo"},
 				Type: typ.Type{typ.KindRec, &typ.Info{
@@ -129,38 +148,28 @@ func TestDom(t *testing.T) {
 			t.Errorf("execute %s got error: %+v", test.raw, err)
 			continue
 		}
-		if !jsonEqual(t, s, test.want) {
+		got := s.String()
+		want := test.want.String()
+		if got != want {
+			t.Errorf("string equal want %s got %s", want, got)
+			continue
+		}
+		if got != test.str {
+			t.Errorf("string equal want %s got %s", test.str, got)
+		}
+		res, err := lit.ParseString(test.str)
+		if err != nil {
+			t.Errorf("parse %s err: %v", test.str, err)
+		}
+		ss := &Schema{}
+		err = ss.FromDict(res.(*lit.Dict))
+		if err != nil {
+			t.Errorf("assign %s err: %v", res, err)
+		}
+		got = ss.String()
+		if got != want {
+			t.Errorf("parsed string equal want %s got %s", want, got)
 			continue
 		}
 	}
-}
-
-func jsonEqual(t *testing.T, a, b interface{}) bool {
-	t.Helper()
-	x, err := lit.Proxy(a)
-	if err != nil {
-		t.Errorf("proxy %T error: %v", a, err)
-		return false
-	}
-	y, err := lit.Proxy(b)
-	if err != nil {
-		t.Errorf("proxy %T error: %v", b, err)
-		return false
-	}
-	v, err := x.MarshalJSON()
-	if err != nil {
-		t.Errorf("marshal json %T error: %v", a, err)
-		return false
-	}
-	w, err := y.MarshalJSON()
-	if err != nil {
-		t.Errorf("marshal json %T error: %v", b, err)
-		return false
-	}
-
-	if !bytes.Equal(v, w) {
-		t.Errorf("json equal want %s got %s", w, v)
-		return false
-	}
-	return true
 }
