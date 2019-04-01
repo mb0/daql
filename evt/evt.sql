@@ -6,8 +6,8 @@ CREATE SCHEMA evt;
 
 CREATE TABLE evt.audit (
 	rev timestamptz PRIMARY KEY,
-	created timestamptz NOT NULL,
-	arrived timestamptz NOT NULL,
+	created timestamptz NULL,
+	arrived timestamptz NULL,
 	acct uuid NULL,
 	extra jsonb NULL
 );

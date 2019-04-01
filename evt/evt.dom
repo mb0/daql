@@ -1,57 +1,54 @@
 (schema 'evt'
-(+Audit :backup :doc `
-Audit holds meta information for a published transaction at uniqe revision.
-`
-	+Rev     time :pk
-	+Created time
-	+Arrived time
-	+Acct?   uuid
-	+Extra?  dict
+(+Detail :doc `Detail holds extra information for audits and transations.`
+	+Created? time
+	+Arrived? time
+	+Acct?    uuid
+	+Extra?   dict
 )
-(+Sig
+
+(+Audit :backup :doc `Audit holds detailed information for a published revision.`
+	+Rev time :pk
+	+    @Detail
+)
+
+(+Sig :doc `Sig is the event signature.`
 	+Top str
 	+Key str
 )
-(+Action :doc `
-Action is an unpublished event represented by a command string and argument map. It usually is a
-data operation on a record identified by a topic and primary key.
-`
-	+     Sig
+
+(+Action :doc `Action is an unpublished event represented by a command string and argument map.
+It usually is a data operation on a record identified by a topic and primary key.`
+	+     @Sig
 	+Cmd  str
 	+Arg? dict
 )
-(+Sub
-	+Top  str
-	+Rev  time
-	+Whr? dyn
-	+Arg? dict
-)
-(+Event :backup :doc `
-Event represents action published to a ledger with a revision and unique id.
-`
+
+(+Event :backup :doc `Event represents action published to a ledger with a revision and unique id.`
 	+ID  int :pk :auto
 	+Rev time :idx
 	+    @Action
 	-
 	:idx ['top' 'key']
 )
+
+(+Trans :doc `Trans is an request to publish a list of actions for a base revision.`
+	+Base time
+	+Acts arr|@Action
+	+     @Detail
+)
+(+Watch
+	+Top  str
+	+Rev? time
+	+IDs? arr|str
+)
 (+Update
-	+Rev time
-	+Evs arr|@Event?
+	+Rev  time
+	+Evs  arr|@Event?
 )
-(+Pub :doc `
-Pub is a request to publish a list of actions to a base revision.
-`
-	+Base     time
-	+Actions  arr|@Action
-	+Created? time
-	+Extra?   dict
-)
-(+Trans :doc `
-Trans is an unfinished publish request with additional audit info.
-`
-	+        @Pub
-	+Acct?   uuid
-	+Arrived time
-)
+(+Qry   func + dyn  - any)
+(+Hist  func + @Sig - @Update)
+(+Audit func + time - @Audit)
+(+Pub   func + @Trans     - @Update)
+(+Sub   func + arr|@Watch - @Update)
+(+Unsub func + arr|@Watch - @Update)
 )
