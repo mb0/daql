@@ -140,6 +140,19 @@ func TestDom(t *testing.T) {
 				},
 				Elems: []*Elem{{}},
 			}}}},
+		{`(schema 'test' (+Spam func +Egg str + bool))`, `{name:'test' models:[` +
+			`{name:'Spam' typ:'func' elems:[{name:'Egg' typ:'str'} {typ:'bool'}]}]}`,
+			&Schema{Node: Node{Name: "test"}, Models: []*Model{{
+				Node: Node{Name: "Spam"},
+				Type: typ.Type{typ.ExpFunc, &typ.Info{
+					Ref: "test.Spam",
+					Params: []typ.Param{
+						{Name: "Egg", Type: typ.Str},
+						{Type: typ.Bool},
+					}},
+				},
+				Elems: []*Elem{{}, {}},
+			}}}},
 	}
 	for _, test := range tests {
 		env := NewEnv(Env, &Project{})

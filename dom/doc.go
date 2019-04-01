@@ -2,8 +2,8 @@
 Package dom provides code for domain model declaration and registration.
 
 Models are the primary focus of this package, they are used to define the flag, enum and record
-schema types. In addition to the schema type information, models hold meta data for display,
-indexing, constraints and other application relevant aspects.
+schema types as well as service contracts. In addition to the schema type information, models hold
+meta data for display, indexing, constraints and other application relevant aspects.
 
 Models are always part of a named schema and multiple schemas are usually represented and used as a
 project. A model can refer to models in other previously declared schemas within a project.
@@ -30,10 +30,8 @@ declarations with their filtered views.
 Models need to describe references to establish model and schema dependencies. The project might be
 a good place to collect some facts about model and schema references.
 
-It would be very useful to also model service contracts like API endpoints and not only their
-arguments and results. There are many reasons why this is useful. A contract can be used to
-automatically route and parse requests, document the endpoint, generate code based on it.  With
-model versions we can also easily detect and handle version mismatches, or even serve multiple
-service versions for gradual service upgrades.
+Using models to describe service contracts and their arguments documents the service and lets us
+automatically read and route requests, and generally generate code based on it. With model versions
+we can also detect and handle version mismatches, or even serve multiple versions for upgrades.
 */
 package dom

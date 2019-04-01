@@ -55,8 +55,10 @@ func WriteFile(c *gen.Ctx, s *dom.Schema) error {
 	f := c.B
 	c.B = b
 	for _, m := range s.Models {
+		if m.Kind == typ.ExpFunc {
+			continue
+		}
 		c.WriteString("\n")
-
 		err := DeclareType(c, m)
 		if err != nil {
 			return err

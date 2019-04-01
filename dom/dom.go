@@ -255,11 +255,15 @@ func (m *Model) WriteBfr(b *bfr.Ctx) error {
 		if i > 0 {
 			b.WriteByte(' ')
 		}
-		b.WriteString("{name:")
+		b.WriteByte('{')
 		if len(m.Params) > 0 {
 			p := m.Params[i]
-			b.Quote(p.Name)
-			b.WriteString(" typ:")
+			if p.Name != "" {
+				b.WriteString("name:")
+				b.Quote(p.Name)
+				b.WriteByte(' ')
+			}
+			b.WriteString("typ:")
 			if p.Info != nil && p.Ref != "" {
 				b.Quote("@" + p.Ref)
 			} else {
@@ -267,8 +271,12 @@ func (m *Model) WriteBfr(b *bfr.Ctx) error {
 			}
 		} else if len(m.Consts) > 0 {
 			c := m.Consts[i]
-			b.Quote(c.Name)
-			b.Fmt(" val:%d", c.Val)
+			if c.Name != "" {
+				b.WriteString("name:")
+				b.Quote(c.Name)
+				b.WriteByte(' ')
+			}
+			b.Fmt("val:%d", c.Val)
 		}
 		if e.Bits != 0 {
 			b.Fmt(" bits:%d", e.Bits)

@@ -85,10 +85,13 @@ var modelRules = utl.NodeRules{
 	Decl: utl.KeyRule{
 		KeyPrepper: func(c *exp.Ctx, env exp.Env, key string, args []exp.El) (lit.Lit, error) {
 			m := env.(*ModelEnv)
-			if m.Model.Kind != typ.KindRec {
+			switch m.Model.Kind {
+			case typ.KindFlag, typ.KindEnum:
 				return resolveConst(c, m, key, args)
+			case typ.KindRec, typ.ExpFunc:
+				return resolveField(c, m, key, args)
 			}
-			return resolveField(c, m, key, args)
+			return nil, cor.Errorf("unexpected model kind %s", m.Model.Kind)
 
 		},
 		KeySetter: noopSetter,
