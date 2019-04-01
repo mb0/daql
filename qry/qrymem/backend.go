@@ -21,13 +21,13 @@ func (b *Backend) Add(m *dom.Model, list lit.List) error {
 		b.tables = make(map[string]*memTable)
 	}
 	for i, v := range list {
-		v, err := lit.Convert(v, m.Typ(), 0)
+		v, err := lit.Convert(v, m.Type, 0)
 		if err != nil {
 			return err
 		}
 		list[i] = v
 	}
-	b.tables[m.Ref()] = &memTable{m.Typ(), list}
+	b.tables[m.Type.Key()] = &memTable{m.Type, list}
 	return nil
 }
 
@@ -190,7 +190,7 @@ func (m *Backend) collectSel(c *exp.Ctx, env exp.Env, tt *qry.Task, a lit.Assign
 		if err != nil {
 			return err
 		}
-		err = keyer.SetKey(key, res.(lit.Lit))
+		_, err = keyer.SetKey(key, res.(lit.Lit))
 		if err != nil {
 			return err
 		}

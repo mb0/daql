@@ -2,10 +2,10 @@ package dom
 
 import (
 	"bytes"
-	"encoding/json"
 	"testing"
 
 	"github.com/mb0/xelf/cor"
+	"github.com/mb0/xelf/lit"
 	"github.com/mb0/xelf/typ"
 )
 
@@ -14,64 +14,113 @@ func TestDom(t *testing.T) {
 		raw  string
 		want *Schema
 	}{
-		{`(schema 'test')`, &Schema{Name: "test"}},
-		{`(schema 'test' :label 'Test Schema')`,
-			&Schema{Name: "test", Display: Display{Label: "Test Schema"}}},
+		{`(schema 'test')`, &Schema{Node: Node{Name: "test"}}},
+		{`(schema 'test' :label 'Test Schema')`, &Schema{
+			Node: Node{Name: "test"},
+			Extra: &lit.Dict{List: []lit.Keyed{
+				{"label", lit.Str("Test Schema")},
+			},
+			}}},
 
 		{`(schema 'test' (+Dir flag +North +East +South +West))`,
-			&Schema{Name: "test", Models: []*Model{
-				{Name: "Dir", Kind: typ.KindFlag, Consts: []cor.Const{
-					{"North", 1}, {"East", 2},
-					{"South", 4}, {"West", 8},
+			&Schema{Node: Node{Name: "test"}, Models: []*Model{{
+				Node: Node{Name: "Dir"},
+				Type: typ.Type{typ.KindFlag, &typ.Info{
+					Ref: "test.Dir",
+					Consts: []cor.Const{
+						{"North", 1}, {"East", 2},
+						{"South", 4}, {"West", 8},
+					},
 				}},
-			}}},
+				Elems: []*Elem{{}, {}, {}, {}},
+			}}}},
 		{`(schema 'test' (+Dir enum +North +East +South +West))`,
-			&Schema{Name: "test", Models: []*Model{
-				{Name: "Dir", Kind: typ.KindEnum, Consts: []cor.Const{
-					{"North", 1}, {"East", 2},
-					{"South", 3}, {"West", 4},
+			&Schema{Node: Node{Name: "test"}, Models: []*Model{{
+				Node: Node{Name: "Dir"},
+				Type: typ.Type{typ.KindEnum, &typ.Info{
+					Ref: "test.Dir",
+					Consts: []cor.Const{
+						{"North", 1}, {"East", 2},
+						{"South", 3}, {"West", 4},
+					},
 				}},
-			}}},
+				Elems: []*Elem{{}, {}, {}, {}},
+			}}}},
 		{`(schema 'test' (+Named :prop "something" +Name str))`,
-			&Schema{Name: "test", Models: []*Model{
-				{Name: "Named", Kind: typ.KindRec, Fields: []*Field{
-					{Name: "Name", Type: typ.Str},
-				}, Extra: map[string]interface{}{
-					"prop": "something",
+			&Schema{Node: Node{Name: "test"}, Models: []*Model{{
+				Node: Node{Name: "Named"},
+				Extra: &lit.Dict{List: []lit.Keyed{
+					{"prop", lit.Str("something")},
 				}},
-			}}},
+				Type: typ.Type{typ.KindRec, &typ.Info{
+					Ref:    "test.Named",
+					Params: []typ.Param{{Name: "Name", Type: typ.Str}},
+				}},
+				Elems: []*Elem{{}},
+			}}}},
 		{`(schema 'test' (+Point +X int +Y int))`,
-			&Schema{Name: "test", Models: []*Model{
-				{Name: "Point", Kind: typ.KindRec, Fields: []*Field{
-					{Name: "X", Type: typ.Int},
-					{Name: "Y", Type: typ.Int},
+			&Schema{Node: Node{Name: "test"}, Models: []*Model{{
+				Node: Node{Name: "Point"},
+				Type: typ.Type{typ.KindRec, &typ.Info{
+					Ref: "test.Point",
+					Params: []typ.Param{
+						{Name: "X", Type: typ.Int},
+						{Name: "Y", Type: typ.Int},
+					},
 				}},
-			}}},
+				Elems: []*Elem{{}, {}},
+			}}}},
 		{`(schema 'test' (+Named +ID uuid :pk +Name str))`,
-			&Schema{Name: "test", Models: []*Model{
-				{Name: "Named", Kind: typ.KindRec, Fields: []*Field{
-					{Name: "ID", Type: typ.UUID, Bits: BitPK},
-					{Name: "Name", Type: typ.Str},
-				}},
-			}}},
+			&Schema{Node: Node{Name: "test"}, Models: []*Model{{
+				Node: Node{Name: "Named"},
+				Type: typ.Type{typ.KindRec, &typ.Info{
+					Ref: "test.Named",
+					Params: []typ.Param{
+						{Name: "ID", Type: typ.UUID},
+						{Name: "Name", Type: typ.Str},
+					}},
+				},
+				Elems: []*Elem{{Bits: BitPK}, {}},
+			}}}},
 		{`(schema 'test' (+Foo +A str) (+Bar +B str))`,
-			&Schema{Name: "test", Models: []*Model{
-				{Name: "Foo", Kind: typ.KindRec, Fields: []*Field{
-					{Name: "A", Type: typ.Str},
+			&Schema{Node: Node{Name: "test"}, Models: []*Model{{
+				Node: Node{Name: "Foo"},
+				Type: typ.Type{typ.KindRec, &typ.Info{
+					Ref: "test.Foo",
+					Params: []typ.Param{
+						{Name: "A", Type: typ.Str},
+					},
 				}},
-				{Name: "Bar", Kind: typ.KindRec, Fields: []*Field{
-					{Name: "B", Type: typ.Str},
+				Elems: []*Elem{{}},
+			}, {
+				Node: Node{Name: "Bar"}, Type: typ.Type{typ.KindRec, &typ.Info{
+					Ref: "test.Bar",
+					Params: []typ.Param{
+						{Name: "B", Type: typ.Str},
+					},
 				}},
-			}}},
+				Elems: []*Elem{{}},
+			}}}},
 		{`(schema 'test' (+Foo +A str) (+Bar +B @Foo))`,
-			&Schema{Name: "test", Models: []*Model{
-				{Name: "Foo", Kind: typ.KindRec, Fields: []*Field{
-					{Name: "A", Type: typ.Str},
-				}},
-				{Name: "Bar", Kind: typ.KindRec, Fields: []*Field{
-					{Name: "B", Type: typ.Rec("test.foo")},
-				}},
-			}}},
+			&Schema{Node: Node{Name: "test"}, Models: []*Model{{
+				Node: Node{Name: "Foo"},
+				Type: typ.Type{typ.KindRec, &typ.Info{
+					Ref: "test.Foo",
+					Params: []typ.Param{
+						{Name: "A", Type: typ.Str},
+					}},
+				},
+				Elems: []*Elem{{}},
+			}, {
+				Node: Node{Name: "Bar"},
+				Type: typ.Type{typ.KindRec, &typ.Info{
+					Ref: "test.Bar",
+					Params: []typ.Param{
+						{Name: "B", Type: typ.Rec("test.Foo")},
+					}},
+				},
+				Elems: []*Elem{{}},
+			}}}},
 	}
 	for _, test := range tests {
 		env := NewEnv(Env, &Project{})
@@ -88,16 +137,27 @@ func TestDom(t *testing.T) {
 
 func jsonEqual(t *testing.T, a, b interface{}) bool {
 	t.Helper()
-	v, err := json.Marshal(a)
+	x, err := lit.Proxy(a)
 	if err != nil {
-		t.Errorf("json equal error for a: %v", err)
+		t.Errorf("proxy %T error: %v", a, err)
 		return false
 	}
-	w, err := json.Marshal(b)
+	y, err := lit.Proxy(b)
 	if err != nil {
-		t.Errorf("json equal error for a: %v", err)
+		t.Errorf("proxy %T error: %v", b, err)
 		return false
 	}
+	v, err := x.MarshalJSON()
+	if err != nil {
+		t.Errorf("marshal json %T error: %v", a, err)
+		return false
+	}
+	w, err := y.MarshalJSON()
+	if err != nil {
+		t.Errorf("marshal json %T error: %v", b, err)
+		return false
+	}
+
 	if !bytes.Equal(v, w) {
 		t.Errorf("json equal want %s got %s", w, v)
 		return false

@@ -1,7 +1,6 @@
 package dom
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/mb0/xelf/cor"
@@ -38,13 +37,18 @@ func resolveSchema(c *exp.Ctx, env exp.Env, x *exp.Expr, h typ.Type) (exp.El, er
 
 func resolveModel(c *exp.Ctx, env exp.Env, x *exp.Expr, h typ.Type) (exp.El, error) {
 	s := env.(*SchemaEnv)
-	m := &Model{Kind: typ.KindRec}
+	m := &Model{Type: typ.Type{typ.KindRec, &typ.Info{}}}
 	env = &ModelEnv{SchemaEnv: s, Model: m}
 	return utl.NodeResolverFunc(modelRules, m)(c, env, x, h)
 }
 
 var schemaRules = utl.NodeRules{
-	Tags: utl.TagRules{IdxKeyer: utl.ZeroKeyer},
+	Tags: utl.TagRules{
+		IdxKeyer: utl.OffsetKeyer(1),
+		KeyRule: utl.KeyRule{
+			KeySetter: utl.ExtraMapSetter("extra"),
+		},
+	},
 	Decl: utl.KeyRule{
 		KeyPrepper: func(c *exp.Ctx, env exp.Env, name string, args []exp.El) (lit.Lit, error) {
 			tmp := make([]exp.El, 0, len(args)+1)
@@ -59,7 +63,8 @@ var schemaRules = utl.NodeRules{
 		KeySetter: func(n utl.Node, key string, el lit.Lit) error {
 			m := el.(utl.Node).Ptr().(*Model)
 			s := n.Ptr().(*Schema)
-			m.schema = s.Name
+			m.schema = s.Key()
+			m.Type.Ref = m.schema + "." + m.Name
 			s.Models = append(s.Models, m)
 			return nil
 		},
@@ -68,13 +73,13 @@ var schemaRules = utl.NodeRules{
 
 var modelRules = utl.NodeRules{
 	Tags: utl.TagRules{
-		IdxKeyer: utl.ZeroKeyer,
+		IdxKeyer: utl.OffsetKeyer(1),
 		KeyRule: utl.KeyRule{
 			KeySetter: utl.ExtraMapSetter("extra"),
 		},
 		Rules: map[string]utl.KeyRule{
-			"kind": {KeyPrepper: kindPrepper},
-			"idx":  {KeyPrepper: idxPrepper, KeySetter: idxSetter},
+			"typ": {KeyPrepper: typPrepper, KeySetter: typSetter},
+			"idx": {KeyPrepper: idxPrepper, KeySetter: idxSetter},
 		},
 	},
 	Decl: utl.KeyRule{
@@ -86,25 +91,21 @@ var modelRules = utl.NodeRules{
 			return resolveField(c, m, key, args)
 
 		},
-		KeySetter: func(n utl.Node, key string, el lit.Lit) error {
-			p := el.(utl.Node).Ptr()
-			m := n.Ptr().(*Model)
-			if m.Kind != typ.KindRec {
-				m.Consts = append(m.Consts, *(p.(*cor.Const)))
-			} else {
-				m.Fields = append(m.Fields, p.(*Field))
-			}
-			return nil
-		},
+		KeySetter: noopSetter,
 	},
 }
+
+func noopSetter(n utl.Node, key string, el lit.Lit) error { return nil }
 
 func resolveConst(c *exp.Ctx, env *ModelEnv, key string, args []exp.El) (lit.Lit, error) {
 	d, err := resolveConstVal(c, env, args, len(env.Model.Consts))
 	if err != nil {
-		return nil, err
+		return nil, cor.Errorf("resolve const val: %w", err)
 	}
-	return utl.GetNode(&cor.Const{key, int64(d)})
+	m := env.Model
+	m.Consts = append(m.Consts, cor.Const{key, int64(d)})
+	m.Elems = append(m.Elems, &Elem{})
+	return m.Type, nil
 }
 
 func resolveConstVal(c *exp.Ctx, env *ModelEnv, args []exp.El, idx int) (_ lit.Int, err error) {
@@ -125,7 +126,7 @@ func resolveConstVal(c *exp.Ctx, env *ModelEnv, args []exp.El, idx int) (_ lit.I
 	}
 	n, ok := el.(lit.Num)
 	if !ok {
-		return 0, fmt.Errorf("expect num got %T", el)
+		return 0, cor.Errorf("expect num got %T", el)
 	}
 	return lit.Int(n.Num()), nil
 }
@@ -143,40 +144,56 @@ var fieldRules = utl.TagRules{
 		"ordr": bitRule,
 		"auto": bitRule,
 		"ro":   bitRule,
+		"typ":  {KeyPrepper: typPrepper, KeySetter: typSetter},
 	},
 	KeyRule: utl.KeyRule{KeySetter: utl.ExtraMapSetter("extra")},
 }
 
 func resolveField(c *exp.Ctx, env *ModelEnv, name string, args []exp.El) (lit.Lit, error) {
-	f := &Field{Name: name}
+	p, el := typ.Param{Name: name}, &Elem{}
 	if strings.HasSuffix(name, "?") {
-		f.Name = name[:len(name)-1]
-		f.Bits = BitOpt
+		el.Bits = BitOpt
 	}
-	err := utl.ParseTags(c, env, args, f, fieldRules)
+	err := utl.ParseTags(c, env, args, &FieldElem{&p, el}, fieldRules)
 	if err != nil {
-		return nil, err
+		return nil, cor.Errorf("parsing tags: %w", err)
 	}
-	return utl.GetNode(f)
+	m := env.Model
+	m.Elems = append(m.Elems, el)
+	m.Params = append(m.Params, p)
+	return p.Type, nil
 }
 
-func kindPrepper(c *exp.Ctx, env exp.Env, key string, args []exp.El) (lit.Lit, error) {
+func typPrepper(c *exp.Ctx, env exp.Env, key string, args []exp.El) (_ lit.Lit, err error) {
 	if len(args) == 0 {
-		return nil, fmt.Errorf("expect type for model kind")
+		return nil, cor.Errorf("expect type for model kind")
 	}
-	if s, ok := args[0].(*exp.Sym); ok {
-		t, err := typ.ParseSym(s.Name, nil)
-		if err == nil {
-			return lit.Int(t.Kind), nil
-		}
+	fst := args[0]
+	fst, err = c.Resolve(env, fst, typ.Typ)
+	if err != nil && err != exp.ErrUnres {
+		return nil, err
 	}
-	return nil, fmt.Errorf("expect type for model kind, got %T", args[0])
+	if t, ok := fst.(typ.Type); ok {
+		return t, nil
+	}
+	return nil, cor.Errorf("expect type for model kind, got %T", args[0])
+}
+func typSetter(o utl.Node, key string, l lit.Lit) error {
+	switch m := o.Ptr().(type) {
+	case *Model:
+		m.Type.Kind = l.(typ.Type).Kind
+	case *FieldElem:
+		m.Type = l.(typ.Type)
+	default:
+		return cor.Errorf("unexpected node %T for %s", o, key)
+	}
+	return nil
 }
 
 func idxPrepper(c *exp.Ctx, env exp.Env, key string, args []exp.El) (lit.Lit, error) {
 	l, err := utl.DynPrepper(c, env, key, args)
 	if err != nil {
-		return l, err
+		return l, cor.Errorf("dyn prepper: %w", err)
 	}
 	uniq := key == "uniq"
 	k := l.Typ().Kind
@@ -190,8 +207,11 @@ func idxSetter(o utl.Node, key string, l lit.Lit) error {
 	var idx Index
 	err := lit.AssignTo(l, &idx)
 	if err != nil {
-		return fmt.Errorf("%v to *Index: %s", err, l)
+		return cor.Errorf("assign idx to %s: %w", l, err)
 	}
-	m.Indices = append(m.Indices, &idx)
+	if m.Rec == nil {
+		m.Rec = &Record{}
+	}
+	m.Rec.Indices = append(m.Rec.Indices, &idx)
 	return nil
 }

@@ -183,11 +183,11 @@ func resolveQuery(c *exp.Ctx, env exp.Env, t *Task, ref string, lo *exp.Layout) 
 		}
 		if len(s) > 2 {
 			f := m.Field(s[2])
-			if f != nil {
+			if f.Param != nil {
 				q.Type = f.Type
 			}
 		} else {
-			q.Type = m.Typ()
+			q.Type = m.Type
 		}
 	}
 	// at this point we need to have the result type to inform argument parsing

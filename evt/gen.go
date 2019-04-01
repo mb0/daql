@@ -67,8 +67,8 @@ func writeSql(pr *dom.Project, s *dom.Schema) {
 	ss := *s
 	ss.Models = make([]*dom.Model, 0, len(s.Models))
 	for _, m := range s.Models {
-		_, backup := m.Extra["backup"]
-		if !backup {
+		b, _ := m.Extra.Key("backup")
+		if b.IsZero() {
 			continue
 		}
 		ss.Models = append(ss.Models, m)

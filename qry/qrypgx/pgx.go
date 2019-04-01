@@ -126,7 +126,7 @@ func CopyFrom(db *pgx.ConnPool, s *dom.Schema, fix *lit.Dict) error {
 	for _, kl := range fix.List {
 		m := s.Model(kl.Key)
 		cols := modelColumns(m)
-		src := &litCopySrc{List: kl.Lit.(lit.List), typ: m.Typ(), cols: cols}
+		src := &litCopySrc{List: kl.Lit.(lit.List), typ: m.Type, cols: cols}
 		_, err := tx.CopyFrom(pgx.Identifier{m.Qual(), m.Key()}, cols, src)
 		if err != nil {
 			return err
@@ -185,9 +185,9 @@ func (c *litCopySrc) Err() error {
 }
 
 func modelColumns(m *dom.Model) []string {
-	res := make([]string, 0, len(m.Fields))
-	for _, f := range m.Fields {
-		res = append(res, f.Key())
+	res := make([]string, 0, len(m.Params))
+	for _, p := range m.Params {
+		res = append(res, p.Key())
 	}
 	return res
 }

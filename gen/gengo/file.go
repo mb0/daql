@@ -94,7 +94,7 @@ func WriteFile(c *gen.Ctx, s *dom.Schema) error {
 // DeclareType writes a type declaration for flag, enum and rec types.
 // For flag and enum types the declaration includes the constant declarations.
 func DeclareType(c *gen.Ctx, m *dom.Model) (err error) {
-	t := m.Typ()
+	t := m.Type
 	switch m.Kind {
 	case typ.KindFlag:
 		c.WriteString("type ")
@@ -149,6 +149,10 @@ func refName(t typ.Type) string {
 		return ""
 	}
 	n, fst := t.Ref, 0
+	if n == "" {
+		d, _ := t.Deopt()
+		return "missing_" + d.Kind.String()
+	}
 	if i := strings.LastIndexByte(n, '.'); i >= 0 {
 		fst = i + 1
 	}

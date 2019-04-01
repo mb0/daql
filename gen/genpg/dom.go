@@ -34,7 +34,7 @@ func WriteFile(c *gen.Ctx, s *dom.Schema) (err error) {
 
 func WriteEnum(b *gen.Ctx, m *dom.Model) error {
 	b.WriteString("CREATE TYPE ")
-	b.WriteString(m.Ref())
+	b.WriteString(m.Type.Key())
 	b.WriteString(" AS ENUM (")
 	b.Indent()
 	for i, c := range m.Consts {
@@ -52,50 +52,50 @@ func WriteEnum(b *gen.Ctx, m *dom.Model) error {
 
 func WriteTable(b *gen.Ctx, m *dom.Model) error {
 	b.WriteString("CREATE TABLE ")
-	b.WriteString(m.Ref())
+	b.WriteString(m.Type.Key())
 	b.WriteString(" (")
 	b.Indent()
-	for i, f := range m.Fields {
+	for i, p := range m.Params {
 		if i > 0 {
 			b.WriteByte(',')
 			if !b.Break() {
 				b.WriteByte(' ')
 			}
 		}
-		writeField(b, f)
+		writeField(b, p, m.Elems[i])
 	}
 	b.Dedent()
 	return b.WriteByte(')')
 }
 
-func writeField(b *gen.Ctx, f *dom.Field) error {
-	key := f.Key()
+func writeField(b *gen.Ctx, p typ.Param, el *dom.Elem) error {
+	key := p.Key()
 	if key == "" {
-		switch f.Type.Kind & typ.MaskRef {
+		switch p.Type.Kind & typ.MaskRef {
 		case typ.KindFlag, typ.KindEnum:
-			split := strings.Split(f.Type.Key(), ".")
+			split := strings.Split(p.Type.Key(), ".")
 			key = split[len(split)-1]
 		case typ.KindRec:
-			return embedField(b, f.Type)
+			return embedField(b, p.Type)
 		default:
-			return cor.Errorf("unexpected embedded field type %s", f.Type)
+			return cor.Errorf("unexpected embedded field type %s", p.Type)
 		}
 	}
 	b.WriteString(key)
 	b.WriteByte(' ')
-	ts, err := TypString(f.Type)
+	ts, err := TypString(p.Type)
 	if err != nil {
 		return err
 	}
-	if ts == "int8" && f.Bits&dom.BitPK != 0 && f.Bits&dom.BitAuto != 0 {
+	if ts == "int8" && el.Bits&dom.BitPK != 0 && el.Bits&dom.BitAuto != 0 {
 		b.WriteString("serial8")
 	} else {
 		b.WriteString(ts)
 	}
-	if f.Bits&dom.BitPK != 0 {
+	if el.Bits&dom.BitPK != 0 {
 		b.WriteString(" PRIMARY KEY")
 		// TODO auto
-	} else if f.Bits&dom.BitOpt != 0 || f.Type.IsOpt() {
+	} else if el.Bits&dom.BitOpt != 0 || p.Type.IsOpt() {
 		b.WriteString(" NULL")
 	} else {
 		b.WriteString(" NOT NULL")

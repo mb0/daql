@@ -22,7 +22,7 @@ const fooRaw = `(schema 'foo'
 	(+Node1 +Name? str)
 	(+Node2 +Start time)
 	(+Node3 +Kind  (flag 'bar.Kind'))
-	(+Node4 +Kind  @Kind)
+	(+Node4 +Kind  (flag 'foo.Kind'))
 )`
 
 func TestWriteFile(t *testing.T) {
@@ -73,7 +73,7 @@ func TestWriteFile(t *testing.T) {
 	for _, test := range tests {
 		var b strings.Builder
 		c := &gen.Ctx{Ctx: bfr.Ctx{B: &b}, Pkg: "path/to/foo", Pkgs: pkgs}
-		ss := &dom.Schema{Name: s.Name}
+		ss := &dom.Schema{Node: dom.Node{Name: s.Name}}
 		if m := s.Model(test.model); m != nil {
 			ss.Models = []*dom.Model{m}
 		}

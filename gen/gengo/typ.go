@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/mb0/daql/gen"
+	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/typ"
 	"github.com/pkg/errors"
 )
@@ -67,7 +68,7 @@ func WriteType(c *gen.Ctx, t typ.Type) error {
 			}
 			err := WriteType(c, f.Type)
 			if err != nil {
-				return err
+				return cor.Errorf("write field %s: %w", f.Name, err)
 			}
 			if name != "" {
 				c.WriteString(" `json:\"")

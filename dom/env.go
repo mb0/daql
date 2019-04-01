@@ -108,19 +108,19 @@ func schemaElem(s *Schema, key string) exp.Resolver {
 	if len(split) > 1 {
 		return modelElem(m, split[1])
 	}
-	return exp.LitResolver{m.Typ()}
+	return exp.LitResolver{typ.Type{m.Kind, &typ.Info{Ref: m.Ref}}}
 }
 
 func modelElem(m *Model, key string) exp.Resolver {
 	if m.Kind&typ.MaskPrim != 0 {
 		c := m.Const(key)
-		if c != nil {
-			return exp.LitResolver{constLit(m, c)}
+		if c.Const != nil {
+			return exp.LitResolver{constLit(m, c.Const)}
 		}
 	} else {
-		f := m.Field(key)
-		if f != nil {
-			return exp.TypedUnresolver{f.Type}
+		e := m.Field(key)
+		if e.Param != nil {
+			return exp.TypedUnresolver{e.Type}
 		}
 	}
 	return nil
@@ -128,7 +128,7 @@ func modelElem(m *Model, key string) exp.Resolver {
 
 func constLit(m *Model, c *cor.Const) lit.Lit {
 	if m.Kind != typ.KindEnum {
-		return lit.FlagInt{m.Typ(), lit.Int(c.Val)}
+		return lit.FlagInt{m.Type, lit.Int(c.Val)}
 	}
-	return lit.EnumStr{m.Typ(), lit.Str(strings.ToLower(c.Name))}
+	return lit.EnumStr{m.Type, lit.Str(strings.ToLower(c.Name))}
 }
