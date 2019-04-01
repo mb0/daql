@@ -106,8 +106,9 @@ func writeField(b *gen.Ctx, p typ.Param, el *dom.Elem) error {
 }
 
 func embedField(b *gen.Ctx, t typ.Type) error {
-	// TODO query embedded dom model instead
-	for i, p := range t.Params {
+	split := strings.Split(t.Key(), ".")
+	m := b.Project.Schema(split[0]).Model(split[1])
+	for i, p := range m.Params {
 		if i > 0 {
 			b.WriteByte(',')
 			if !b.Break() {
