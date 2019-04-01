@@ -3,6 +3,7 @@
 package evt
 
 import (
+	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/lit"
 	"time"
 )
@@ -51,4 +52,63 @@ type Watch struct {
 type Update struct {
 	Rev time.Time `json:"rev"`
 	Evs []*Event  `json:"evs"`
+}
+
+type Result struct {
+	Rev time.Time `json:"rev"`
+	Val lit.Lit   `json:"val"`
+}
+
+type QryReq struct {
+	Arg exp.Dyn `json:"arg"`
+}
+
+type QryRes struct {
+	Res *Result `json:"res,omitempty"`
+	Err string  `json:"err,omitempty"`
+}
+
+type MetaReq struct {
+	Rev time.Time `json:"rev"`
+}
+
+type MetaRes struct {
+	Res *Audit `json:"res,omitempty"`
+	Err string `json:"err,omitempty"`
+}
+
+type HistReq struct {
+	Sig
+}
+
+type HistRes struct {
+	Res *Update `json:"res,omitempty"`
+	Err string  `json:"err,omitempty"`
+}
+
+type PubReq struct {
+	Trans
+}
+
+type PubRes struct {
+	Res *Update `json:"res,omitempty"`
+	Err string  `json:"err,omitempty"`
+}
+
+type SubReq struct {
+	List []Watch `json:"list"`
+}
+
+type SubRes struct {
+	Res *Update `json:"res,omitempty"`
+	Err string  `json:"err,omitempty"`
+}
+
+type UnsubReq struct {
+	List []Watch `json:"list"`
+}
+
+type UnsubRes struct {
+	Res bool   `json:"res,omitempty"`
+	Err string `json:"err,omitempty"`
 }

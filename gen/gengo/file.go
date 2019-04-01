@@ -55,9 +55,6 @@ func WriteFile(c *gen.Ctx, s *dom.Schema) error {
 	f := c.B
 	c.B = b
 	for _, m := range s.Models {
-		if m.Kind == typ.ExpFunc {
-			continue
-		}
 		c.WriteString("\n")
 		err := DeclareType(c, m)
 		if err != nil {
@@ -81,7 +78,7 @@ func WriteFile(c *gen.Ctx, s *dom.Schema) error {
 	}
 	res, err := format.Source(b.Bytes())
 	if err != nil {
-		return err
+		return cor.Errorf("format %s: %w", b.Bytes(), err)
 	}
 	for len(res) > 0 {
 		n, err := f.Write(res)
@@ -115,6 +112,23 @@ func DeclareType(c *gen.Ctx, m *dom.Model) (err error) {
 		t.Kind &^= typ.FlagRef
 		err = WriteType(c, t)
 		c.WriteByte('\n')
+	case typ.ExpFunc:
+		last := len(m.Params) - 1
+		c.WriteString("type ")
+		c.WriteString(m.Name)
+		c.WriteString("Req ")
+		err = WriteType(c, typ.Obj(m.Params[:last]))
+		if err != nil {
+			break
+		}
+		c.WriteString("\n\ntype ")
+		c.WriteString(m.Name)
+		c.WriteString("Res ")
+		err = WriteType(c, typ.Obj([]typ.Param{
+			{Name: "Res?", Type: m.Params[last].Type},
+			{Name: "Err?", Type: typ.Str},
+		}))
+		c.WriteString("\n")
 	default:
 		err = errors.Errorf("model kind %s cannot be declared", m.Kind)
 	}

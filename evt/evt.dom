@@ -45,10 +45,14 @@ It usually is a data operation on a record identified by a topic and primary key
 	+Rev  time
 	+Evs  arr|@Event?
 )
-(+Qry   func + dyn  - any)
-(+Hist  func + @Sig - @Update)
-(+Audit func + time - @Audit)
-(+Pub   func + @Trans     - @Update)
-(+Sub   func + arr|@Watch - @Update)
-(+Unsub func + arr|@Watch - @Update)
+(+Result
+	+Rev time
+	+Val any
+)
+(+Qry   func +Arg dyn  + @Result?)
+(+Meta  func +Rev time + @Audit?)
+(+Hist  func + @Sig    + @Update?)
+(+Pub   func + @Trans  + @Update?)
+(+Sub   func +List arr|@Watch + @Update?)
+(+Unsub func +List arr|@Watch + bool)
 )
