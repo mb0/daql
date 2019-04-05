@@ -3,40 +3,28 @@
 package main
 
 import (
-	"bytes"
 	"flag"
-	"io/ioutil"
 	"log"
-	"os"
 
 	"github.com/mb0/daql/dom"
 	"github.com/mb0/daql/gen"
 	"github.com/mb0/daql/gen/gengo"
 	"github.com/mb0/daql/gen/genpg"
-	"github.com/mb0/xelf/bfr"
 )
 
 func main() {
 	flag.Parse()
-	fname := flag.Arg(0)
-	f, err := os.Open(fname)
+	fname, pr := flag.Arg(0), &dom.Project{}
+	s, err := gen.DomFile(flag.Arg(0), pr)
 	if err != nil {
-		log.Fatalf("open file %s error: %v", fname, err)
-	}
-	defer f.Close()
-	pr := &dom.Project{}
-	env := dom.NewEnv(dom.Env, pr)
-	s, err := dom.Execute(env, f)
-	if err != nil {
-		log.Fatalf("execute %s error: %v", fname, err)
+		log.Fatalf("dom file %s error: %v", fname, err)
 	}
 	writeGo(pr, s)
 	writeSql(pr, s)
 }
+
 func writeGo(pr *dom.Project, s *dom.Schema) {
-	var buf bytes.Buffer
 	b := &gen.Ctx{
-		Ctx:     bfr.Ctx{B: &buf, Tab: "\t"},
 		Project: pr,
 		Pkg:     "github.com/mb0/daql/evt",
 		Pkgs: map[string]string{
@@ -47,19 +35,14 @@ func writeGo(pr *dom.Project, s *dom.Schema) {
 		},
 		Header: "// generated code\n\n",
 	}
-	err := gengo.WriteFile(b, s)
+	err := gengo.WriteFile(b, "evt.go", s)
 	if err != nil {
-		log.Fatalf("gen file evt.go error: %v", err)
-	}
-	err = ioutil.WriteFile("evt.go", buf.Bytes(), 0644)
-	if err != nil {
-		log.Fatalf("write evt.go error: %v", err)
+		log.Fatalf("write file error: %v", err)
 	}
 }
+
 func writeSql(pr *dom.Project, s *dom.Schema) {
-	var buf bytes.Buffer
 	b := &gen.Ctx{
-		Ctx:     bfr.Ctx{B: &buf, Tab: "\t"},
 		Project: pr,
 		Pkg:     "evt",
 		Header:  "-- generated code\n\n",
@@ -73,12 +56,8 @@ func writeSql(pr *dom.Project, s *dom.Schema) {
 		}
 		ss.Models = append(ss.Models, m)
 	}
-	err := genpg.WriteFile(b, &ss)
+	err := genpg.WriteFile(b, "evt.sql", &ss)
 	if err != nil {
-		log.Fatalf("gen file evt.sql error: %v", err)
-	}
-	err = ioutil.WriteFile("evt.sql", buf.Bytes(), 0644)
-	if err != nil {
-		log.Fatalf("write evt.sql error: %v", err)
+		log.Fatalf("write file error: %v", err)
 	}
 }

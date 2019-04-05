@@ -2,6 +2,7 @@
 package gen
 
 import (
+	"os"
 	"sort"
 
 	"github.com/mb0/daql/dom"
@@ -49,4 +50,17 @@ func (i *Imports) Add(path string) {
 	i.List = append(i.List, "")
 	copy(i.List[idx+1:], i.List[idx:])
 	i.List[idx] = path
+}
+
+func DomFile(fname string, pr *dom.Project) (*dom.Schema, error) {
+	f, err := os.Open(fname)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	if pr == nil {
+		pr = &dom.Project{}
+	}
+	env := dom.NewEnv(dom.Env, pr)
+	return dom.Execute(env, f)
 }

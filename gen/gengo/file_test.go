@@ -77,7 +77,7 @@ func TestWriteFile(t *testing.T) {
 		if m := s.Model(test.model); m != nil {
 			ss.Models = []*dom.Model{m}
 		}
-		err := WriteFile(c, ss)
+		err := RenderFile(c, ss)
 		if err != nil {
 			t.Errorf("write %s error: %v", test.model, err)
 			continue

@@ -2,6 +2,7 @@ package gengo
 
 import (
 	"go/format"
+	"io/ioutil"
 	"strings"
 
 	"github.com/mb0/daql/dom"
@@ -45,10 +46,25 @@ func Import(c *gen.Ctx, name string) string {
 	return name
 }
 
-// WriteFile writes the elements to a go file with package and import declarations.
+func WriteFile(c *gen.Ctx, fname string, s *dom.Schema) error {
+	b := bfr.Get()
+	defer bfr.Put(b)
+	c.Ctx = bfr.Ctx{B: b, Tab: "\t"}
+	err := RenderFile(c, s)
+	if err != nil {
+		return cor.Errorf("render file %s error: %v", fname, err)
+	}
+	err = ioutil.WriteFile(fname, b.Bytes(), 0644)
+	if err != nil {
+		return cor.Errorf("write file %s error: %v", fname, err)
+	}
+	return nil
+}
+
+// RenderFile writes the elements to a go file with package and import declarations.
 //
 // For now only flag, enum and rec type definitions are supported
-func WriteFile(c *gen.Ctx, s *dom.Schema) error {
+func RenderFile(c *gen.Ctx, s *dom.Schema) error {
 	b := bfr.Get()
 	defer bfr.Put(b)
 	// swap new buffer with context buffer

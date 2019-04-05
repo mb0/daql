@@ -1,15 +1,32 @@
 package genpg
 
 import (
+	"io/ioutil"
 	"strings"
 
 	"github.com/mb0/daql/dom"
 	"github.com/mb0/daql/gen"
+	"github.com/mb0/xelf/bfr"
 	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/typ"
 )
 
-func WriteFile(c *gen.Ctx, s *dom.Schema) (err error) {
+func WriteFile(c *gen.Ctx, fname string, s *dom.Schema) error {
+	b := bfr.Get()
+	defer bfr.Put(b)
+	c.Ctx = bfr.Ctx{B: b, Tab: "\t"}
+	err := RenderFile(c, s)
+	if err != nil {
+		return cor.Errorf("render file %s error: %v", fname, err)
+	}
+	err = ioutil.WriteFile(fname, b.Bytes(), 0644)
+	if err != nil {
+		return cor.Errorf("write file %s error: %v", fname, err)
+	}
+	return nil
+}
+
+func RenderFile(c *gen.Ctx, s *dom.Schema) (err error) {
 	c.WriteString(c.Header)
 	c.WriteString("BEGIN;\n\n")
 	c.WriteString("CREATE SCHEMA ")
