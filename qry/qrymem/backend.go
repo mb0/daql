@@ -97,7 +97,7 @@ func (b *Backend) execQuery(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 	}
 	rt := t.Type
 	if rt.Kind&typ.MaskElem == typ.KindArr {
-		rt = rt.Next()
+		rt = rt.Elem()
 	} else {
 		rt, _ = rt.Deopt()
 	}

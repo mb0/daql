@@ -226,7 +226,7 @@ func writeApd(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
 	}
 	restore := b.Prec(PrecDef)
 	// either jsonb or postgres array
-	ispg := t.Next().Kind&typ.MaskPrim != 0
+	ispg := t.Elem().Kind&typ.MaskPrim != 0
 	for i, arg := range e.Args {
 		if i > 0 {
 			b.WriteString(" || ")

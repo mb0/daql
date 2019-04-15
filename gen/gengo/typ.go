@@ -42,12 +42,12 @@ func WriteType(c *gen.Ctx, t typ.Type) error {
 		return c.Fmt(Import(c, "lit.List"))
 	case typ.KindArr:
 		c.WriteString("[]")
-		return WriteType(c, t.Next())
+		return WriteType(c, t.Elem())
 	case typ.BaseDict:
 		return c.Fmt(Import(c, "*lit.Dict"))
 	case typ.KindMap:
 		c.WriteString("map[string]")
-		return WriteType(c, t.Next())
+		return WriteType(c, t.Elem())
 	case typ.KindObj:
 		if k&typ.FlagOpt != 0 {
 			c.WriteByte('*')

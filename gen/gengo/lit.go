@@ -63,7 +63,7 @@ func WriteLit(c *gen.Ctx, l lit.Lit) error {
 		return writeIdxer(c, l)
 	case typ.KindArr:
 		c.WriteString("[]")
-		err := WriteType(c, t.Next())
+		err := WriteType(c, t.Elem())
 		if err != nil {
 			return err
 		}
@@ -85,7 +85,7 @@ func WriteLit(c *gen.Ctx, l lit.Lit) error {
 		})
 	case typ.KindMap:
 		c.WriteString("map[string]")
-		err := WriteType(c, t.Next())
+		err := WriteType(c, t.Elem())
 		if err != nil {
 			return err
 		}

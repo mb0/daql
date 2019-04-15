@@ -31,7 +31,7 @@ func TypString(t typ.Type) (string, error) {
 	case typ.KindAny, typ.BaseList, typ.BaseDict, typ.KindMap, typ.KindObj, typ.KindRec:
 		return "jsonb", nil
 	case typ.KindArr:
-		if n := t.Next(); n.Kind&typ.MaskPrim != 0 {
+		if n := t.Elem(); n.Kind&typ.MaskPrim != 0 {
 			res, err := TypString(n)
 			if err != nil {
 				return "", err
@@ -77,7 +77,7 @@ func WriteLit(b *gen.Ctx, l lit.Lit) error {
 	case typ.BaseList:
 		return writeJSONB(b, l)
 	case typ.KindArr:
-		if t.Next().Kind&typ.MaskPrim != 0 {
+		if t.Elem().Kind&typ.MaskPrim != 0 {
 			// use postgres array for one dimensional primitive arrays
 			return writeArray(b, l.(lit.Arr))
 		}
