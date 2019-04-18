@@ -30,10 +30,10 @@ func TestDom(t *testing.T) {
 				Node: Node{Name: "Dir"},
 				Type: typ.Type{typ.KindFlag, &typ.Info{
 					Ref: "test.Dir",
-					Consts: []cor.Const{
-						{"North", 1}, {"East", 2},
-						{"South", 4}, {"West", 8},
-					},
+					Consts: cor.Consts(map[string]int64{
+						"North": 1, "East": 2,
+						"South": 4, "West": 8,
+					}),
 				}},
 				Elems: []*Elem{{}, {}, {}, {}},
 			}}}},
@@ -46,10 +46,10 @@ func TestDom(t *testing.T) {
 				Node: Node{Name: "Dir"},
 				Type: typ.Type{typ.KindEnum, &typ.Info{
 					Ref: "test.Dir",
-					Consts: []cor.Const{
-						{"North", 1}, {"East", 2},
-						{"South", 3}, {"West", 4},
-					},
+					Consts: cor.Consts(map[string]int64{
+						"North": 1, "East": 2,
+						"South": 3, "West": 4,
+					}),
 				}},
 				Elems: []*Elem{{}, {}, {}, {}},
 			}}}},

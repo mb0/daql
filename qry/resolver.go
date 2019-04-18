@@ -284,11 +284,7 @@ func resolveOrd(c *exp.Ctx, env exp.Env, q *Query, desc bool, args []exp.El) err
 		if !ok {
 			return cor.Errorf("want order symbol got %T", arg)
 		}
-		key := sym.Key()
-		if key[0] != '.' {
-			key = "." + key
-		}
-		q.Ord = append(q.Ord, Ord{key, desc})
+		q.Ord = append(q.Ord, Ord{"." + sym.Key(), desc})
 	}
 	return nil
 }

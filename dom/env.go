@@ -130,5 +130,5 @@ func constLit(m *Model, c *cor.Const) lit.Lit {
 	if m.Kind != typ.KindEnum {
 		return lit.FlagInt{m.Type, lit.Int(c.Val)}
 	}
-	return lit.EnumStr{m.Type, lit.Str(strings.ToLower(c.Name))}
+	return lit.EnumStr{m.Type, lit.Str(c.Key())}
 }

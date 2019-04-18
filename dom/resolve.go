@@ -92,7 +92,6 @@ var modelRules = utl.NodeRules{
 				return resolveField(c, m, key, args)
 			}
 			return nil, cor.Errorf("unexpected model kind %s", m.Model.Kind)
-
 		},
 		KeySetter: noopSetter,
 	},
@@ -135,7 +134,7 @@ func resolveConstVal(c *exp.Ctx, env *ModelEnv, args []exp.El, idx int) (_ lit.I
 }
 
 var bitRule = utl.KeyRule{
-	KeyPrepper: utl.FlagPrepper(bitConsts),
+	KeyPrepper: utl.FlagPrepper(cor.Consts(bitConsts)),
 	KeySetter:  utl.FlagSetter("bits"),
 }
 var fieldRules = utl.TagRules{

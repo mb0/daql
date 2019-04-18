@@ -1,8 +1,6 @@
 package gengo
 
 import (
-	"strings"
-
 	"github.com/mb0/daql/gen"
 	"github.com/mb0/xelf/bfr"
 	"github.com/mb0/xelf/cor"
@@ -129,13 +127,15 @@ func WriteLit(c *gen.Ctx, l lit.Lit) error {
 				if !ok {
 					return cor.Errorf("no constant with value %d", v)
 				}
-				c.WriteString(strings.ToLower(tref + e.Name))
+				c.WriteString(tref)
+				c.WriteString(e.Cased())
 			} else {
 				for i, f := range cor.GetFlags(t.Consts, uint64(v)) {
 					if i > 0 {
 						c.WriteString(" | ")
 					}
-					c.WriteString(tref + f.Name)
+					c.WriteString(tref)
+					c.WriteString(f.Cased())
 				}
 			}
 		case string: // must be enum key
@@ -143,7 +143,8 @@ func WriteLit(c *gen.Ctx, l lit.Lit) error {
 			if !ok {
 				return cor.Errorf("no constant with key %s", v)
 			}
-			c.WriteString(tref + cst.Name)
+			c.WriteString(tref)
+			c.WriteString(cst.Cased())
 		default:
 			return cor.Errorf("unexpected constant value %T", valer.Val())
 		}

@@ -22,7 +22,7 @@ const (
 	BitRO
 )
 
-func (Bit) Flag() []cor.Const { return bitConsts }
+func (Bit) Flags() map[string]int64 { return bitConsts }
 
 // Keys is a slice of field keys used for indices and order by definitions.
 type Keys []string
@@ -123,7 +123,7 @@ type ConstElem struct {
 func (m *Model) Const(key string) ConstElem {
 	if m != nil {
 		for i, c := range m.Consts {
-			if strings.EqualFold(c.Name, key) {
+			if c.Key() == key {
 				return ConstElem{&m.Consts[i], m.Elems[i]}
 			}
 		}
@@ -147,14 +147,14 @@ func (m *Model) Field(key string) FieldElem {
 	return FieldElem{}
 }
 
-var bitConsts = []cor.Const{
-	{"Opt", BitOpt},
-	{"PK", BitPK},
-	{"Idx", BitIdx},
-	{"Uniq", BitUniq},
-	{"Ordr", BitOrdr},
-	{"Auto", BitAuto},
-	{"RO", BitRO},
+var bitConsts = map[string]int64{
+	"Opt":  BitOpt,
+	"PK":   BitPK,
+	"Idx":  BitIdx,
+	"Uniq": BitUniq,
+	"Ordr": BitOrdr,
+	"Auto": BitAuto,
+	"RO":   BitRO,
 }
 
 func setNode(n *Node, x lit.Keyed) error {
@@ -273,7 +273,7 @@ func (m *Model) WriteBfr(b *bfr.Ctx) error {
 			c := m.Consts[i]
 			if c.Name != "" {
 				b.WriteString("name:")
-				b.Quote(c.Name)
+				b.Quote(string(c.Name))
 				b.WriteByte(' ')
 			}
 			b.Fmt("val:%d", c.Val)

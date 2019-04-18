@@ -61,7 +61,7 @@ func WriteEnum(b *gen.Ctx, m *dom.Model) error {
 				b.WriteByte(' ')
 			}
 		}
-		WriteQuote(b, c.Name)
+		WriteQuote(b, c.Key())
 	}
 	b.Dedent()
 	return b.WriteByte(')')

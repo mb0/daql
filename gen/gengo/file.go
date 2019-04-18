@@ -200,7 +200,7 @@ func writeFlagConsts(c *gen.Ctx, t typ.Type, ref string) {
 	for i, cst := range t.Consts {
 		c.WriteString("\n\t")
 		c.WriteString(ref)
-		c.WriteString(cst.Name)
+		c.WriteString(cst.Cased())
 		mask := uint64(cst.Val)
 		mono = mono && mask == (1<<uint64(i))
 		if mono {
@@ -216,7 +216,7 @@ func writeFlagConsts(c *gen.Ctx, t typ.Type, ref string) {
 					c.WriteString(" | ")
 				}
 				c.WriteString(ref)
-				c.WriteString(cr.Name)
+				c.WriteString(cr.Cased())
 			}
 		}
 	}
@@ -228,11 +228,11 @@ func writeEnumConsts(c *gen.Ctx, t typ.Type, ref string) {
 	for _, cst := range t.Consts {
 		c.WriteString("\n\t")
 		c.WriteString(ref)
-		c.WriteString(cst.Name)
+		c.WriteString(cst.Cased())
 		c.WriteByte(' ')
 		c.WriteString(ref)
 		c.WriteString(" = \"")
-		c.WriteString(strings.ToLower(cst.Name))
+		c.WriteString(cst.Key())
 		c.WriteByte('"')
 	}
 	c.WriteString("\n)\n")
