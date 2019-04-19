@@ -258,9 +258,9 @@ func writeSet(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
 	// Collect literals and other decls. We can merge all literal directly,
 	// but need to use jsonb_set for references and other expressions.
 	dict := &lit.Dict{}
-	var rest []exp.Decl
+	var rest []*exp.Named
 	for _, d := range decls {
-		switch v := d.Args[0].(type) {
+		switch v := d.El.(type) {
 		case lit.Lit:
 			dict.SetKey(d.Name, v)
 		case *exp.Sym:
@@ -288,7 +288,7 @@ func writeSet(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
 		b.WriteString(", {")
 		b.WriteString(strings.ToLower(d.Name))
 		b.WriteString("}, ")
-		err = WriteEl(b, env, d.Args[0])
+		err = WriteEl(b, env, d.El)
 		if err != nil {
 			return err
 		}

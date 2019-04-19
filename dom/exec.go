@@ -20,7 +20,7 @@ func Execute(env exp.Env, r io.Reader) (*Schema, error) {
 	if err != nil {
 		return nil, err
 	}
-	x, err := exp.Parse(t)
+	x, err := exp.Parse(env, t)
 	if err != nil {
 		return nil, err
 	}

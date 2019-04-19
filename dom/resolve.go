@@ -50,9 +50,10 @@ var schemaRules = utl.NodeRules{
 		},
 	},
 	Decl: utl.KeyRule{
-		KeyPrepper: func(c *exp.Ctx, env exp.Env, name string, args []exp.El) (lit.Lit, error) {
+		KeyPrepper: func(c *exp.Ctx, env exp.Env, n *exp.Named) (lit.Lit, error) {
+			args := n.Args()
 			tmp := make([]exp.El, 0, len(args)+1)
-			tmp = append(tmp, lit.Str(name))
+			tmp = append(tmp, lit.Str(n.Name[1:]))
 			tmp = append(tmp, args...)
 			e, err := resolveModel(c, env, &exp.Expr{modelForm, tmp, typ.Void}, typ.Void)
 			if err != nil {
@@ -83,13 +84,13 @@ var modelRules = utl.NodeRules{
 		},
 	},
 	Decl: utl.KeyRule{
-		KeyPrepper: func(c *exp.Ctx, env exp.Env, key string, args []exp.El) (lit.Lit, error) {
+		KeyPrepper: func(c *exp.Ctx, env exp.Env, n *exp.Named) (lit.Lit, error) {
 			m := env.(*ModelEnv)
 			switch m.Model.Kind {
 			case typ.KindFlag, typ.KindEnum:
-				return resolveConst(c, m, key, args)
+				return resolveConst(c, m, n)
 			case typ.KindRec, typ.ExpFunc:
-				return resolveField(c, m, key, args)
+				return resolveField(c, m, n)
 			}
 			return nil, cor.Errorf("unexpected model kind %s", m.Model.Kind)
 		},
@@ -99,13 +100,13 @@ var modelRules = utl.NodeRules{
 
 func noopSetter(n utl.Node, key string, el lit.Lit) error { return nil }
 
-func resolveConst(c *exp.Ctx, env *ModelEnv, key string, args []exp.El) (lit.Lit, error) {
-	d, err := resolveConstVal(c, env, args, len(env.Model.Consts))
+func resolveConst(c *exp.Ctx, env *ModelEnv, n *exp.Named) (lit.Lit, error) {
+	d, err := resolveConstVal(c, env, n.Args(), len(env.Model.Consts))
 	if err != nil {
 		return nil, cor.Errorf("resolve const val: %w", err)
 	}
 	m := env.Model
-	m.Consts = append(m.Consts, cor.Const{key, int64(d)})
+	m.Consts = append(m.Consts, cor.Const{n.Name[1:], int64(d)})
 	m.Elems = append(m.Elems, &Elem{})
 	return m.Type, nil
 }
@@ -151,12 +152,12 @@ var fieldRules = utl.TagRules{
 	KeyRule: utl.KeyRule{KeySetter: utl.ExtraMapSetter("extra")},
 }
 
-func resolveField(c *exp.Ctx, env *ModelEnv, name string, args []exp.El) (lit.Lit, error) {
-	p, el := typ.Param{Name: name}, &Elem{}
-	if strings.HasSuffix(name, "?") {
+func resolveField(c *exp.Ctx, env *ModelEnv, n *exp.Named) (lit.Lit, error) {
+	p, el := typ.Param{Name: n.Name[1:]}, &Elem{}
+	if strings.HasSuffix(n.Name, "?") {
 		el.Bits = BitOpt
 	}
-	err := utl.ParseTags(c, env, args, &FieldElem{&p, el}, fieldRules)
+	err := utl.ParseTags(c, env, n.Args(), &FieldElem{&p, el}, fieldRules)
 	if err != nil {
 		return nil, cor.Errorf("parsing tags: %w", err)
 	}
@@ -166,7 +167,8 @@ func resolveField(c *exp.Ctx, env *ModelEnv, name string, args []exp.El) (lit.Li
 	return p.Type, nil
 }
 
-func typPrepper(c *exp.Ctx, env exp.Env, key string, args []exp.El) (_ lit.Lit, err error) {
+func typPrepper(c *exp.Ctx, env exp.Env, n *exp.Named) (_ lit.Lit, err error) {
+	args := n.Args()
 	if len(args) == 0 {
 		return nil, cor.Errorf("expect type for model kind")
 	}
@@ -192,12 +194,12 @@ func typSetter(o utl.Node, key string, l lit.Lit) error {
 	return nil
 }
 
-func idxPrepper(c *exp.Ctx, env exp.Env, key string, args []exp.El) (lit.Lit, error) {
-	l, err := utl.DynPrepper(c, env, key, args)
+func idxPrepper(c *exp.Ctx, env exp.Env, n *exp.Named) (lit.Lit, error) {
+	l, err := utl.DynPrepper(c, env, n)
 	if err != nil {
 		return l, cor.Errorf("dyn prepper: %w", err)
 	}
-	uniq := key == "uniq"
+	uniq := n.Key() == "uniq"
 	k := l.Typ().Kind
 	if k&typ.BaseList != 0 {
 		return &lit.Dict{List: []lit.Keyed{{"keys", l}, {"unique", lit.Bool(uniq)}}}, nil

@@ -36,7 +36,7 @@ func resolvePlan(c *exp.Ctx, env exp.Env, x *exp.Expr, hint typ.Type) (exp.El, e
 			return nil, cor.Errorf("either use simple or compound query got %v rest %v",
 				args, lo.Args(1))
 		}
-		t, err := resolveTask(c, env, exp.Decl{Args: args})
+		t, err := resolveTask(c, env, &exp.Named{El: exp.Dyn(args)})
 		if err != nil {
 			return nil, err
 		}
@@ -87,21 +87,22 @@ func resolvePlan(c *exp.Ctx, env exp.Env, x *exp.Expr, hint typ.Type) (exp.El, e
 
 var taskLayout = []typ.Param{{Name: "ref?"}, {Name: "args"}}
 
-func resolveTask(c *exp.Ctx, env exp.Env, d exp.Decl) (*Task, error) {
-	lo, err := exp.LayoutArgs(taskLayout, d.Args)
-	if err != nil {
-		return nil, err
-	}
-	t := &Task{}
+func resolveTask(c *exp.Ctx, env exp.Env, d *exp.Named) (t *Task, err error) {
+	t = &Task{}
 	if d.Name != "" {
 		t.Name = d.Name[1:]
 	}
-	fst := lo.Arg(0)
-	if fst == nil {
+	var fst exp.El
+	if d.El == nil {
 		// must be field selection in a parent query
 		// this transforms +id to (+id .id) an + to (+ .)
 		fst = &exp.Sym{Name: "." + t.Name}
-	} else if fst.Typ() == typ.Sym {
+	} else {
+		lo, err := exp.LayoutArgs(taskLayout, d.Args())
+		if err != nil {
+			return nil, err
+		}
+		fst = lo.Arg(0)
 		switch sym := fst.String(); sym[0] {
 		case '?', '*', '#':
 			err = resolveQuery(c, env, t, sym, lo)
@@ -110,12 +111,10 @@ func resolveTask(c *exp.Ctx, env exp.Env, d exp.Decl) (*Task, error) {
 			}
 			return t, nil
 		}
+		fst = d.Dyn()
 	}
 	if t.Name == "" {
 		return nil, cor.Error("unnamed expr task")
-	}
-	if len(lo.Args(1)) > 0 || len(lo.Args(2)) > 0 {
-		return nil, cor.Error("extra arguments in expr task")
 	}
 	// partially resolve expression
 	fst, err = exp.Resolve(env, fst)
@@ -234,26 +233,26 @@ func resolveQuery(c *exp.Ctx, env exp.Env, t *Task, ref string, lo *exp.Layout) 
 
 func resolveTag(c *exp.Ctx, env exp.Env, q *Query, args []exp.El) (sel []exp.El, err error) {
 	for _, arg := range args {
-		tag, ok := arg.(exp.Tag)
+		tag, ok := arg.(*exp.Named)
 		if !ok {
 			q.Whr = append(q.Whr, arg)
 			continue
 		}
 		switch tag.Name {
 		case ":whr":
-			q.Whr = append(q.Whr, tag.Args...)
+			q.Whr = append(q.Whr, tag.Args()...)
 		case ":lim":
 			// takes one number
-			q.Lim, err = resolveInt(c, env, tag.Args)
+			q.Lim, err = resolveInt(c, env, tag.Args())
 		case ":off":
 			// takes one or two number or a list of two numbers
-			q.Off, err = resolveInt(c, env, tag.Args)
+			q.Off, err = resolveInt(c, env, tag.Args())
 		case ":ord", ":asc", ":desc":
 			// takes one or more field references
 			// can be used multiple times to append to order
-			err = resolveOrd(c, env, q, tag.Name == ":desc", tag.Args)
+			err = resolveOrd(c, env, q, tag.Name == ":desc", tag.Args())
 		case "::":
-			sel = tag.Args
+			sel = tag.Args()
 
 		default:
 			return nil, cor.Errorf("unexpected query tag %q", tag.Name)
@@ -304,16 +303,17 @@ func resolveSel(c *exp.Ctx, env exp.Env, q *Query, args []exp.El) (typ.Type, err
 		return q.Type, nil
 	}
 	for i, arg := range args {
-		d, ok := arg.(exp.Decl)
+		d, ok := arg.(*exp.Named)
 		if !ok || d.Name == "" {
 			return typ.Void, cor.Errorf("expect declaration got %T", arg)
 		}
+		args := d.Args()
 		switch d.Name[0] {
 		case '-':
 			if len(d.Name) == 1 {
-				if len(d.Args) > 0 {
+				if len(args) > 0 {
 					// remove all arguments from fields
-					keys, err := getKeys(d.Args)
+					keys, err := getKeys(args)
 					if err != nil {
 						return typ.Void, err
 					}
@@ -328,7 +328,7 @@ func resolveSel(c *exp.Ctx, env exp.Env, q *Query, args []exp.El) (typ.Type, err
 					res = res[:0]
 				}
 			} else {
-				if len(d.Args) > 0 {
+				if len(args) > 0 {
 					return typ.Void, cor.Errorf("unexpected arguments %s", d)
 				}
 				// remove from fields
@@ -340,12 +340,12 @@ func resolveSel(c *exp.Ctx, env exp.Env, q *Query, args []exp.El) (typ.Type, err
 			}
 		case '+':
 			if len(d.Name) == 1 {
-				if len(d.Args) > 0 {
+				if len(args) > 0 {
 					if i == 0 { // reset with explicit decls
 						res = res[:0]
 					}
 					// include all arguments as fields
-					keys, err := getKeys(d.Args)
+					keys, err := getKeys(args)
 					if err != nil {
 						return typ.Void, err
 					}
@@ -359,7 +359,7 @@ func resolveSel(c *exp.Ctx, env exp.Env, q *Query, args []exp.El) (typ.Type, err
 					}
 				}
 			} else {
-				if len(d.Args) > 0 {
+				if len(args) > 0 {
 					// add arguments as task to sel
 					t, err := resolveTask(c, env, d)
 					if err != nil {

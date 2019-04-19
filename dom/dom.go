@@ -58,10 +58,10 @@ func (n *Node) Key() string {
 // Model represents either a flag, enum or record type and has extra domain information.
 type Model struct {
 	Node
-	typ.Type
-	Elems  []*Elem `json:"elems,omitempty"`
-	Rec    *Record `json:"rec,omitempty"`
-	schema string
+	typ.Type `json:"typ"`
+	Elems    []*Elem `json:"elems,omitempty"`
+	Rec      *Record `json:"rec,omitempty"`
+	schema   string
 }
 
 // Record holds data specific to record types for grouping.

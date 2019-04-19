@@ -42,7 +42,6 @@ func FindEnv(env exp.Env) *ProjectEnv {
 func (s *ProjectEnv) Parent() exp.Env      { return s.pa }
 func (s *ProjectEnv) Supports(x byte) bool { return x == '~' }
 
-func (s *ProjectEnv) Def(sym string, r exp.Resolver) error { return exp.ErrNoDefEnv }
 func (s *ProjectEnv) Get(sym string) exp.Resolver {
 	if sym == "schema" {
 		return schemaForm
@@ -70,8 +69,6 @@ type SchemaEnv struct {
 
 func (s *SchemaEnv) Parent() exp.Env      { return s.parent }
 func (s *SchemaEnv) Supports(x byte) bool { return x == '~' }
-
-func (s *SchemaEnv) Def(sym string, r exp.Resolver) error { return exp.ErrNoDefEnv }
 
 func (r *SchemaEnv) Get(sym string) exp.Resolver {
 	if sym[0] == '~' {

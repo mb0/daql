@@ -77,7 +77,7 @@ func TestQry(t *testing.T) {
 		{testQry, ``},
 	}
 	for _, test := range tests {
-		el, err := exp.ParseString(test.raw)
+		el, err := exp.ParseString(domEnv, test.raw)
 		if err != nil {
 			t.Errorf("parse %s error %+v", test.raw, err)
 			continue

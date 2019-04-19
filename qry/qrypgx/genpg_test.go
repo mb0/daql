@@ -35,7 +35,7 @@ func TestGenQuery(t *testing.T) {
 			`SELECT id, 'label: ' || name AS label FROM prod.cat`},
 	}
 	for _, test := range tests {
-		el, err := exp.ParseString(test.raw)
+		el, err := exp.ParseString(denv, test.raw)
 		if err != nil {
 			t.Errorf("parse %s error %+v", test.raw, err)
 			continue

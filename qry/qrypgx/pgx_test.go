@@ -39,7 +39,7 @@ func TestPgx(t *testing.T) {
 	}
 	pgxBed := New(db, &f.Project)
 	for _, test := range tests {
-		el, err := exp.ParseString(test.raw)
+		el, err := exp.ParseString(domEnv, test.raw)
 		if err != nil {
 			t.Errorf("parse %s error %+v", test.raw, err)
 			continue

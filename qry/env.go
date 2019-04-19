@@ -35,9 +35,8 @@ type PlanEnv struct {
 	Backend
 }
 
-func (p *PlanEnv) Parent() exp.Env              { return p.Par }
-func (*PlanEnv) Supports(x byte) bool           { return x == '/' }
-func (*PlanEnv) Def(string, exp.Resolver) error { return exp.ErrNoDefEnv }
+func (p *PlanEnv) Parent() exp.Env    { return p.Par }
+func (*PlanEnv) Supports(x byte) bool { return x == '/' }
 func (s *PlanEnv) Get(sym string) exp.Resolver {
 	// resolve from added tasks
 	if sym[0] != '/' {
@@ -68,7 +67,6 @@ type TaskEnv struct {
 func (s *TaskEnv) Parent() exp.Env      { return s.Par }
 func (s *TaskEnv) Supports(x byte) bool { return x == '.' }
 
-func (s *TaskEnv) Def(sym string, r exp.Resolver) error { return exp.ErrNoDefEnv }
 func (s *TaskEnv) Get(sym string) exp.Resolver {
 	if sym[0] != '.' {
 		return nil

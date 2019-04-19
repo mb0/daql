@@ -50,7 +50,7 @@ func TestRender(t *testing.T) {
 	unresed(env, typ.Str, "v", "w")
 	unresed(env, typ.Int, "x", "y")
 	for _, test := range tests {
-		el, err := exp.ParseString(test.el)
+		el, err := exp.ParseString(env, test.el)
 		if err != nil {
 			t.Errorf("parse %s err: %v", test.el, err)
 			continue
@@ -73,7 +73,7 @@ func TestRender(t *testing.T) {
 	}
 }
 
-func unresed(env exp.Env, t typ.Type, names ...string) {
+func unresed(env *exp.Scope, t typ.Type, names ...string) {
 	for _, n := range names {
 		env.Def(n, exp.TypedUnresolver{t})
 	}
