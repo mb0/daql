@@ -10,16 +10,16 @@ import (
 	"github.com/mb0/xelf/typ"
 )
 
-var qryForm *exp.Form
+var qryForm *exp.Spec
 
 func init() {
-	qryForm = &exp.Form{exp.FormSig("qry", []typ.Param{
+	qryForm = &exp.Spec{typ.Form("qry", []typ.Param{
 		{Name: "args"}, {Name: "decls"}, {},
 	}), exp.FormResolverFunc(resolvePlan)}
 }
 
-func resolvePlan(c *exp.Ctx, env exp.Env, x *exp.Expr, hint typ.Type) (exp.El, error) {
-	lo, err := exp.LayoutArgs(x.Rslv.Arg(), x.Args)
+func resolvePlan(c *exp.Ctx, env exp.Env, x *exp.Call, hint typ.Type) (exp.El, error) {
+	lo, err := exp.LayoutArgs(x.Spec.Arg(), x.Args)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func resolvePlan(c *exp.Ctx, env exp.Env, x *exp.Expr, hint typ.Type) (exp.El, e
 			return nil, cor.Errorf("either use simple or compound query got %v rest %v",
 				args, lo.Args(1))
 		}
-		t, err := resolveTask(c, env, &exp.Named{El: exp.Dyn(args)})
+		t, err := resolveTask(c, env, &exp.Named{El: &exp.Dyn{Els: args}})
 		if err != nil {
 			return nil, err
 		}
@@ -57,7 +57,7 @@ func resolvePlan(c *exp.Ctx, env exp.Env, x *exp.Expr, hint typ.Type) (exp.El, e
 			p.Root = append(p.Root, t)
 			ps = append(ps, typ.Param{Name: t.Name, Type: t.Type})
 		}
-		rt = typ.Obj(ps)
+		rt = typ.Rec(ps)
 	}
 	if p.Result == nil {
 		// create a synthetic result literal
@@ -119,7 +119,7 @@ func resolveTask(c *exp.Ctx, env exp.Env, d *exp.Named) (t *Task, err error) {
 	// partially resolve expression
 	fst, err = exp.Resolve(env, fst)
 	if err != nil && err != exp.ErrUnres {
-		return nil, err
+		return nil, cor.Errorf("resolve task %s: %v", d, err)
 	}
 	t.Expr = fst
 	if err == nil {
@@ -128,14 +128,14 @@ func resolveTask(c *exp.Ctx, env exp.Env, d *exp.Named) (t *Task, err error) {
 	} else {
 		// check for sym, form or func expression to find a result type
 		var rt typ.Type
-		switch tt := fst.Typ(); tt.Kind {
-		case typ.ExpSym:
-			rt = fst.(*exp.Sym).Type
-		case typ.ExpForm, typ.ExpFunc:
-			if x, ok := fst.(*exp.Expr); ok && x.Type != typ.Void {
-				rt = x.Type
-			} else if tt.Info != nil && len(tt.Params) > 0 {
-				rt = tt.Params[len(tt.Params)-1].Type
+		switch v := fst.(type) {
+		case *exp.Sym:
+			if v.Def != nil {
+				rt = v.Def.Type
+			}
+		case *exp.Call:
+			if v.Def != nil {
+				rt = v.Def.Type
 			}
 		}
 		switch rt.Kind {
@@ -145,16 +145,16 @@ func resolveTask(c *exp.Ctx, env exp.Env, d *exp.Named) (t *Task, err error) {
 		}
 	}
 	if t.Type == typ.Void {
-		panic(cor.Errorf("no type for task %s %s", d, fst))
+		return t, cor.Errorf("no type for task %s", d, fst)
 	}
 	// this is it, we handle the final resolution after planning
 	return t, nil
 }
 
-var andForm *exp.Form
+var andForm *exp.Spec
 
 func init() {
-	andForm = exp.Core("and").(*exp.Form)
+	andForm = exp.Core("and")
 }
 func resolveQuery(c *exp.Ctx, env exp.Env, t *Task, ref string, lo *exp.Layout) error {
 	q := &Query{Ref: ref}
@@ -214,18 +214,18 @@ func resolveQuery(c *exp.Ctx, env exp.Env, t *Task, ref string, lo *exp.Layout) 
 		}
 		q.Lim = 1
 	case '*':
-		t.Type = typ.Arr(rt)
+		t.Type = typ.List(rt)
 	case '#':
 		t.Type = typ.Int
 	}
 	// simplify where clause
-	if len(q.Whr) != 0 {
-		x := &exp.Expr{andForm, q.Whr, typ.Bool}
+	if len(q.Whr.Els) != 0 {
+		x := &exp.Call{Def: exp.DefSpec(andForm), Args: q.Whr.Els}
 		res, err := exp.Resolve(env, x)
 		if err != nil && err != exp.ErrUnres {
 			return err
 		}
-		q.Whr = exp.Dyn{res}
+		q.Whr.Els = []exp.El{res}
 	}
 
 	return nil
@@ -235,12 +235,12 @@ func resolveTag(c *exp.Ctx, env exp.Env, q *Query, args []exp.El) (sel []exp.El,
 	for _, arg := range args {
 		tag, ok := arg.(*exp.Named)
 		if !ok {
-			q.Whr = append(q.Whr, arg)
+			q.Whr.Els = append(q.Whr.Els, arg)
 			continue
 		}
 		switch tag.Name {
 		case ":whr":
-			q.Whr = append(q.Whr, tag.Args()...)
+			q.Whr.Els = append(q.Whr.Els, tag.Args()...)
 		case ":lim":
 			// takes one number
 			q.Lim, err = resolveInt(c, env, tag.Args())
@@ -265,11 +265,11 @@ func resolveTag(c *exp.Ctx, env exp.Env, q *Query, args []exp.El) (sel []exp.El,
 }
 
 func resolveInt(c *exp.Ctx, env exp.Env, args []exp.El) (int, error) {
-	el, err := c.Resolve(env, exp.Dyn(args), typ.Int)
+	el, err := c.Resolve(env, &exp.Dyn{Els: args}, typ.Int)
 	if err != nil {
 		return 0, err
 	}
-	n, ok := el.(lit.Numer)
+	n, ok := el.(lit.Numeric)
 	if !ok {
 		return 0, cor.Errorf("expect int got %s", el.Typ())
 	}
@@ -290,7 +290,7 @@ func resolveOrd(c *exp.Ctx, env exp.Env, q *Query, desc bool, args []exp.El) err
 
 func resolveSel(c *exp.Ctx, env exp.Env, q *Query, args []exp.El) (typ.Type, error) {
 	var ps []typ.Param
-	if q.Type.Kind&typ.MaskElem == typ.KindObj && q.Type.Info != nil {
+	if q.Type.Kind&typ.MaskElem == typ.KindRec && q.Type.Info != nil {
 		ps = q.Type.Params
 	}
 	// start with all fields unless we start with "-"
@@ -387,7 +387,7 @@ func resolveSel(c *exp.Ctx, env exp.Env, q *Query, args []exp.El) (typ.Type, err
 		ps = append(ps, typ.Param{Name: t.Name, Type: t.Type})
 	}
 	q.Sel = res
-	return typ.Obj(ps), nil
+	return typ.Rec(ps), nil
 }
 
 func getKeys(args []exp.El) ([]string, error) {

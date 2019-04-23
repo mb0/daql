@@ -12,7 +12,7 @@ type Detail struct {
 	Created time.Time `json:"created,omitempty"`
 	Arrived time.Time `json:"arrived,omitempty"`
 	Acct    [16]byte  `json:"acct,omitempty"`
-	Extra   *lit.Dict `json:"extra,omitempty"`
+	Extra   *lit.Keyr `json:"extra,omitempty"`
 }
 
 type Audit struct {
@@ -28,7 +28,7 @@ type Sig struct {
 type Action struct {
 	Sig
 	Cmd string    `json:"cmd"`
-	Arg *lit.Dict `json:"arg,omitempty"`
+	Arg *lit.Keyr `json:"arg,omitempty"`
 }
 
 type Event struct {

@@ -16,7 +16,7 @@ type Backend struct {
 	tables map[string]*memTable
 }
 
-func (b *Backend) Add(m *dom.Model, list lit.List) error {
+func (b *Backend) Add(m *dom.Model, list lit.Idxr) error {
 	if b.tables == nil {
 		b.tables = make(map[string]*memTable)
 	}
@@ -96,16 +96,16 @@ func (b *Backend) execQuery(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 		return nil
 	}
 	rt := t.Type
-	if rt.Kind&typ.MaskElem == typ.KindArr {
+	if rt.Kind&typ.MaskElem == typ.KindList {
 		rt = rt.Elem()
 	} else {
 		rt, _ = rt.Deopt()
 	}
-	result := make(lit.List, 0, len(m.data))
+	result := make(lit.Idxr, 0, len(m.data))
 	for _, l := range m.data {
 		if whr != nil {
 			lenv := &exp.DataScope{env, l}
-			res, err := andForm.Resolve(c, lenv, whr, typ.Bool)
+			res, err := andForm.ResolveCall(c, lenv, whr, typ.Bool)
 			if err != nil {
 				return err
 			}
@@ -197,7 +197,7 @@ func (m *Backend) collectSel(c *exp.Ctx, env exp.Env, tt *qry.Task, a lit.Assign
 	}
 	return nil
 }
-func orderResult(list lit.List, sel []qry.Ord) (res error) {
+func orderResult(list lit.Idxr, sel []qry.Ord) (res error) {
 	// TODO order on more than one field
 	ord := sel[0]
 	sort.SliceStable(list, func(i, j int) bool {
@@ -232,7 +232,7 @@ func orderResult(list lit.List, sel []qry.Ord) (res error) {
 
 type memTable struct {
 	rec  typ.Type
-	data lit.List
+	data lit.Idxr
 }
 
 func (m *memTable) execCount(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
@@ -251,7 +251,7 @@ func (m *memTable) execCount(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 		for _, l := range m.data {
 			// skip if it does not resolve to true
 			lenv := &exp.DataScope{env, l}
-			res, err := andForm.Resolve(c, lenv, whr, typ.Bool)
+			res, err := andForm.ResolveCall(c, lenv, whr, typ.Bool)
 			if err != nil {
 				return err
 			}
@@ -275,23 +275,23 @@ func (m *memTable) execCount(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 	return t.Result.Assign(lit.Int(result))
 }
 
-var andForm *exp.Form
+var andForm *exp.Spec
 
 func init() {
-	andForm = exp.Core("and").(*exp.Form)
+	andForm = exp.Core("and")
 }
 
-func prepareWhr(env exp.Env, q *qry.Query) (x *exp.Expr, null bool, _ error) {
-	if len(q.Whr) == 0 {
+func prepareWhr(env exp.Env, q *qry.Query) (x *exp.Call, null bool, _ error) {
+	if len(q.Whr.Els) == 0 {
 		return nil, false, nil
 	}
-	x = &exp.Expr{andForm, q.Whr, typ.Bool}
+	x = &exp.Call{Def: exp.DefSpec(andForm), Args: q.Whr.Els}
 	res, err := exp.Resolve(env, x)
 	if err != nil {
 		if err != exp.ErrUnres {
 			return nil, false, err
 		}
-		return res.(*exp.Expr), false, nil
+		return res.(*exp.Call), false, nil
 	}
 	return nil, res != lit.True, nil
 }

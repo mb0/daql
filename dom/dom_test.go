@@ -16,7 +16,7 @@ func TestDom(t *testing.T) {
 	}{
 		{`(schema 'test')`, `{name:'test'}`, &Schema{Node: Node{Name: "test"}}},
 		{`(schema 'test' :label 'Test Schema')`, `{name:'test' label:'Test Schema'}`,
-			&Schema{Node: Node{Name: "test", Extra: &lit.Dict{List: []lit.Keyed{
+			&Schema{Node: Node{Name: "test", Extra: &lit.Keyr{List: []lit.Keyed{
 				{"label", lit.Str("Test Schema")},
 			}}}},
 		},
@@ -54,27 +54,27 @@ func TestDom(t *testing.T) {
 				Elems: []*Elem{{}, {}, {}, {}},
 			}}}},
 		{`(schema 'test' (+Named :prop "something" +Name str))`,
-			`{name:'test' models:[{name:'Named' typ:'rec' ` +
+			`{name:'test' models:[{name:'Named' typ:'obj' ` +
 				`elems:[{name:'Name' typ:'str'}] ` +
 				`prop:'something'}]}`,
 			&Schema{Node: Node{Name: "test"}, Models: []*Model{{
 				Node: Node{Name: "Named",
-					Extra: &lit.Dict{List: []lit.Keyed{
+					Extra: &lit.Keyr{List: []lit.Keyed{
 						{"prop", lit.Str("something")},
 					}},
 				},
-				Type: typ.Type{typ.KindRec, &typ.Info{
+				Type: typ.Type{typ.KindObj, &typ.Info{
 					Ref:    "test.Named",
 					Params: []typ.Param{{Name: "Name", Type: typ.Str}},
 				}},
 				Elems: []*Elem{{}},
 			}}}},
 		{`(schema 'test' (+Point +X int +Y int))`,
-			`{name:'test' models:[{name:'Point' typ:'rec' ` +
+			`{name:'test' models:[{name:'Point' typ:'obj' ` +
 				`elems:[{name:'X' typ:'int'} {name:'Y' typ:'int'}]}]}`,
 			&Schema{Node: Node{Name: "test"}, Models: []*Model{{
 				Node: Node{Name: "Point"},
-				Type: typ.Type{typ.KindRec, &typ.Info{
+				Type: typ.Type{typ.KindObj, &typ.Info{
 					Ref: "test.Point",
 					Params: []typ.Param{
 						{Name: "X", Type: typ.Int},
@@ -84,11 +84,11 @@ func TestDom(t *testing.T) {
 				Elems: []*Elem{{}, {}},
 			}}}},
 		{`(schema 'test' (+Named +ID uuid :pk +Name str))`,
-			`{name:'test' models:[{name:'Named' typ:'rec' elems:[` +
+			`{name:'test' models:[{name:'Named' typ:'obj' elems:[` +
 				`{name:'ID' typ:'uuid' bits:2} {name:'Name' typ:'str'}]}]}`,
 			&Schema{Node: Node{Name: "test"}, Models: []*Model{{
 				Node: Node{Name: "Named"},
-				Type: typ.Type{typ.KindRec, &typ.Info{
+				Type: typ.Type{typ.KindObj, &typ.Info{
 					Ref: "test.Named",
 					Params: []typ.Param{
 						{Name: "ID", Type: typ.UUID},
@@ -98,11 +98,11 @@ func TestDom(t *testing.T) {
 				Elems: []*Elem{{Bits: BitPK}, {}},
 			}}}},
 		{`(schema 'test' (+Foo +A str) (+Bar +B str))`, `{name:'test' models:[` +
-			`{name:'Foo' typ:'rec' elems:[{name:'A' typ:'str'}]} ` +
-			`{name:'Bar' typ:'rec' elems:[{name:'B' typ:'str'}]}]}`,
+			`{name:'Foo' typ:'obj' elems:[{name:'A' typ:'str'}]} ` +
+			`{name:'Bar' typ:'obj' elems:[{name:'B' typ:'str'}]}]}`,
 			&Schema{Node: Node{Name: "test"}, Models: []*Model{{
 				Node: Node{Name: "Foo"},
-				Type: typ.Type{typ.KindRec, &typ.Info{
+				Type: typ.Type{typ.KindObj, &typ.Info{
 					Ref: "test.Foo",
 					Params: []typ.Param{
 						{Name: "A", Type: typ.Str},
@@ -110,7 +110,7 @@ func TestDom(t *testing.T) {
 				}},
 				Elems: []*Elem{{}},
 			}, {
-				Node: Node{Name: "Bar"}, Type: typ.Type{typ.KindRec, &typ.Info{
+				Node: Node{Name: "Bar"}, Type: typ.Type{typ.KindObj, &typ.Info{
 					Ref: "test.Bar",
 					Params: []typ.Param{
 						{Name: "B", Type: typ.Str},
@@ -119,11 +119,11 @@ func TestDom(t *testing.T) {
 				Elems: []*Elem{{}},
 			}}}},
 		{`(schema 'test' (+Foo +A str) (+Bar +B @Foo))`, `{name:'test' models:[` +
-			`{name:'Foo' typ:'rec' elems:[{name:'A' typ:'str'}]} ` +
-			`{name:'Bar' typ:'rec' elems:[{name:'B' typ:'@test.Foo'}]}]}`,
+			`{name:'Foo' typ:'obj' elems:[{name:'A' typ:'str'}]} ` +
+			`{name:'Bar' typ:'obj' elems:[{name:'B' typ:'@Foo'}]}]}`,
 			&Schema{Node: Node{Name: "test"}, Models: []*Model{{
 				Node: Node{Name: "Foo"},
-				Type: typ.Type{typ.KindRec, &typ.Info{
+				Type: typ.Type{typ.KindObj, &typ.Info{
 					Ref: "test.Foo",
 					Params: []typ.Param{
 						{Name: "A", Type: typ.Str},
@@ -132,10 +132,10 @@ func TestDom(t *testing.T) {
 				Elems: []*Elem{{}},
 			}, {
 				Node: Node{Name: "Bar"},
-				Type: typ.Type{typ.KindRec, &typ.Info{
+				Type: typ.Type{typ.KindObj, &typ.Info{
 					Ref: "test.Bar",
 					Params: []typ.Param{
-						{Name: "B", Type: typ.Rec("test.Foo")},
+						{Name: "B", Type: typ.Obj("Foo")},
 					}},
 				},
 				Elems: []*Elem{{}},
@@ -165,7 +165,6 @@ func TestDom(t *testing.T) {
 		want := test.want.String()
 		if got != want {
 			t.Errorf("string equal want %s got %s", want, got)
-			continue
 		}
 		if got != test.str {
 			t.Errorf("string equal want %s got %s", test.str, got)
@@ -175,7 +174,7 @@ func TestDom(t *testing.T) {
 			t.Errorf("parse %s err: %v", test.str, err)
 		}
 		ss := &Schema{}
-		err = ss.FromDict(res.(*lit.Dict))
+		err = ss.FromDict(res.(*lit.Keyr))
 		if err != nil {
 			t.Errorf("assign %s err: %v", res, err)
 		}

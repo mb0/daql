@@ -121,7 +121,7 @@ func DeclareType(c *gen.Ctx, m *dom.Model) (err error) {
 		c.WriteString(m.Name)
 		c.WriteString(" string\n\n")
 		writeEnumConsts(c, t, m.Name)
-	case typ.KindRec:
+	case typ.KindObj:
 		c.WriteString("type ")
 		c.WriteString(m.Name)
 		c.WriteByte(' ')
@@ -133,14 +133,14 @@ func DeclareType(c *gen.Ctx, m *dom.Model) (err error) {
 		c.WriteString("type ")
 		c.WriteString(m.Name)
 		c.WriteString("Req ")
-		err = WriteType(c, typ.Obj(m.Params[:last]))
+		err = WriteType(c, typ.Rec(m.Params[:last]))
 		if err != nil {
 			break
 		}
 		c.WriteString("\n\ntype ")
 		c.WriteString(m.Name)
 		c.WriteString("Res ")
-		err = WriteType(c, typ.Obj([]typ.Param{
+		err = WriteType(c, typ.Rec([]typ.Param{
 			{Name: "Res?", Type: m.Params[last].Type},
 			{Name: "Err?", Type: typ.Str},
 		}))

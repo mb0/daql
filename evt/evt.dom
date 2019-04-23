@@ -33,17 +33,17 @@ It usually is a data operation on a record identified by a topic and primary key
 
 (+Trans :doc `Trans is an request to publish a list of actions for a base revision.`
 	+Base time
-	+Acts arr|@Action
+	+Acts list|@Action
 	+     @Detail
 )
 (+Watch
 	+Top  str
 	+Rev? time
-	+IDs? arr|str
+	+IDs? list|str
 )
 (+Update
 	+Rev  time
-	+Evs  arr|@Event?
+	+Evs  list|@Event?
 )
 (+Result
 	+Rev time
@@ -53,6 +53,6 @@ It usually is a data operation on a record identified by a topic and primary key
 (+Meta  func +Rev time + @Audit?)
 (+Hist  func + @Sig    + @Update?)
 (+Pub   func + @Trans  + @Update?)
-(+Sub   func +List arr|@Watch + @Update?)
-(+Unsub func +List arr|@Watch + bool)
+(+Sub   func +List list|@Watch + @Update?)
+(+Unsub func +List list|@Watch + bool)
 )

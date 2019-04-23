@@ -27,8 +27,8 @@ func TestRender(t *testing.T) {
 		{`(time '2019-02-11')`, `'2019-02-11T00:00:00+01:00'::timestamptz`},
 		{`(span '1h5m')`, `'1:05:00'::interval`},
 		{`[null true]`, `'[null,true]'::jsonb`},
-		{`(arr|int [1 2 3])`, `'{1,2,3}'::int8[]`},
-		{`(arr|str ['a' 'b' "'"])`, `'{"a","b","''"}'::text[]`},
+		{`(list|int [1 2 3])`, `'{1,2,3}'::int8[]`},
+		{`(list|str ['a' 'b' "'"])`, `'{"a","b","''"}'::text[]`},
 		{`{a: null b: true}`, `'{"a":null,"b":true}'::jsonb`},
 		{`(or a b)`, `a OR b`},
 		{`(not a b)`, `NOT a AND NOT b`},
@@ -50,12 +50,12 @@ func TestRender(t *testing.T) {
 	unresed(env, typ.Str, "v", "w")
 	unresed(env, typ.Int, "x", "y")
 	for _, test := range tests {
-		el, err := exp.ParseString(env, test.el)
+		ex, err := exp.ParseString(env, test.el)
 		if err != nil {
 			t.Errorf("parse %s err: %v", test.el, err)
 			continue
 		}
-		el, err = exp.Resolve(env, el)
+		el, err := exp.Resolve(env, ex)
 		if err != nil && err != exp.ErrUnres {
 			t.Errorf("resolve %s err: %v", test.el, err)
 			continue
@@ -75,6 +75,6 @@ func TestRender(t *testing.T) {
 
 func unresed(env *exp.Scope, t typ.Type, names ...string) {
 	for _, n := range names {
-		env.Def(n, exp.TypedUnresolver{t})
+		env.Def(n, &exp.Def{Type: t})
 	}
 }

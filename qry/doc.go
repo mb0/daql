@@ -59,5 +59,20 @@ delegate to an in-memory backend for cached data and another sql backend as its 
 	(() Previous results can be used in the query)
 	+top10prods *prod.prod (in .cat /top10/id) :asc .name
 )
+
+We could construct a query from tagged struct types, that will also be populated with the results.
+
+type MyQuery struct {
+	All   []prod.Cat `qry:"*prod.cat"`
+	Top10 []prod.Cat `qry:"*prod.cat :lim 10"`
+	Mats  int        `qry:"#prod.cat (eq .kind 'material')"`
+	Nest  *struct{
+		prod.Cat `qry:"."`
+		Prods []struct{
+			ID   [16]byte
+			Name string
+		} `qry:"*prod.prod (eq .cat ..id)" :asc .name`
+	} `qry:"?prod.cat (eq .name $name)"`
+}
 */
 package qry

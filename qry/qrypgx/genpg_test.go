@@ -35,14 +35,14 @@ func TestGenQuery(t *testing.T) {
 			`SELECT id, 'label: ' || name AS label FROM prod.cat`},
 	}
 	for _, test := range tests {
-		el, err := exp.ParseString(denv, test.raw)
+		ex, err := exp.ParseString(denv, test.raw)
 		if err != nil {
 			t.Errorf("parse %s error %+v", test.raw, err)
 			continue
 		}
 		env := qry.NewEnv(denv, nil)
 		c := &exp.Ctx{Part: true}
-		el, err = c.Resolve(env, el, typ.Void)
+		_, err = c.Resolve(env, ex, typ.Void)
 		if err != nil && err != exp.ErrExec {
 			t.Errorf("resolve %s error %+v", test.raw, err)
 			continue

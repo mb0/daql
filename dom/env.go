@@ -42,9 +42,9 @@ func FindEnv(env exp.Env) *ProjectEnv {
 func (s *ProjectEnv) Parent() exp.Env      { return s.pa }
 func (s *ProjectEnv) Supports(x byte) bool { return x == '~' }
 
-func (s *ProjectEnv) Get(sym string) exp.Resolver {
+func (s *ProjectEnv) Get(sym string) *exp.Def {
 	if sym == "schema" {
-		return schemaForm
+		return exp.DefSpec(schemaForm)
 	}
 	prefix := sym[0] == '~'
 	if prefix { // strip prefix and continue
@@ -70,9 +70,9 @@ type SchemaEnv struct {
 func (s *SchemaEnv) Parent() exp.Env      { return s.parent }
 func (s *SchemaEnv) Supports(x byte) bool { return x == '~' }
 
-func (r *SchemaEnv) Get(sym string) exp.Resolver {
+func (r *SchemaEnv) Get(sym string) *exp.Def {
 	if sym[0] == '~' {
-		if len(sym) < 3 || sym[1] != '.' {
+		if len(sym) < 2 || sym[1] != '.' {
 			return nil
 		}
 		sym = sym[2:]
@@ -86,17 +86,17 @@ type ModelEnv struct {
 	Model *Model
 }
 
-func (r *ModelEnv) Get(sym string) exp.Resolver {
+func (r *ModelEnv) Get(sym string) *exp.Def {
 	if sym[0] != '~' {
-		r := modelElem(r.Model, sym[1:])
+		d := modelElem(r.Model, sym[1:])
 		if r != nil {
-			return r
+			return d
 		}
 	}
 	return r.SchemaEnv.Get(sym)
 }
 
-func schemaElem(s *Schema, key string) exp.Resolver {
+func schemaElem(s *Schema, key string) *exp.Def {
 	split := strings.SplitN(key, ".", 2)
 	m := s.Model(split[0])
 	if m == nil {
@@ -105,19 +105,20 @@ func schemaElem(s *Schema, key string) exp.Resolver {
 	if len(split) > 1 {
 		return modelElem(m, split[1])
 	}
-	return exp.LitResolver{typ.Type{m.Kind, &typ.Info{Ref: m.Ref}}}
+	return exp.DefLit(typ.Type{m.Kind, &typ.Info{Ref: m.Ref}})
 }
 
-func modelElem(m *Model, key string) exp.Resolver {
+func modelElem(m *Model, key string) *exp.Def {
 	if m.Kind&typ.MaskPrim != 0 {
 		c := m.Const(key)
 		if c.Const != nil {
-			return exp.LitResolver{constLit(m, c.Const)}
+			l := constLit(m, c.Const)
+			return exp.DefLit(l)
 		}
 	} else {
 		e := m.Field(key)
 		if e.Param != nil {
-			return exp.TypedUnresolver{e.Type}
+			return &exp.Def{Type: e.Type}
 		}
 	}
 	return nil

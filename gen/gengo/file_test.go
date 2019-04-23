@@ -89,7 +89,7 @@ func TestWriteFile(t *testing.T) {
 }
 
 func rec(ref string, fs []typ.Param) typ.Type {
-	res := typ.Rec(ref)
+	res := typ.Obj(ref)
 	res.Params = fs
 	return res
 }

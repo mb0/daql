@@ -10,18 +10,18 @@ import (
 	"github.com/mb0/xelf/utl"
 )
 
-var schemaForm, modelForm *exp.Form
+var schemaForm, modelForm *exp.Spec
 
 func init() {
-	schemaForm = &exp.Form{exp.FormSig("schema", []typ.Param{
+	schemaForm = &exp.Spec{typ.Form("schema", []typ.Param{
 		{Name: "args"}, {Name: "decls"}, {},
 	}), exp.FormResolverFunc(resolveSchema)}
-	modelForm = &exp.Form{exp.FormSig("model", []typ.Param{
+	modelForm = &exp.Spec{typ.Form("model", []typ.Param{
 		{Name: "args"}, {Name: "decls"}, {Name: "tail"}, {},
 	}), exp.FormResolverFunc(resolveModel)}
 }
 
-func resolveSchema(c *exp.Ctx, env exp.Env, x *exp.Expr, h typ.Type) (exp.El, error) {
+func resolveSchema(c *exp.Ctx, env exp.Env, x *exp.Call, h typ.Type) (exp.El, error) {
 	s := &Schema{}
 	env = &SchemaEnv{parent: env, Schema: s}
 	n, err := utl.NodeResolverFunc(schemaRules, s)(c, env, x, h)
@@ -35,9 +35,9 @@ func resolveSchema(c *exp.Ctx, env exp.Env, x *exp.Expr, h typ.Type) (exp.El, er
 	return n, nil
 }
 
-func resolveModel(c *exp.Ctx, env exp.Env, x *exp.Expr, h typ.Type) (exp.El, error) {
+func resolveModel(c *exp.Ctx, env exp.Env, x *exp.Call, h typ.Type) (exp.El, error) {
 	s := env.(*SchemaEnv)
-	m := &Model{Type: typ.Type{typ.KindRec, &typ.Info{}}}
+	m := &Model{Type: typ.Type{typ.KindObj, &typ.Info{}}}
 	env = &ModelEnv{SchemaEnv: s, Model: m}
 	return utl.NodeResolverFunc(modelRules, m)(c, env, x, h)
 }
@@ -55,7 +55,8 @@ var schemaRules = utl.NodeRules{
 			tmp := make([]exp.El, 0, len(args)+1)
 			tmp = append(tmp, lit.Str(n.Name[1:]))
 			tmp = append(tmp, args...)
-			e, err := resolveModel(c, env, &exp.Expr{modelForm, tmp, typ.Void}, typ.Void)
+			call := &exp.Call{Def: exp.DefSpec(modelForm), Args: tmp}
+			e, err := resolveModel(c, env, call, typ.Void)
 			if err != nil {
 				return nil, err
 			}
@@ -89,7 +90,7 @@ var modelRules = utl.NodeRules{
 			switch m.Model.Kind {
 			case typ.KindFlag, typ.KindEnum:
 				return resolveConst(c, m, n)
-			case typ.KindRec, typ.ExpFunc:
+			case typ.KindObj, typ.ExpFunc:
 				return resolveField(c, m, n)
 			}
 			return nil, cor.Errorf("unexpected model kind %s", m.Model.Kind)
@@ -122,7 +123,7 @@ func resolveConstVal(c *exp.Ctx, env *ModelEnv, args []exp.El, idx int) (_ lit.I
 	case 1:
 		el, err = c.Resolve(env, args[0], typ.Int)
 	default:
-		el, err = c.Resolve(env, exp.Dyn(args), typ.Int)
+		el, err = c.Resolve(env, &exp.Dyn{Els: args}, typ.Int)
 	}
 	if err != nil {
 		return 0, err
@@ -201,8 +202,8 @@ func idxPrepper(c *exp.Ctx, env exp.Env, n *exp.Named) (lit.Lit, error) {
 	}
 	uniq := n.Key() == "uniq"
 	k := l.Typ().Kind
-	if k&typ.BaseList != 0 {
-		return &lit.Dict{List: []lit.Keyed{{"keys", l}, {"unique", lit.Bool(uniq)}}}, nil
+	if k&typ.BaseIdxr != 0 {
+		return &lit.Keyr{List: []lit.Keyed{{"keys", l}, {"unique", lit.Bool(uniq)}}}, nil
 	}
 	return l, nil
 }

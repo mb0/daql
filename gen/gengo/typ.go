@@ -1,6 +1,7 @@
 package gengo
 
 import (
+	"log"
 	"strings"
 
 	"github.com/mb0/daql/gen"
@@ -38,17 +39,17 @@ func WriteType(c *gen.Ctx, t typ.Type) error {
 		r = Import(c, "time.Time")
 	case typ.KindSpan:
 		r = Import(c, "time.Duration")
-	case typ.BaseList:
+	case typ.BaseIdxr:
 		return c.Fmt(Import(c, "lit.List"))
-	case typ.KindArr:
+	case typ.KindList:
 		c.WriteString("[]")
 		return WriteType(c, t.Elem())
-	case typ.BaseDict:
+	case typ.BaseKeyr:
 		return c.Fmt(Import(c, "*lit.Dict"))
-	case typ.KindMap:
+	case typ.KindDict:
 		c.WriteString("map[string]")
 		return WriteType(c, t.Elem())
-	case typ.KindObj:
+	case typ.KindRec:
 		if k&typ.FlagOpt != 0 {
 			c.WriteByte('*')
 		}
@@ -82,9 +83,9 @@ func WriteType(c *gen.Ctx, t typ.Type) error {
 		}
 		c.WriteByte('}')
 		return nil
-	case typ.KindFlag, typ.KindEnum, typ.KindRec:
-		// TODO lookup cased name from dom schema
+	case typ.KindFlag, typ.KindEnum, typ.KindObj:
 		r = Import(c, refName(t))
+		log.Printf("got ref %s for %s", r, t)
 	}
 	if r == "" {
 		return errors.Errorf("type %s cannot be represented in go", t)

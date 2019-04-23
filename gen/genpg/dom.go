@@ -92,7 +92,7 @@ func writeField(b *gen.Ctx, p typ.Param, el *dom.Elem) error {
 		case typ.KindFlag, typ.KindEnum:
 			split := strings.Split(p.Type.Key(), ".")
 			key = split[len(split)-1]
-		case typ.KindRec:
+		case typ.KindObj:
 			return embedField(b, p.Type)
 		default:
 			return cor.Errorf("unexpected embedded field type %s", p.Type)

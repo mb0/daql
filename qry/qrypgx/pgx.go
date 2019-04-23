@@ -85,7 +85,7 @@ func CreateModel(tx *pgx.Tx, s *dom.Schema, m *dom.Model) error {
 		return nil
 	case typ.KindEnum:
 		return createModel(tx, m, genpg.WriteEnum)
-	case typ.KindRec:
+	case typ.KindObj:
 		err := createModel(tx, m, genpg.WriteTable)
 		if err != nil {
 			return err
@@ -117,7 +117,7 @@ func dropProject(tx *pgx.Tx, p *dom.Project) error {
 	return nil
 }
 
-func CopyFrom(db *pgx.ConnPool, s *dom.Schema, fix *lit.Dict) error {
+func CopyFrom(db *pgx.ConnPool, s *dom.Schema, fix *lit.Keyr) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -126,7 +126,7 @@ func CopyFrom(db *pgx.ConnPool, s *dom.Schema, fix *lit.Dict) error {
 	for _, kl := range fix.List {
 		m := s.Model(kl.Key)
 		cols := modelColumns(m)
-		src := &litCopySrc{List: kl.Lit.(lit.List), typ: m.Type, cols: cols}
+		src := &litCopySrc{Idxr: kl.Lit.(lit.Idxr), typ: m.Type, cols: cols}
 		_, err := tx.CopyFrom(pgx.Identifier{m.Qual(), m.Key()}, cols, src)
 		if err != nil {
 			return err
@@ -136,7 +136,7 @@ func CopyFrom(db *pgx.ConnPool, s *dom.Schema, fix *lit.Dict) error {
 }
 
 type litCopySrc struct {
-	lit.List
+	lit.Idxr
 	typ  typ.Type
 	cols []string
 	nxt  int
@@ -145,7 +145,7 @@ type litCopySrc struct {
 
 func (c *litCopySrc) Next() bool {
 	c.nxt++
-	return c.err == nil && c.nxt <= len(c.List)
+	return c.err == nil && c.nxt <= len(c.Idxr)
 }
 func (c *litCopySrc) Values() ([]interface{}, error) {
 	el, err := c.Idx(c.nxt - 1)

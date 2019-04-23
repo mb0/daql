@@ -56,17 +56,17 @@ func WriteLit(c *gen.Ctx, l lit.Lit) error {
 			c.WriteByte('*')
 		}
 		return writeCall(c, "cor.Span", l)
-	case typ.BaseList:
+	case typ.BaseIdxr:
 		c.WriteString(Import(c, "lit.List"))
 		return writeIdxer(c, l)
-	case typ.KindArr:
+	case typ.KindList:
 		c.WriteString("[]")
 		err := WriteType(c, t.Elem())
 		if err != nil {
 			return err
 		}
 		return writeIdxer(c, l)
-	case typ.BaseDict:
+	case typ.BaseKeyr:
 		c.WriteString(Import(c, "&lit.Dict"))
 		return writeKeyer(c, l, func(i int, k string, e lit.Lit) error {
 			c.WriteByte('{')
@@ -81,7 +81,7 @@ func WriteLit(c *gen.Ctx, l lit.Lit) error {
 			}
 			return c.WriteByte('}')
 		})
-	case typ.KindMap:
+	case typ.KindDict:
 		c.WriteString("map[string]")
 		err := WriteType(c, t.Elem())
 		if err != nil {
@@ -95,7 +95,7 @@ func WriteLit(c *gen.Ctx, l lit.Lit) error {
 			c.WriteString(": ")
 			return WriteLit(c, e)
 		})
-	case typ.KindObj, typ.KindRec:
+	case typ.KindRec, typ.KindObj:
 		if opt {
 			c.WriteByte('&')
 		}
@@ -164,7 +164,7 @@ func writeCall(c *gen.Ctx, name string, l lit.Lit) error {
 }
 
 func writeIdxer(c *gen.Ctx, l lit.Lit) error {
-	v, ok := l.(lit.Idxer)
+	v, ok := l.(lit.Indexer)
 	if !ok {
 		return cor.Errorf("expect idxer got %T", l)
 	}

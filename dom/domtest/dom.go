@@ -63,7 +63,7 @@ const ProdFixRaw = `{
 
 type ProdProj struct {
 	dom.Project
-	ProdFix *lit.Dict
+	ProdFix *lit.Keyr
 }
 
 func ProdFixture() (*ProdProj, error) {
@@ -77,6 +77,6 @@ func ProdFixture() (*ProdProj, error) {
 	if err != nil {
 		return nil, cor.Errorf("fixture: %w", err)
 	}
-	res.ProdFix = l.(*lit.Dict)
+	res.ProdFix = l.(*lit.Keyr)
 	return res, nil
 }

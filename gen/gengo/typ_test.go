@@ -17,12 +17,12 @@ func TestWriteType(t *testing.T) {
 		imports []string
 	}{
 		{typ.Any, "lit.Lit", []string{"xelf/lit"}},
-		{typ.List, "lit.List", []string{"xelf/lit"}},
-		{typ.Dict, "*lit.Dict", []string{"xelf/lit"}},
+		{typ.Idxer, "lit.List", []string{"xelf/lit"}},
+		{typ.Keyer, "*lit.Dict", []string{"xelf/lit"}},
 		{typ.Bool, "bool", nil},
 		{typ.Span, "time.Duration", []string{"time"}},
-		{typ.Arr(typ.Time), "[]time.Time", []string{"time"}},
-		{typ.Obj([]typ.Param{
+		{typ.List(typ.Time), "[]time.Time", []string{"time"}},
+		{typ.Rec([]typ.Param{
 			{Name: "Foo", Type: typ.Str},
 			{Name: "Bar?", Type: typ.Int},
 			{Name: "Spam", Type: typ.Opt(typ.Int)},

@@ -16,7 +16,7 @@ type (
 		raw  string
 		prec int
 	}
-	writeFunc  func(*gen.Ctx, exp.Env, *exp.Expr) error
+	writeFunc  func(*gen.Ctx, exp.Env, *exp.Call) error
 	writeArith struct {
 		op   string
 		prec int
@@ -33,14 +33,14 @@ type (
 	}
 )
 
-func (r writeRaw) WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
+func (r writeRaw) WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Call) error {
 	restore := b.Prec(r.prec)
 	b.WriteString(r.raw)
 	restore()
 	return nil
 }
-func (r writeFunc) WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Expr) error { return r(b, env, e) }
-func (r writeLogic) WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
+func (r writeFunc) WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Call) error { return r(b, env, e) }
+func (r writeLogic) WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Call) error {
 	restore := b.Prec(r.prec)
 	for i, arg := range e.Args {
 		if i > 0 {
@@ -55,7 +55,7 @@ func (r writeLogic) WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
 	return nil
 }
 
-func (r writeArith) WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
+func (r writeArith) WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Call) error {
 	restore := b.Prec(r.prec)
 	for i, arg := range e.Args {
 		if i > 0 {
@@ -70,7 +70,7 @@ func (r writeArith) WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
 	return nil
 }
 
-func renderIf(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
+func renderIf(b *gen.Ctx, env exp.Env, e *exp.Call) error {
 	restore := b.Prec(PrecDef)
 	b.WriteString("CASE ")
 	var i int
@@ -98,7 +98,7 @@ func renderIf(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
 	return nil
 }
 
-func (r writeEq) WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
+func (r writeEq) WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Call) error {
 	if len(e.Args) > 2 {
 		defer b.Prec(PrecAnd)()
 	}
@@ -142,7 +142,7 @@ func (r writeEq) WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
 	return nil
 }
 
-func (r writeCmp) WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
+func (r writeCmp) WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Call) error {
 	if len(e.Args) > 2 {
 		defer b.Prec(PrecAnd)()
 	}
@@ -169,7 +169,7 @@ func (r writeCmp) WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
 	return nil
 }
 
-func writeAs(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
+func writeAs(b *gen.Ctx, env exp.Env, e *exp.Call) error {
 	if len(e.Args) == 0 {
 		return cor.Errorf("empty as expression")
 	}
@@ -201,7 +201,7 @@ func writeAs(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
 	return nil
 }
 
-func writeCat(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
+func writeCat(b *gen.Ctx, env exp.Env, e *exp.Call) error {
 	restore := b.Prec(PrecDef)
 	for i, arg := range e.Args {
 		if i > 0 {
@@ -216,7 +216,7 @@ func writeCat(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
 	restore()
 	return nil
 }
-func writeApd(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
+func writeApd(b *gen.Ctx, env exp.Env, e *exp.Call) error {
 	if len(e.Args) == 0 {
 		return cor.Errorf("empty apd expression")
 	}
@@ -242,9 +242,9 @@ func writeApd(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
 	return nil
 }
 
-var layoutSet = []typ.Param{{Name: "a", Type: typ.Dict}, {Name: "unis"}}
+var layoutSet = []typ.Param{{Name: "a", Type: typ.Keyer}, {Name: "unis"}}
 
-func writeSet(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
+func writeSet(b *gen.Ctx, env exp.Env, e *exp.Call) error {
 	// First arg can only be a jsonb obj
 	// TODO but check that
 	lo, err := exp.LayoutArgs(layoutSet, e.Args)
@@ -257,7 +257,7 @@ func writeSet(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
 	}
 	// Collect literals and other decls. We can merge all literal directly,
 	// but need to use jsonb_set for references and other expressions.
-	dict := &lit.Dict{}
+	dict := &lit.Keyr{}
 	var rest []*exp.Named
 	for _, d := range decls {
 		switch v := d.El.(type) {
@@ -265,7 +265,7 @@ func writeSet(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
 			dict.SetKey(d.Name, v)
 		case *exp.Sym:
 			rest = append(rest, d)
-		case *exp.Expr:
+		case *exp.Call:
 			rest = append(rest, d)
 		}
 	}
@@ -300,12 +300,14 @@ func writeSet(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
 func writeBool(b *gen.Ctx, env exp.Env, not bool, e exp.El) error {
 	var t typ.Type
 	switch v := e.(type) {
+	case *exp.Sym:
+		if v.Def != nil {
+			t = v.Def.Type
+		}
+	case *exp.Call:
+		t = v.Spec.Res()
 	case lit.Lit:
 		t = v.Typ()
-	case *exp.Sym:
-		t = v.Type
-	case *exp.Expr:
-		t = v.Rslv.Res()
 	default:
 		return cor.Errorf("unexpected element %s", e)
 	}
@@ -386,12 +388,14 @@ func writeString(c *gen.Ctx, env exp.Env, e exp.El) (string, error) {
 
 func elType(e exp.El) typ.Type {
 	switch v := e.(type) {
+	case *exp.Sym:
+		if v.Def != nil {
+			return v.Def.Type
+		}
+	case *exp.Call:
+		return v.Spec.Res()
 	case lit.Lit:
 		return v.Typ()
-	case *exp.Sym:
-		return v.Type
-	case *exp.Expr:
-		return v.Rslv.Res()
 	}
 	return typ.Void
 }
@@ -409,12 +413,12 @@ func zeroStrings(t typ.Type) (zero, alt string, _ error) {
 		zero = "'0001-01-01Z'"
 	case typ.KindEnum:
 		// TODO
-	case typ.KindArr:
+	case typ.KindList:
 		// TODO check if postgres array otherwise
 		fallthrough
-	case typ.BaseList:
+	case typ.BaseIdxr:
 		zero, alt = "'null'", "'[]'"
-	case typ.BaseDict, typ.KindObj, typ.KindRec:
+	case typ.BaseKeyr, typ.KindRec, typ.KindObj:
 		zero, alt = "'null'", "'{}'"
 	default:
 		return "", "", cor.Errorf("error unexpected type %s", t)

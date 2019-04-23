@@ -30,7 +30,7 @@ type Keys []string
 // Elem holds additional information for either constants or type paramters.
 type Elem struct {
 	Bits  Bit       `json:"bits,omitempty"`
-	Extra *lit.Dict `json:"extra,omitempty"`
+	Extra *lit.Keyr `json:"extra,omitempty"`
 }
 
 // Index represents a record model index, mainly used for databases.
@@ -43,7 +43,7 @@ type Index struct {
 // Node represents the common name and version of a model, schema or project.
 type Node struct {
 	Vers  int64     `json:"vers,omitempty"`
-	Extra *lit.Dict `json:"extra,omitempty"`
+	Extra *lit.Keyr `json:"extra,omitempty"`
 	Name  string    `json:"name,omitempty"`
 	key   string
 }
@@ -160,12 +160,12 @@ var bitConsts = map[string]int64{
 func setNode(n *Node, x lit.Keyed) error {
 	switch x.Key {
 	case "name":
-		n.Name = x.Lit.(lit.Charer).Char()
+		n.Name = x.Lit.(lit.Character).Char()
 	case "vers":
-		n.Vers = int64(x.Lit.(lit.Numer).Num())
+		n.Vers = int64(x.Lit.(lit.Numeric).Num())
 	default:
 		if n.Extra == nil {
-			n.Extra = &lit.Dict{}
+			n.Extra = &lit.Keyr{}
 		}
 		_, err := n.Extra.SetKey(x.Key, x.Lit)
 		return err
@@ -173,28 +173,28 @@ func setNode(n *Node, x lit.Keyed) error {
 	return nil
 }
 
-func addElemFromDict(m *Model, d *lit.Dict) error {
+func addElemFromDict(m *Model, d *lit.Keyr) error {
 	var el Elem
 	var p typ.Param
 	var c cor.Const
 	for _, x := range d.List {
 		switch x.Key {
 		case "name":
-			p.Name = x.Lit.(lit.Charer).Char()
+			p.Name = x.Lit.(lit.Character).Char()
 			c.Name = p.Name
 		case "val":
-			c.Val = int64(x.Lit.(lit.Numer).Num())
+			c.Val = int64(x.Lit.(lit.Numeric).Num())
 		case "typ":
-			t, err := typ.ParseSym(x.Lit.(lit.Charer).Char(), nil)
+			t, err := typ.ParseSym(x.Lit.(lit.Character).Char(), nil)
 			if err != nil {
 				return err
 			}
 			p.Type = t
 		case "bits":
-			el.Bits = Bit(x.Lit.(lit.Numer).Num())
+			el.Bits = Bit(x.Lit.(lit.Numeric).Num())
 		default:
 			if el.Extra == nil {
-				el.Extra = &lit.Dict{}
+				el.Extra = &lit.Keyr{}
 			}
 			_, err := el.Extra.SetKey(x.Key, x.Lit)
 			return err
@@ -209,21 +209,21 @@ func addElemFromDict(m *Model, d *lit.Dict) error {
 	return nil
 }
 
-func (m *Model) FromDict(d *lit.Dict) (err error) {
+func (m *Model) FromDict(d *lit.Keyr) (err error) {
 	if m.Info == nil {
-		m.Type.Kind = typ.KindRec
+		m.Type.Kind = typ.KindObj
 		m.Info = &typ.Info{}
 	}
 	for _, x := range d.List {
 		switch x.Key {
 		case "typ":
-			t, err := typ.ParseSym(x.Lit.(lit.Charer).Char(), nil)
+			t, err := typ.ParseSym(x.Lit.(lit.Character).Char(), nil)
 			if err != nil {
 				return err
 			}
 			m.Type.Kind = t.Kind
 		case "elems":
-			idx, ok := x.Lit.(lit.Idxer)
+			idx, ok := x.Lit.(lit.Indexer)
 			if !ok {
 				return cor.Errorf("expect indexer got %T", x.Lit)
 			}
@@ -233,7 +233,7 @@ func (m *Model) FromDict(d *lit.Dict) (err error) {
 				m.Params = make([]typ.Param, 0, n)
 			}
 			err = idx.IterIdx(func(i int, el lit.Lit) error {
-				return addElemFromDict(m, el.(*lit.Dict))
+				return addElemFromDict(m, el.(*lit.Keyr))
 			})
 		default:
 			err = setNode(&m.Node, x)
@@ -293,11 +293,11 @@ func (m *Model) WriteBfr(b *bfr.Ctx) error {
 	return err
 }
 
-func (s *Schema) FromDict(d *lit.Dict) (err error) {
+func (s *Schema) FromDict(d *lit.Keyr) (err error) {
 	for _, x := range d.List {
 		switch x.Key {
 		case "models":
-			idx, ok := x.Lit.(lit.Idxer)
+			idx, ok := x.Lit.(lit.Indexer)
 			if !ok {
 				return cor.Errorf("expect indexer got %T", x.Lit)
 			}
@@ -307,7 +307,7 @@ func (s *Schema) FromDict(d *lit.Dict) (err error) {
 			err = idx.IterIdx(func(i int, el lit.Lit) error {
 				var m Model
 				m.schema = s.Key()
-				err := m.FromDict(el.(*lit.Dict))
+				err := m.FromDict(el.(*lit.Keyr))
 				m.Ref = m.schema + "." + m.Name
 				s.Models = append(s.Models, &m)
 				return err
@@ -344,11 +344,11 @@ func (s *Schema) WriteBfr(b *bfr.Ctx) error {
 	return err
 }
 
-func (p *Project) FromDict(d *lit.Dict) (err error) {
+func (p *Project) FromDict(d *lit.Keyr) (err error) {
 	for _, x := range d.List {
 		switch x.Key {
 		case "schemas":
-			idx, ok := x.Lit.(lit.Idxer)
+			idx, ok := x.Lit.(lit.Indexer)
 			if !ok {
 				return cor.Errorf("expect indexer got %T", x.Lit)
 			}
@@ -357,7 +357,7 @@ func (p *Project) FromDict(d *lit.Dict) (err error) {
 			}
 			err = idx.IterIdx(func(i int, el lit.Lit) error {
 				var s Schema
-				err := s.FromDict(el.(*lit.Dict))
+				err := s.FromDict(el.(*lit.Keyr))
 				p.Schemas = append(p.Schemas, &s)
 				return err
 			})
@@ -394,7 +394,7 @@ func (p *Project) WriteBfr(b *bfr.Ctx) error {
 	return err
 }
 
-func writeExtra(b *bfr.Ctx, extra *lit.Dict) error {
+func writeExtra(b *bfr.Ctx, extra *lit.Keyr) error {
 	if extra != nil && len(extra.List) > 0 {
 		for _, x := range extra.List {
 			b.WriteByte(' ')

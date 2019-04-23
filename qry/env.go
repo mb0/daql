@@ -22,7 +22,7 @@ func NewEnv(env exp.Env, bend Backend) *PlanEnv {
 	return &PlanEnv{s, &Plan{}, bend}
 }
 
-func QryLookup(sym string) exp.Resolver {
+func QryLookup(sym string) *exp.Spec {
 	if sym == "qry" {
 		return qryForm
 	}
@@ -37,13 +37,13 @@ type PlanEnv struct {
 
 func (p *PlanEnv) Parent() exp.Env    { return p.Par }
 func (*PlanEnv) Supports(x byte) bool { return x == '/' }
-func (s *PlanEnv) Get(sym string) exp.Resolver {
+func (s *PlanEnv) Get(sym string) *exp.Def {
 	// resolve from added tasks
 	if sym[0] != '/' {
 		return nil
 	}
 	if len(sym) == 1 {
-		return exp.LitResolver{s.Result}
+		return exp.DefLit(s.Result)
 	}
 	path, err := lit.ReadPath(sym[1:])
 	if err != nil {
@@ -52,7 +52,7 @@ func (s *PlanEnv) Get(sym string) exp.Resolver {
 	sym = path[0].Key
 	for _, t := range s.Root {
 		if t.Name == sym {
-			return &TaskResolver{t, path[1:]}
+			return taskDef(t, path[1:])
 		}
 	}
 	return nil
@@ -67,7 +67,7 @@ type TaskEnv struct {
 func (s *TaskEnv) Parent() exp.Env      { return s.Par }
 func (s *TaskEnv) Supports(x byte) bool { return x == '.' }
 
-func (s *TaskEnv) Get(sym string) exp.Resolver {
+func (s *TaskEnv) Get(sym string) *exp.Def {
 	if sym[0] != '.' {
 		return nil
 	}
@@ -75,26 +75,26 @@ func (s *TaskEnv) Get(sym string) exp.Resolver {
 	if s.Query != nil {
 		for _, t := range s.Query.Sel {
 			if t.Name == sym {
-				return &TaskResolver{t, nil}
+				return taskDef(t, nil)
 			}
 		}
 		if s.Param != nil {
 			l, err := lit.Select(s.Param, sym)
 			if err == nil {
-				return exp.LitResolver{l}
+				return exp.DefLit(l)
 			}
 		} else {
 			// otherwise check query result type
 			p, _, err := s.Query.Type.ParamByKey(sym)
 			if err == nil {
-				return exp.TypedUnresolver{p.Type}
+				return &exp.Def{Type: p.Type}
 			}
 		}
 	}
 	// resolves to result from result type
 	p, _, err := s.Type.ParamByKey(sym)
 	if err == nil {
-		return exp.TypedUnresolver{p.Type}
+		return &exp.Def{Type: p.Type}
 	}
 	return nil
 }
@@ -112,28 +112,23 @@ func FindEnv(env exp.Env) *PlanEnv {
 	return nil
 }
 
-type TaskResolver struct {
-	*Task
-	Rest lit.Path
-}
-
-func (r *TaskResolver) Resolve(c *exp.Ctx, env exp.Env, e exp.El, hint typ.Type) (exp.El, error) {
-	if r.Done {
-		if len(r.Rest) != 0 {
-			return lit.SelectPath(r.Result, r.Rest)
-		}
-		return r.Result, nil
-	}
-	if e.Typ().Kind == typ.ExpSym {
-		t := r.Type
-		if len(r.Rest) != 0 {
-			l, err := lit.SelectPath(t, r.Rest)
+func taskDef(t *Task, path lit.Path) *exp.Def {
+	if t.Done {
+		if len(path) != 0 {
+			l, err := lit.SelectPath(t.Result, path)
 			if err != nil {
-				return nil, err
+				return nil
 			}
-			t = l.(typ.Type)
+			return exp.DefLit(l)
 		}
-		e.(*exp.Sym).Type = t
+		return exp.DefLit(t.Result)
 	}
-	return e, exp.ErrUnres
+	if len(path) != 0 {
+		l, err := lit.SelectPath(t.Type, path)
+		if err != nil {
+			return nil
+		}
+		return &exp.Def{Type: l.(typ.Type)}
+	}
+	return &exp.Def{Type: t.Type}
 }

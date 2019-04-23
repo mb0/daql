@@ -15,13 +15,13 @@ import (
 // This is used for explicit selectors for example.
 func WriteEl(b *gen.Ctx, env exp.Env, e exp.El) error {
 	switch v := e.(type) {
-	case lit.Lit:
-		return WriteLit(b, v)
 	case *exp.Sym:
 		// is this a column name?
 		return WriteRef(b, env, v)
-	case *exp.Expr:
+	case *exp.Call:
 		return WriteExpr(b, env, v)
+	case lit.Lit:
+		return WriteLit(b, v)
 	}
 	return cor.Errorf("unexpected element %[1]T %[1]s", e)
 }
@@ -44,19 +44,22 @@ func WriteRef(b *gen.Ctx, env exp.Env, r *exp.Sym) error {
 // Most xelf expressions with resolvers from the core or lib built-ins have a corresponding
 // expression in postgresql. Custom resolvers can be rendered to sql by detecting
 // and handling them before calling this function.
-func WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Expr) error {
-	key := e.Rslv.Key()
+func WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Call) error {
+	key := e.Spec.Key()
+	if key == "bool" {
+		key = "(bool)"
+	}
 	r := exprWriterMap[key]
 	if r != nil {
 		return r.WriteExpr(b, env, e)
 	}
 	// dyn and reduce are not supported
 	// TODO let and with might use common table expressions on a higher level
-	return cor.Errorf("not implemented for %s", key)
+	return cor.Errorf("no writer for expression %s", e)
 }
 
 type exprWriter interface {
-	WriteExpr(*gen.Ctx, exp.Env, *exp.Expr) error
+	WriteExpr(*gen.Ctx, exp.Env, *exp.Call) error
 }
 
 var exprWriterMap map[string]exprWriter
@@ -121,7 +124,7 @@ func writeJSONB(b *gen.Ctx, l lit.Lit) error {
 	return b.Fmt("::jsonb")
 }
 
-func writeArray(b *gen.Ctx, l lit.Arr) error {
+func writeArray(b *gen.Ctx, l lit.Appender) error {
 	var bb strings.Builder
 	bb.WriteByte('{')
 	err := l.IterIdx(func(i int, e lit.Lit) error {

@@ -27,7 +27,7 @@ func init() {
 	memBed = &qrymem.Backend{}
 	s := f.Schema("prod")
 	for _, kl := range f.ProdFix.List {
-		err = memBed.Add(s.Model(kl.Key), kl.Lit.(lit.List))
+		err = memBed.Add(s.Model(kl.Key), kl.Lit.(lit.Idxr))
 		if err != nil {
 			log.Fatalf("add %s error: %v", kl.Key, err)
 		}
@@ -58,6 +58,7 @@ func TestQry(t *testing.T) {
 	}{
 		{`(qry ?prod.cat)`, `{id:25 name:'y'}`},
 		{`(qry +count #prod.cat)`, `{count:7}`},
+		{`(qry +cat ?prod.cat +count #prod.cat)`, `{cat:{id:25 name:'y'} count:7}`},
 		{`(qry ?prod.cat.name)`, `'y'`},
 		{`(qry *prod.cat :lim 3)`, `[{id:25 name:'y'} {id:2 name:'b'} {id:3 name:'c'}]`},
 		{`(qry *prod.cat :lim 3 :asc .name)`,
@@ -86,7 +87,7 @@ func TestQry(t *testing.T) {
 		c := &exp.Ctx{Exec: true}
 		l, err := c.Resolve(env, el, typ.Void)
 		if err != nil {
-			t.Errorf("resolve %s error %+v\n%v", el, err, c.Unres)
+			t.Errorf("resolve %s error %+v", test.raw, err)
 			continue
 		}
 		if test.want == "" {

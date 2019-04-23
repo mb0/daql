@@ -60,9 +60,9 @@ func genQuery(b *gen.Ctx, c *exp.Ctx, env exp.Env, t *qry.Task) error {
 	}
 	b.WriteString(" FROM ")
 	b.WriteString(strings.ToLower(q.Ref[1:]))
-	if len(q.Whr) > 0 {
+	if len(q.Whr.Els) > 0 {
 		b.WriteString(" WHERE ")
-		err := genpg.WriteEl(b, env, q.Whr[0])
+		err := genpg.WriteEl(b, env, q.Whr.Els[0])
 		if err != nil {
 			return err
 		}
