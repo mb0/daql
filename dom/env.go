@@ -44,7 +44,7 @@ func (s *ProjectEnv) Supports(x byte) bool { return x == '~' }
 
 func (s *ProjectEnv) Get(sym string) *exp.Def {
 	if sym == "schema" {
-		return exp.DefSpec(schemaForm)
+		return exp.DefSpec(schemaSpec)
 	}
 	prefix := sym[0] == '~'
 	if prefix { // strip prefix and continue

@@ -10,37 +10,28 @@ import (
 	"github.com/mb0/xelf/utl"
 )
 
-var schemaForm, modelForm *exp.Spec
+var schemaSpec = exp.Implement("(form 'schema' :args :decls : @)", false,
+	func(c *exp.Ctx, env exp.Env, x *exp.Call, lo *exp.Layout, h typ.Type) (exp.El, error) {
+		s := &Schema{}
+		env = &SchemaEnv{parent: env, Schema: s}
+		n, err := utl.NodeResolverFunc(schemaRules, s)(c, env, x, h)
+		if err != nil {
+			return n, err
+		}
+		pro := FindEnv(env)
+		if pro != nil {
+			pro.Schemas = append(pro.Schemas, n.(utl.Node).Ptr().(*Schema))
+		}
+		return n, nil
+	})
 
-func init() {
-	schemaForm = &exp.Spec{typ.Form("schema", []typ.Param{
-		{Name: "args"}, {Name: "decls"}, {},
-	}), exp.FormResolverFunc(resolveSchema)}
-	modelForm = &exp.Spec{typ.Form("model", []typ.Param{
-		{Name: "args"}, {Name: "decls"}, {Name: "tail"}, {},
-	}), exp.FormResolverFunc(resolveModel)}
-}
-
-func resolveSchema(c *exp.Ctx, env exp.Env, x *exp.Call, h typ.Type) (exp.El, error) {
-	s := &Schema{}
-	env = &SchemaEnv{parent: env, Schema: s}
-	n, err := utl.NodeResolverFunc(schemaRules, s)(c, env, x, h)
-	if err != nil {
-		return n, err
-	}
-	pro := FindEnv(env)
-	if pro != nil {
-		pro.Schemas = append(pro.Schemas, n.(utl.Node).Ptr().(*Schema))
-	}
-	return n, nil
-}
-
-func resolveModel(c *exp.Ctx, env exp.Env, x *exp.Call, h typ.Type) (exp.El, error) {
-	s := env.(*SchemaEnv)
-	m := &Model{Type: typ.Type{typ.KindObj, &typ.Info{}}}
-	env = &ModelEnv{SchemaEnv: s, Model: m}
-	return utl.NodeResolverFunc(modelRules, m)(c, env, x, h)
-}
+var modelSpec = exp.Implement("(form 'model' :args :decls :tail : @)", false,
+	func(c *exp.Ctx, env exp.Env, x *exp.Call, lo *exp.Layout, h typ.Type) (exp.El, error) {
+		s := env.(*SchemaEnv)
+		m := &Model{Type: typ.Type{typ.KindObj, &typ.Info{}}}
+		env = &ModelEnv{SchemaEnv: s, Model: m}
+		return utl.NodeResolverFunc(modelRules, m)(c, env, x, h)
+	})
 
 var schemaRules = utl.NodeRules{
 	Tags: utl.TagRules{
@@ -55,8 +46,8 @@ var schemaRules = utl.NodeRules{
 			tmp := make([]exp.El, 0, len(args)+1)
 			tmp = append(tmp, lit.Str(n.Name[1:]))
 			tmp = append(tmp, args...)
-			call := &exp.Call{Def: exp.DefSpec(modelForm), Args: tmp}
-			e, err := resolveModel(c, env, call, typ.Void)
+			call := &exp.Call{Def: exp.DefSpec(modelSpec), Args: tmp}
+			e, err := modelSpec.ResolveCall(c, env, call, typ.Void)
 			if err != nil {
 				return nil, err
 			}

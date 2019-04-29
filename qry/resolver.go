@@ -10,80 +10,69 @@ import (
 	"github.com/mb0/xelf/typ"
 )
 
-var qryForm *exp.Spec
-
-func init() {
-	qryForm = &exp.Spec{typ.Form("qry", []typ.Param{
-		{Name: "args"}, {Name: "decls"}, {},
-	}), exp.FormResolverFunc(resolvePlan)}
-}
-
-func resolvePlan(c *exp.Ctx, env exp.Env, x *exp.Call, hint typ.Type) (exp.El, error) {
-	lo, err := exp.LayoutArgs(x.Spec.Arg(), x.Args)
-	if err != nil {
-		return nil, err
-	}
-	penv := FindEnv(env)
-	if penv == nil {
-		return nil, cor.Errorf("no plan environment for query %s", x)
-	}
-	p := penv.Plan
-	args := lo.Args(0)
-	var rt typ.Type
-	if len(args) > 0 {
-		// simple query
-		if len(lo.Args(1)) > 0 {
-			return nil, cor.Errorf("either use simple or compound query got %v rest %v",
-				args, lo.Args(1))
+var qrySpec = exp.Implement("(form 'qry' :args :decls : @)", false,
+	func(c *exp.Ctx, env exp.Env, x *exp.Call, lo *exp.Layout, hint typ.Type) (exp.El, error) {
+		penv := FindEnv(env)
+		if penv == nil {
+			return nil, cor.Errorf("no plan environment for query %s", x)
 		}
-		t, err := resolveTask(c, env, exp.NewNamed("", args...))
-		if err != nil {
-			return nil, err
-		}
-		p.Simple = true
-		p.Root = []*Task{t}
-		rt = t.Type
-	} else {
-		decls, err := lo.Decls(1)
-		if err != nil {
-			return nil, err
-		}
-		ps := make([]typ.Param, 0, len(decls))
-		for _, d := range decls {
-			t, err := resolveTask(c, env, d)
+		p := penv.Plan
+		args := lo.Args(0)
+		var rt typ.Type
+		if len(args) > 0 {
+			// simple query
+			if len(lo.Args(1)) > 0 {
+				return nil, cor.Errorf("either use simple or compound query got %v rest %v",
+					args, lo.Args(1))
+			}
+			t, err := resolveTask(c, env, exp.NewNamed("", args...))
 			if err != nil {
 				return nil, err
 			}
-			p.Root = append(p.Root, t)
-			ps = append(ps, typ.Param{Name: t.Name, Type: t.Type})
+			p.Simple = true
+			p.Root = []*Task{t}
+			rt = t.Type
+		} else {
+			decls, err := lo.Decls(1)
+			if err != nil {
+				return nil, err
+			}
+			ps := make([]typ.Param, 0, len(decls))
+			for _, d := range decls {
+				t, err := resolveTask(c, env, d)
+				if err != nil {
+					return nil, err
+				}
+				p.Root = append(p.Root, t)
+				ps = append(ps, typ.Param{Name: t.Name, Type: t.Type})
+			}
+			rt = typ.Rec(ps)
 		}
-		rt = typ.Rec(ps)
-	}
-	if p.Result == nil {
-		// create a synthetic result literal
-		p.Result = lit.ZeroProxy(rt)
-	} else {
-		// compare to expected result
-		cmp := typ.Compare(rt, p.Result.Typ())
-		if cmp < typ.LvlCheck {
-			return nil, cor.Errorf(
-				"cannot convert query result type %s to expected result type",
-				rt, p.Result.Typ(),
-			)
+		if p.Result == nil {
+			// create a synthetic result literal
+			p.Result = lit.ZeroProxy(rt)
+		} else {
+			// compare to expected result
+			cmp := typ.Compare(rt, p.Result.Typ())
+			if cmp < typ.LvlCheck {
+				return nil, cor.Errorf(
+					"cannot convert query result type %s to expected result type",
+					rt, p.Result.Typ(),
+				)
+			}
 		}
-	}
-	if len(p.Root) == 0 {
-		return nil, cor.Error("empty plan")
-	}
-	if !c.Exec {
-		return x, exp.ErrExec
-	}
-	err = penv.ExecPlan(c, env, p)
-	if err != nil {
-		return nil, err
-	}
-	return p.Result, nil
-}
+		if len(p.Root) == 0 {
+			return nil, cor.Error("empty plan")
+		}
+		if !c.Exec {
+			return x, exp.ErrExec
+		}
+		err := penv.ExecPlan(c, env, p)
+		if err != nil {
+			return nil, err
+		}
+		return p.Result, nil
+	})
 
 var taskLayout = []typ.Param{{Name: "ref?"}, {Name: "args"}, {Name: "decls"}}
 
@@ -154,11 +143,8 @@ func resolveTask(c *exp.Ctx, env exp.Env, d *exp.Named) (t *Task, err error) {
 	return t, nil
 }
 
-var andForm *exp.Spec
+var andSpec = exp.Core("and")
 
-func init() {
-	andForm = exp.Core("and")
-}
 func resolveQuery(c *exp.Ctx, env exp.Env, t *Task, ref string, lo *exp.Layout) error {
 	q := &Query{Ref: ref}
 	name := ref[1:]
@@ -224,7 +210,7 @@ func resolveQuery(c *exp.Ctx, env exp.Env, t *Task, ref string, lo *exp.Layout) 
 	}
 	// simplify where clause
 	if len(q.Whr.Els) != 0 {
-		x := &exp.Call{Def: exp.DefSpec(andForm), Args: q.Whr.Els}
+		x := &exp.Call{Def: exp.DefSpec(andSpec), Args: q.Whr.Els}
 		res, err := exp.Resolve(env, x)
 		if err != nil && err != exp.ErrUnres {
 			return err

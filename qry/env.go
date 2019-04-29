@@ -24,7 +24,7 @@ func NewEnv(env exp.Env, bend Backend) *PlanEnv {
 
 func QryLookup(sym string) *exp.Spec {
 	if sym == "qry" {
-		return qryForm
+		return qrySpec
 	}
 	return nil
 }
