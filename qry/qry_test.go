@@ -35,18 +35,35 @@ func init() {
 }
 
 var testQry = `(qry
-	+cat ?prod.cat
-	+name ?prod.cat.name
+	+cat   ?prod.cat
+	+name  ?prod.cat.name
 	+all   *prod.cat
 	+top10 *prod.cat :lim 10
 	+page3 *prod.cat :off 20 :lim 10
 	+named ?prod.cat (eq .name 'a')
 	+param ?prod.prod (eq .name 'A') :desc cat :asc .name
 	+numc  #prod.prod (eq cat 3)
-	+infoLabel *prod.label (:: +id +label ('Label: ' .name))
-	+leanLabel *prod.label (:: +tmpl)
-	+nest ?prod.cat (eq .name 'a') (::
-		+prods *prod.prod (eq .cat ..id) :asc .name (:: +id +name)
+	+infoLabel (*prod.label +id +label ('Label: ' .name))
+	+leanLabel (*prod.label +tmpl)
+	+nest (?prod.cat (eq .name 'a')
+		+prods (*prod.prod (eq .cat ..id) :asc .name +id +name)
+	)
+	+top10prods *prod.prod (in .cat /top10/id) :asc .name
+)`
+
+var testQry1 = `(qry
+	+cat   ?prod.cat
+	+name  ?prod.cat.name
+	+all   *prod.cat
+	+top10 *prod.cat :lim 10)
+	+page3 *prod.cat :off 20 :lim 10
+	+named ?prod.cat (eq .name 'a')
+	+param ?prod.prod (eq .name 'A') :desc cat :asc .name
+	+numc  #prod.prod (eq cat 3)
+	+infoLabel (*prod.label +id +label ('Label: ' .name))
+	+leanLabel (*prod.label +tmpl)
+	+nest (?prod.cat (eq .name 'a')
+		+prods (*prod.prod (eq .cat ..id) :asc .name +id +name)
 	)
 	+top10prods *prod.prod (in .cat /top10/id) :asc .name
 )`
@@ -66,13 +83,13 @@ func TestQry(t *testing.T) {
 		{`(qry *prod.cat :off 1 :lim 2 :desc .name)`,
 			`[{id:25 name:'y'} {id:24 name:'x'}]`},
 		{`(qry ?prod.cat (eq .name 'c'))`, `{id:3 name:'c'}`},
-		{`(qry ?prod.label (:: +id +label ('Label: ' .name)))`, `{id:1 label:'Label: M'}`},
-		{`(qry *prod.label :off 1 :lim 2 (:: -tmpl))`, `[{id:2 name:'N'} {id:3 name:'O'}]`},
-		{`(qry ?prod.cat (eq .name 'c') (::
-			+prods *prod.prod (eq .cat ..id) :asc .name (:: +id +name)
+		{`(qry (?prod.label +id +label ('Label: ' .name)))`, `{id:1 label:'Label: M'}`},
+		{`(qry (*prod.label :off 1 :lim 2 -tmpl))`, `[{id:2 name:'N'} {id:3 name:'O'}]`},
+		{`(qry (?prod.cat (eq .name 'c')
+			+prods (*prod.prod (eq .cat ..id) :asc .name +id +name)
 		))`, `{id:3 name:'c' prods:[{id:1 name:'A'} {id:3 name:'C'}]}`},
-		{`(qry *prod.cat (or (eq .name 'b') (eq .name 'c')) (::
-			+prods *prod.prod (eq .cat ..id) :asc .name (:: +id +name)
+		{`(qry (*prod.cat (or (eq .name 'b') (eq .name 'c'))
+			+prods (*prod.prod (eq .cat ..id) :asc .name +id +name)
 		))`, `[{id:2 name:'b' prods:[{id:2 name:'B'} {id:4 name:'D'}]} ` +
 			`{id:3 name:'c' prods:[{id:1 name:'A'} {id:3 name:'C'}]}]`},
 		{testQry, ``},

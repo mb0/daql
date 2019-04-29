@@ -36,7 +36,7 @@ func resolvePlan(c *exp.Ctx, env exp.Env, x *exp.Call, hint typ.Type) (exp.El, e
 			return nil, cor.Errorf("either use simple or compound query got %v rest %v",
 				args, lo.Args(1))
 		}
-		t, err := resolveTask(c, env, &exp.Named{El: &exp.Dyn{Els: args}})
+		t, err := resolveTask(c, env, exp.NewNamed("", args...))
 		if err != nil {
 			return nil, err
 		}
@@ -85,7 +85,7 @@ func resolvePlan(c *exp.Ctx, env exp.Env, x *exp.Call, hint typ.Type) (exp.El, e
 	return p.Result, nil
 }
 
-var taskLayout = []typ.Param{{Name: "ref?"}, {Name: "args"}}
+var taskLayout = []typ.Param{{Name: "ref?"}, {Name: "args"}, {Name: "decls"}}
 
 func resolveTask(c *exp.Ctx, env exp.Env, d *exp.Named) (t *Task, err error) {
 	t = &Task{}
@@ -105,6 +105,9 @@ func resolveTask(c *exp.Ctx, env exp.Env, d *exp.Named) (t *Task, err error) {
 		fst = lo.Arg(0)
 		switch sym := fst.String(); sym[0] {
 		case '?', '*', '#':
+			if d.Name == "" {
+				t.Name = cor.LastKey(sym)
+			}
 			err = resolveQuery(c, env, t, sym, lo)
 			if err != nil {
 				return nil, err
@@ -114,7 +117,7 @@ func resolveTask(c *exp.Ctx, env exp.Env, d *exp.Named) (t *Task, err error) {
 		fst = d.Dyn()
 	}
 	if t.Name == "" {
-		return nil, cor.Error("unnamed expr task")
+		return nil, cor.Errorf("unnamed expr task %s", d)
 	}
 	// partially resolve expression
 	fst, err = exp.Resolve(env, fst)
@@ -195,10 +198,11 @@ func resolveQuery(c *exp.Ctx, env exp.Env, t *Task, ref string, lo *exp.Layout) 
 	}
 	args := lo.Args(1)
 	tenv := &TaskEnv{env, t, nil}
-	sel, err := resolveTag(c, tenv, q, args)
+	err := resolveTag(c, tenv, q, args)
 	if err != nil {
 		return err
 	}
+	sel := lo.Args(2)
 	rt, err := resolveSel(c, tenv, q, sel)
 	if err != nil {
 		return err
@@ -227,11 +231,10 @@ func resolveQuery(c *exp.Ctx, env exp.Env, t *Task, ref string, lo *exp.Layout) 
 		}
 		q.Whr.Els = []exp.El{res}
 	}
-
 	return nil
 }
 
-func resolveTag(c *exp.Ctx, env exp.Env, q *Query, args []exp.El) (sel []exp.El, err error) {
+func resolveTag(c *exp.Ctx, env exp.Env, q *Query, args []exp.El) (err error) {
 	for _, arg := range args {
 		tag, ok := arg.(*exp.Named)
 		if !ok {
@@ -251,17 +254,14 @@ func resolveTag(c *exp.Ctx, env exp.Env, q *Query, args []exp.El) (sel []exp.El,
 			// takes one or more field references
 			// can be used multiple times to append to order
 			err = resolveOrd(c, env, q, tag.Name == ":desc", tag.Args())
-		case "::":
-			sel = tag.Args()
-
 		default:
-			return nil, cor.Errorf("unexpected query tag %q", tag.Name)
+			return cor.Errorf("unexpected query tag %q", tag.Name)
 		}
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return sel, nil
+	return nil
 }
 
 func resolveInt(c *exp.Ctx, env exp.Env, args []exp.El) (int, error) {

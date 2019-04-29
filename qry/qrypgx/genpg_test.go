@@ -27,11 +27,11 @@ func TestGenQuery(t *testing.T) {
 		{`(qry *prod.cat)`, `SELECT id, name FROM prod.cat`},
 		{`(qry ?prod.cat)`, `SELECT id, name FROM prod.cat LIMIT 1`},
 		{`(qry ?prod.cat :off 2)`, `SELECT id, name FROM prod.cat LIMIT 1 OFFSET 2`},
-		{`(qry *prod.cat (:: +id))`, `SELECT id FROM prod.cat`},
+		{`(qry (*prod.cat +id))`, `SELECT id FROM prod.cat`},
 		{`(qry *prod.cat (gt .name 'B'))`,
 			`SELECT id, name FROM prod.cat WHERE name > 'B'`},
 		{`(qry *prod.cat :asc .name)`, `SELECT id, name FROM prod.cat ORDER BY name`},
-		{`(qry *prod.cat (:: +id +label ('label: ' .name)))`,
+		{`(qry (*prod.cat +id +label ('label: ' .name)))`,
 			`SELECT id, 'label: ' || name AS label FROM prod.cat`},
 	}
 	for _, test := range tests {
