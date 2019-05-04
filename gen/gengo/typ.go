@@ -16,12 +16,12 @@ func WriteType(c *gen.Ctx, t typ.Type) error {
 	switch k {
 	case typ.KindAny:
 		return c.Fmt(Import(c, "lit.Lit"))
-	case typ.ExpDyn:
+	case typ.KindDyn:
 		return c.Fmt(Import(c, "exp.Dyn"))
 	}
 	var r string
 	switch k & typ.MaskRef {
-	case typ.BaseNum:
+	case typ.KindNum:
 		r = "float64"
 	case typ.KindBool:
 		r = "bool"
@@ -29,7 +29,7 @@ func WriteType(c *gen.Ctx, t typ.Type) error {
 		r = "int64"
 	case typ.KindReal:
 		r = "float64"
-	case typ.BaseChar, typ.KindStr:
+	case typ.KindChar, typ.KindStr:
 		r = "string"
 	case typ.KindRaw:
 		r = "[]byte"
@@ -39,18 +39,18 @@ func WriteType(c *gen.Ctx, t typ.Type) error {
 		r = Import(c, "time.Time")
 	case typ.KindSpan:
 		r = Import(c, "time.Duration")
-	case typ.BaseIdxr:
+	case typ.KindIdxr:
 		return c.Fmt(Import(c, "lit.List"))
 	case typ.KindList:
 		c.WriteString("[]")
 		return WriteType(c, t.Elem())
-	case typ.BaseKeyr:
+	case typ.KindKeyr:
 		return c.Fmt(Import(c, "*lit.Dict"))
 	case typ.KindDict:
 		c.WriteString("map[string]")
 		return WriteType(c, t.Elem())
 	case typ.KindRec:
-		if k&typ.FlagOpt != 0 {
+		if k&typ.KindOpt != 0 {
 			c.WriteByte('*')
 		}
 		if t.Info == nil {
@@ -83,14 +83,14 @@ func WriteType(c *gen.Ctx, t typ.Type) error {
 		}
 		c.WriteByte('}')
 		return nil
-	case typ.KindFlag, typ.KindEnum, typ.KindObj:
+	case typ.KindBits, typ.KindEnum, typ.KindObj:
 		r = Import(c, refName(t))
 		log.Printf("got ref %s for %s", r, t)
 	}
 	if r == "" {
 		return errors.Errorf("type %s cannot be represented in go", t)
 	}
-	if k&typ.FlagOpt != 0 {
+	if k&typ.KindOpt != 0 {
 		c.WriteByte('*')
 	}
 	c.WriteString(r)

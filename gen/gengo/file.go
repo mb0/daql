@@ -111,7 +111,7 @@ func RenderFile(c *gen.Ctx, s *dom.Schema) error {
 func DeclareType(c *gen.Ctx, m *dom.Model) (err error) {
 	t := m.Type
 	switch m.Kind {
-	case typ.KindFlag:
+	case typ.KindBits:
 		c.WriteString("type ")
 		c.WriteString(m.Name)
 		c.WriteString(" uint64\n\n")
@@ -125,10 +125,10 @@ func DeclareType(c *gen.Ctx, m *dom.Model) (err error) {
 		c.WriteString("type ")
 		c.WriteString(m.Name)
 		c.WriteByte(' ')
-		t.Kind &^= typ.FlagRef
+		t.Kind &^= typ.KindCtx
 		err = WriteType(c, t)
 		c.WriteByte('\n')
-	case typ.ExpFunc:
+	case typ.KindFunc:
 		last := len(m.Params) - 1
 		c.WriteString("type ")
 		c.WriteString(m.Name)

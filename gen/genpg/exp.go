@@ -194,7 +194,7 @@ func writeAs(b *gen.Ctx, env exp.Env, e *exp.Call) error {
 			return err
 		}
 	default:
-		return cor.Errorf("not implemented")
+		return cor.Errorf("not implemented %q", e)
 	}
 	b.WriteString("::")
 	b.WriteString(ts)
@@ -242,12 +242,12 @@ func writeApd(b *gen.Ctx, env exp.Env, e *exp.Call) error {
 	return nil
 }
 
-var layoutSet = []typ.Param{{Name: "a", Type: typ.Keyer}, {Name: "unis"}}
+var setSig = exp.MustSig("(form '' :a ~keyr :unis : void)")
 
 func writeSet(b *gen.Ctx, env exp.Env, e *exp.Call) error {
 	// First arg can only be a jsonb obj
 	// TODO but check that
-	lo, err := exp.LayoutArgs(layoutSet, e.Args)
+	lo, err := exp.LayoutArgs(setSig, e.Args)
 	if err != nil {
 		return err
 	}
@@ -319,7 +319,7 @@ func writeBool(b *gen.Ctx, env exp.Env, not bool, e exp.El) error {
 		return WriteEl(b, env, e)
 	}
 	// add boolean conversion if necessary
-	if t.Kind&typ.FlagOpt != 0 {
+	if t.Kind&typ.KindOpt != 0 {
 		defer b.Prec(PrecIs)()
 		err := WriteEl(b, env, e)
 		if err != nil {
@@ -403,9 +403,9 @@ func elType(e exp.El) typ.Type {
 func zeroStrings(t typ.Type) (zero, alt string, _ error) {
 	switch t.Kind & typ.SlotMask {
 	case typ.KindBool:
-	case typ.BaseNum, typ.KindInt, typ.KindReal, typ.KindFlag:
+	case typ.KindNum, typ.KindInt, typ.KindReal, typ.KindBits:
 		zero = "0"
-	case typ.BaseChar, typ.KindStr, typ.KindRaw:
+	case typ.KindChar, typ.KindStr, typ.KindRaw:
 		zero = "''"
 	case typ.KindSpan:
 		zero = "'0'"
@@ -416,9 +416,9 @@ func zeroStrings(t typ.Type) (zero, alt string, _ error) {
 	case typ.KindList:
 		// TODO check if postgres array otherwise
 		fallthrough
-	case typ.BaseIdxr:
+	case typ.KindIdxr:
 		zero, alt = "'null'", "'[]'"
-	case typ.BaseKeyr, typ.KindRec, typ.KindObj:
+	case typ.KindKeyr, typ.KindRec, typ.KindObj:
 		zero, alt = "'null'", "'{}'"
 	default:
 		return "", "", cor.Errorf("error unexpected type %s", t)

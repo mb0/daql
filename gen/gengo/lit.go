@@ -17,7 +17,7 @@ func WriteLit(c *gen.Ctx, l lit.Lit) error {
 		return nil
 	}
 	switch k := t.Kind; k & typ.MaskRef {
-	case typ.BaseNum, typ.KindBool, typ.KindInt, typ.KindReal:
+	case typ.KindNum, typ.KindBool, typ.KindInt, typ.KindReal:
 		if opt {
 			call := "cor.Real"
 			switch k & typ.MaskElem {
@@ -30,7 +30,7 @@ func WriteLit(c *gen.Ctx, l lit.Lit) error {
 		} else {
 			c.WriteString(l.String())
 		}
-	case typ.BaseChar, typ.KindStr:
+	case typ.KindChar, typ.KindStr:
 		if opt {
 			return writeCall(c, "cor.Str", l)
 		} else {
@@ -56,7 +56,7 @@ func WriteLit(c *gen.Ctx, l lit.Lit) error {
 			c.WriteByte('*')
 		}
 		return writeCall(c, "cor.Span", l)
-	case typ.BaseIdxr:
+	case typ.KindIdxr:
 		c.WriteString(Import(c, "lit.List"))
 		return writeIdxer(c, l)
 	case typ.KindList:
@@ -66,7 +66,7 @@ func WriteLit(c *gen.Ctx, l lit.Lit) error {
 			return err
 		}
 		return writeIdxer(c, l)
-	case typ.BaseKeyr:
+	case typ.KindKeyr:
 		c.WriteString(Import(c, "&lit.Dict"))
 		return writeKeyer(c, l, func(i int, k string, e lit.Lit) error {
 			c.WriteByte('{')
@@ -109,7 +109,7 @@ func WriteLit(c *gen.Ctx, l lit.Lit) error {
 			c.WriteString(": ")
 			return WriteLit(c, e)
 		})
-	case typ.KindFlag, typ.KindEnum:
+	case typ.KindBits, typ.KindEnum:
 		valer, ok := l.(interface{ Val() interface{} })
 		if !ok {
 			return cor.Errorf("expect flag or enum to implement val method got %T", l)

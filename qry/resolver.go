@@ -74,7 +74,7 @@ var qrySpec = exp.Implement("(form 'qry' :args :decls : @)", false,
 		return p.Result, nil
 	})
 
-var taskLayout = []typ.Param{{Name: "ref?"}, {Name: "args"}, {Name: "decls"}}
+var taskSig = exp.MustSig("(form '_' :ref? :args :decls : void)")
 
 func resolveTask(c *exp.Ctx, env exp.Env, d *exp.Named) (t *Task, err error) {
 	t = &Task{}
@@ -87,7 +87,7 @@ func resolveTask(c *exp.Ctx, env exp.Env, d *exp.Named) (t *Task, err error) {
 		// this transforms +id to (+id .id) an + to (+ .)
 		fst = &exp.Sym{Name: "." + t.Name}
 	} else {
-		lo, err := exp.LayoutArgs(taskLayout, d.Args())
+		lo, err := exp.LayoutArgs(taskSig, d.Args())
 		if err != nil {
 			return nil, err
 		}

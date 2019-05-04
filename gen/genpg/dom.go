@@ -34,7 +34,7 @@ func RenderFile(c *gen.Ctx, s *dom.Schema) (err error) {
 	c.WriteString(";\n\n")
 	for _, m := range s.Models {
 		switch m.Kind {
-		case typ.KindFlag:
+		case typ.KindBits:
 		case typ.KindEnum:
 			err = WriteEnum(c, m)
 		default:
@@ -89,7 +89,7 @@ func writeField(b *gen.Ctx, p typ.Param, el *dom.Elem) error {
 	key := p.Key()
 	if key == "" {
 		switch p.Type.Kind & typ.MaskRef {
-		case typ.KindFlag, typ.KindEnum:
+		case typ.KindBits, typ.KindEnum:
 			split := strings.Split(p.Type.Key(), ".")
 			key = split[len(split)-1]
 		case typ.KindObj:

@@ -28,7 +28,7 @@ func TestDom(t *testing.T) {
 				`}]}`,
 			&Schema{Node: Node{Name: "test"}, Models: []*Model{{
 				Node: Node{Name: "Dir"},
-				Type: typ.Type{typ.KindFlag, &typ.Info{
+				Type: typ.Type{typ.KindBits, &typ.Info{
 					Ref: "test.Dir",
 					Consts: cor.Consts(map[string]int64{
 						"North": 1, "East": 2,
@@ -144,7 +144,7 @@ func TestDom(t *testing.T) {
 			`{name:'Spam' typ:'func' elems:[{name:'Egg' typ:'str'} {typ:'bool'}]}]}`,
 			&Schema{Node: Node{Name: "test"}, Models: []*Model{{
 				Node: Node{Name: "Spam"},
-				Type: typ.Type{typ.ExpFunc, &typ.Info{
+				Type: typ.Type{typ.KindFunc, &typ.Info{
 					Ref: "test.Spam",
 					Params: []typ.Param{
 						{Name: "Egg", Type: typ.Str},

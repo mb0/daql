@@ -11,11 +11,11 @@ func TypString(t typ.Type) (string, error) {
 	switch t.Kind & typ.MaskRef {
 	case typ.KindBool:
 		return "bool", nil
-	case typ.KindInt, typ.KindFlag:
+	case typ.KindInt, typ.KindBits:
 		return "int8", nil
-	case typ.BaseNum, typ.KindReal:
+	case typ.KindNum, typ.KindReal:
 		return "float8", nil
-	case typ.BaseChar, typ.KindStr:
+	case typ.KindChar, typ.KindStr:
 		return "text", nil
 	case typ.KindEnum:
 		// TODO
@@ -28,7 +28,7 @@ func TypString(t typ.Type) (string, error) {
 		return "timestamptz", nil
 	case typ.KindSpan:
 		return "interval", nil
-	case typ.KindAny, typ.BaseIdxr, typ.BaseKeyr, typ.KindDict, typ.KindRec, typ.KindObj:
+	case typ.KindAny, typ.KindIdxr, typ.KindKeyr, typ.KindDict, typ.KindRec, typ.KindObj:
 		return "jsonb", nil
 	case typ.KindList:
 		if n := t.Elem(); n.Kind&typ.MaskPrim != 0 {
@@ -46,7 +46,7 @@ func TypString(t typ.Type) (string, error) {
 // WriteLit renders the literal l to b or returns an error.
 func WriteLit(b *gen.Ctx, l lit.Lit) error {
 	t := l.Typ()
-	if t.Kind&typ.FlagOpt != 0 && l.IsZero() {
+	if (t.Kind == typ.KindAny || t.Kind&typ.KindOpt != 0) && l.IsZero() {
 		return b.Fmt("NULL")
 	}
 	if o, ok := l.(lit.Opter); ok {
@@ -60,9 +60,9 @@ func WriteLit(b *gen.Ctx, l lit.Lit) error {
 			return b.Fmt("FALSE")
 		}
 		return b.Fmt("TRUE")
-	case typ.BaseNum, typ.KindInt, typ.KindReal, typ.KindFlag:
+	case typ.KindNum, typ.KindInt, typ.KindReal, typ.KindBits:
 		return l.WriteBfr(&b.Ctx)
-	case typ.BaseChar, typ.KindStr:
+	case typ.KindChar, typ.KindStr:
 		return l.WriteBfr(&b.Ctx)
 	case typ.KindEnum:
 		// TODO write string and cast with qualified enum name
@@ -74,7 +74,7 @@ func WriteLit(b *gen.Ctx, l lit.Lit) error {
 		return writeSuffix(b, l, "::timestamptz")
 	case typ.KindSpan:
 		return writeSuffix(b, l, "::interval")
-	case typ.BaseIdxr:
+	case typ.KindIdxr:
 		return writeJSONB(b, l)
 	case typ.KindList:
 		if t.Elem().Kind&typ.MaskPrim != 0 {
@@ -82,7 +82,7 @@ func WriteLit(b *gen.Ctx, l lit.Lit) error {
 			return writeArray(b, l.(lit.Appender))
 		}
 		return writeJSONB(b, l) // otherwise use jsonb
-	case typ.BaseKeyr, typ.KindDict, typ.KindRec, typ.KindObj:
+	case typ.KindKeyr, typ.KindDict, typ.KindRec, typ.KindObj:
 		return writeJSONB(b, l)
 	}
 	return cor.Errorf("unexpected lit %s", l)

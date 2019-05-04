@@ -81,7 +81,7 @@ func DropProject(db *pgx.ConnPool, p *dom.Project) error {
 
 func CreateModel(tx *pgx.Tx, s *dom.Schema, m *dom.Model) error {
 	switch m.Kind {
-	case typ.KindFlag:
+	case typ.KindBits:
 		return nil
 	case typ.KindEnum:
 		return createModel(tx, m, genpg.WriteEnum)

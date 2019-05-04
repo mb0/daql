@@ -79,9 +79,9 @@ var modelRules = utl.NodeRules{
 		KeyPrepper: func(c *exp.Ctx, env exp.Env, n *exp.Named) (lit.Lit, error) {
 			m := env.(*ModelEnv)
 			switch m.Model.Kind {
-			case typ.KindFlag, typ.KindEnum:
+			case typ.KindBits, typ.KindEnum:
 				return resolveConst(c, m, n)
-			case typ.KindObj, typ.ExpFunc:
+			case typ.KindObj, typ.KindFunc:
 				return resolveField(c, m, n)
 			}
 			return nil, cor.Errorf("unexpected model kind %s", m.Model.Kind)
@@ -107,7 +107,7 @@ func resolveConstVal(c *exp.Ctx, env *ModelEnv, args []exp.El, idx int) (_ lit.I
 	var el exp.El
 	switch len(args) {
 	case 0:
-		if env.Model.Kind&typ.MaskRef == typ.KindFlag {
+		if env.Model.Kind&typ.MaskRef == typ.KindBits {
 			return lit.Int(1 << uint64(idx)), nil
 		}
 		return lit.Int(idx) + 1, nil
@@ -193,7 +193,7 @@ func idxPrepper(c *exp.Ctx, env exp.Env, n *exp.Named) (lit.Lit, error) {
 	}
 	uniq := n.Key() == "uniq"
 	k := l.Typ().Kind
-	if k&typ.BaseIdxr != 0 {
+	if k&typ.KindIdxr != 0 {
 		return &lit.Keyr{List: []lit.Keyed{{"keys", l}, {"unique", lit.Bool(uniq)}}}, nil
 	}
 	return l, nil
