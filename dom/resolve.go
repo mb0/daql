@@ -10,7 +10,7 @@ import (
 	"github.com/mb0/xelf/utl"
 )
 
-var schemaSpec = exp.Implement("(form 'schema' :args :decls : @)", false,
+var schemaSpec = exp.Implement("(form 'schema' :args? :decls? : @)", false,
 	func(c *exp.Ctx, env exp.Env, x *exp.Call, lo *exp.Layout, h typ.Type) (exp.El, error) {
 		s := &Schema{}
 		env = &SchemaEnv{parent: env, Schema: s}
@@ -25,7 +25,7 @@ var schemaSpec = exp.Implement("(form 'schema' :args :decls : @)", false,
 		return n, nil
 	})
 
-var modelSpec = exp.Implement("(form 'model' :args :decls :tail : @)", false,
+var modelSpec = exp.Implement("(form 'model' :args? :decls? :tail? : @)", false,
 	func(c *exp.Ctx, env exp.Env, x *exp.Call, lo *exp.Layout, h typ.Type) (exp.El, error) {
 		s := env.(*SchemaEnv)
 		m := &Model{Type: typ.Type{typ.KindObj, &typ.Info{}}}
@@ -46,8 +46,8 @@ var schemaRules = utl.NodeRules{
 			tmp := make([]exp.El, 0, len(args)+1)
 			tmp = append(tmp, lit.Str(n.Name[1:]))
 			tmp = append(tmp, args...)
-			call := &exp.Call{Def: exp.DefSpec(modelSpec), Args: tmp}
-			e, err := modelSpec.ResolveCall(c, env, call, typ.Void)
+			call := &exp.Call{Spec: modelSpec, Args: tmp}
+			e, err := modelSpec.Resolve(c, env, call, typ.Void)
 			if err != nil {
 				return nil, err
 			}
@@ -98,7 +98,7 @@ func resolveConst(c *exp.Ctx, env *ModelEnv, n *exp.Named) (lit.Lit, error) {
 		return nil, cor.Errorf("resolve const val: %w", err)
 	}
 	m := env.Model
-	m.Consts = append(m.Consts, cor.Const{n.Name[1:], int64(d)})
+	m.Consts = append(m.Consts, typ.Const{n.Name[1:], int64(d)})
 	m.Elems = append(m.Elems, &Elem{})
 	return m.Type, nil
 }
@@ -127,7 +127,7 @@ func resolveConstVal(c *exp.Ctx, env *ModelEnv, args []exp.El, idx int) (_ lit.I
 }
 
 var bitRule = utl.KeyRule{
-	KeyPrepper: utl.FlagPrepper(cor.Consts(bitConsts)),
+	KeyPrepper: utl.FlagPrepper(typ.Consts(bitConsts)),
 	KeySetter:  utl.FlagSetter("bits"),
 }
 var fieldRules = utl.TagRules{

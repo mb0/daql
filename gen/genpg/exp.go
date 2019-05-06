@@ -226,7 +226,7 @@ func writeApd(b *gen.Ctx, env exp.Env, e *exp.Call) error {
 	}
 	restore := b.Prec(PrecDef)
 	// either jsonb or postgres array
-	ispg := t.Elem().Kind&typ.MaskPrim != 0
+	ispg := t.Elem().Kind&typ.KindPrim != 0
 	for i, arg := range e.Args {
 		if i > 0 {
 			b.WriteString(" || ")
@@ -301,9 +301,7 @@ func writeBool(b *gen.Ctx, env exp.Env, not bool, e exp.El) error {
 	var t typ.Type
 	switch v := e.(type) {
 	case *exp.Sym:
-		if v.Def != nil {
-			t = v.Def.Type
-		}
+		t = v.Type
 	case *exp.Call:
 		t = v.Spec.Res()
 	case lit.Lit:
@@ -389,9 +387,7 @@ func writeString(c *gen.Ctx, env exp.Env, e exp.El) (string, error) {
 func elType(e exp.El) typ.Type {
 	switch v := e.(type) {
 	case *exp.Sym:
-		if v.Def != nil {
-			return v.Def.Type
-		}
+		return v.Type
 	case *exp.Call:
 		return v.Spec.Res()
 	case lit.Lit:

@@ -7,10 +7,11 @@ import (
 	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/lit"
+	"github.com/mb0/xelf/std"
 	"github.com/mb0/xelf/typ"
 )
 
-var qrySpec = exp.Implement("(form 'qry' :args :decls : @)", false,
+var qrySpec = exp.Implement("(form 'qry' :args? :decls? : @)", false,
 	func(c *exp.Ctx, env exp.Env, x *exp.Call, lo *exp.Layout, hint typ.Type) (exp.El, error) {
 		penv := FindEnv(env)
 		if penv == nil {
@@ -74,7 +75,7 @@ var qrySpec = exp.Implement("(form 'qry' :args :decls : @)", false,
 		return p.Result, nil
 	})
 
-var taskSig = exp.MustSig("(form '_' :ref? :args :decls : void)")
+var taskSig = exp.MustSig("(form '_' :ref? @ :args? :decls? : void)")
 
 func resolveTask(c *exp.Ctx, env exp.Env, d *exp.Named) (t *Task, err error) {
 	t = &Task{}
@@ -122,12 +123,10 @@ func resolveTask(c *exp.Ctx, env exp.Env, d *exp.Named) (t *Task, err error) {
 		var rt typ.Type
 		switch v := fst.(type) {
 		case *exp.Sym:
-			if v.Def != nil {
-				rt = v.Def.Type
-			}
+			rt = v.Type
 		case *exp.Call:
-			if v.Def != nil {
-				rt = v.Def.Type
+			if v.Spec != nil {
+				rt = v.Spec.Res()
 			}
 		}
 		switch rt.Kind {
@@ -143,7 +142,7 @@ func resolveTask(c *exp.Ctx, env exp.Env, d *exp.Named) (t *Task, err error) {
 	return t, nil
 }
 
-var andSpec = exp.Core("and")
+var andSpec = std.Core("and")
 
 func resolveQuery(c *exp.Ctx, env exp.Env, t *Task, ref string, lo *exp.Layout) error {
 	q := &Query{Ref: ref}
@@ -210,7 +209,7 @@ func resolveQuery(c *exp.Ctx, env exp.Env, t *Task, ref string, lo *exp.Layout) 
 	}
 	// simplify where clause
 	if len(q.Whr.Els) != 0 {
-		x := &exp.Call{Def: exp.DefSpec(andSpec), Args: q.Whr.Els}
+		x := &exp.Call{Spec: andSpec, Args: q.Whr.Els}
 		res, err := exp.Resolve(env, x)
 		if err != nil && err != exp.ErrUnres {
 			return err
@@ -276,7 +275,7 @@ func resolveOrd(c *exp.Ctx, env exp.Env, q *Query, desc bool, args []exp.El) err
 
 func resolveSel(c *exp.Ctx, env exp.Env, q *Query, args []exp.El) (typ.Type, error) {
 	var ps []typ.Param
-	if q.Type.Kind&typ.MaskElem == typ.KindRec && q.Type.Info != nil {
+	if q.Type.Kind&typ.MaskElem == typ.KindRec && q.Type.HasParams() {
 		ps = q.Type.Params
 	}
 	// start with all fields unless we start with "-"

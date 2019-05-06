@@ -3,9 +3,9 @@ package dom
 import (
 	"strings"
 
-	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/lit"
+	"github.com/mb0/xelf/std"
 	"github.com/mb0/xelf/typ"
 	"github.com/mb0/xelf/utl"
 )
@@ -13,7 +13,7 @@ import (
 var Env = exp.Builtin{
 	utl.StrLib.Lookup(),
 	utl.TimeLib.Lookup(),
-	exp.Std, exp.Core,
+	std.Core, std.Decl,
 }
 
 // ProjectEnv is a root environment that allows schema declaration or model resolution.
@@ -44,7 +44,7 @@ func (s *ProjectEnv) Supports(x byte) bool { return x == '~' }
 
 func (s *ProjectEnv) Get(sym string) *exp.Def {
 	if sym == "schema" {
-		return exp.DefSpec(schemaSpec)
+		return exp.NewDef(schemaSpec)
 	}
 	prefix := sym[0] == '~'
 	if prefix { // strip prefix and continue
@@ -105,15 +105,15 @@ func schemaElem(s *Schema, key string) *exp.Def {
 	if len(split) > 1 {
 		return modelElem(m, split[1])
 	}
-	return exp.DefLit(typ.Type{m.Kind, &typ.Info{Ref: m.Ref}})
+	return exp.NewDef(typ.Type{m.Kind, &typ.Info{Ref: m.Ref}})
 }
 
 func modelElem(m *Model, key string) *exp.Def {
-	if m.Kind&typ.MaskPrim != 0 {
+	if m.Kind&typ.KindPrim != 0 {
 		c := m.Const(key)
 		if c.Const != nil {
 			l := constLit(m, c.Const)
-			return exp.DefLit(l)
+			return exp.NewDef(l)
 		}
 	} else {
 		e := m.Field(key)
@@ -124,7 +124,7 @@ func modelElem(m *Model, key string) *exp.Def {
 	return nil
 }
 
-func constLit(m *Model, c *cor.Const) lit.Lit {
+func constLit(m *Model, c *typ.Const) lit.Lit {
 	if m.Kind != typ.KindEnum {
 		return lit.FlagInt{m.Type, lit.Int(c.Val)}
 	}

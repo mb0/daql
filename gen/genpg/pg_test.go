@@ -7,6 +7,7 @@ import (
 	"github.com/mb0/daql/gen"
 	"github.com/mb0/xelf/bfr"
 	"github.com/mb0/xelf/exp"
+	"github.com/mb0/xelf/std"
 	"github.com/mb0/xelf/typ"
 )
 
@@ -45,7 +46,7 @@ func TestRender(t *testing.T) {
 		{`(and (or a b) c)`, `(a OR b) AND c`},
 		{`(or (and a b) c)`, `a AND b OR c`},
 	}
-	env := exp.NewScope(exp.Builtin{exp.Core})
+	env := exp.NewScope(exp.Builtin{std.Core})
 	unresed(env, typ.Bool, "a", "b", "c")
 	unresed(env, typ.Str, "v", "w")
 	unresed(env, typ.Int, "x", "y")

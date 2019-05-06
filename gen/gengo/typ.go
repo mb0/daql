@@ -53,10 +53,10 @@ func WriteType(c *gen.Ctx, t typ.Type) error {
 		if k&typ.KindOpt != 0 {
 			c.WriteByte('*')
 		}
-		if t.Info == nil {
+		c.WriteString("struct {\n")
+		if !t.HasParams() {
 			return typ.ErrInvalid
 		}
-		c.WriteString("struct {\n")
 		for _, f := range t.Info.Params {
 			name, opt := f.Name, f.Opt()
 			if opt {

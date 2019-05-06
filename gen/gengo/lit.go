@@ -123,14 +123,14 @@ func WriteLit(c *gen.Ctx, l lit.Lit) error {
 		switch v := valer.Val().(type) {
 		case int64:
 			if t.Kind&typ.MaskRef == typ.KindEnum {
-				e, ok := cor.ConstByVal(t.Consts, v)
+				e, ok := typ.ConstByVal(t.Consts, v)
 				if !ok {
 					return cor.Errorf("no constant with value %d", v)
 				}
 				c.WriteString(tref)
 				c.WriteString(e.Cased())
 			} else {
-				for i, f := range cor.GetFlags(t.Consts, uint64(v)) {
+				for i, f := range typ.GetFlags(t.Consts, uint64(v)) {
 					if i > 0 {
 						c.WriteString(" | ")
 					}
@@ -139,7 +139,7 @@ func WriteLit(c *gen.Ctx, l lit.Lit) error {
 				}
 			}
 		case string: // must be enum key
-			cst, ok := cor.ConstByKey(t.Consts, v)
+			cst, ok := typ.ConstByKey(t.Consts, v)
 			if !ok {
 				return cor.Errorf("no constant with key %s", v)
 			}

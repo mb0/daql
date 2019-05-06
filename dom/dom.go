@@ -115,7 +115,7 @@ func (s *Schema) Model(key string) *Model {
 }
 
 type ConstElem struct {
-	*cor.Const
+	*typ.Const
 	*Elem
 }
 
@@ -176,7 +176,7 @@ func setNode(n *Node, x lit.Keyed) error {
 func addElemFromDict(m *Model, d *lit.Keyr) error {
 	var el Elem
 	var p typ.Param
-	var c cor.Const
+	var c typ.Const
 	for _, x := range d.List {
 		switch x.Key {
 		case "name":
@@ -200,7 +200,7 @@ func addElemFromDict(m *Model, d *lit.Keyr) error {
 			return err
 		}
 	}
-	if m.Kind&typ.MaskPrim != 0 {
+	if m.Kind&typ.KindPrim != 0 {
 		m.Consts = append(m.Consts, c)
 	} else {
 		m.Params = append(m.Params, p)
@@ -264,7 +264,7 @@ func (m *Model) WriteBfr(b *bfr.Ctx) error {
 				b.WriteByte(' ')
 			}
 			b.WriteString("typ:")
-			if p.Info != nil && p.Ref != "" {
+			if p.HasRef() {
 				b.Quote("@" + p.Ref)
 			} else {
 				b.Quote(p.Type.String())

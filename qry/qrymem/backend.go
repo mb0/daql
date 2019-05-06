@@ -9,6 +9,7 @@ import (
 	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/lit"
+	"github.com/mb0/xelf/std"
 	"github.com/mb0/xelf/typ"
 )
 
@@ -105,7 +106,7 @@ func (b *Backend) execQuery(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 	for _, l := range m.data {
 		if whr != nil {
 			lenv := &exp.DataScope{env, l}
-			res, err := andForm.ResolveCall(c, lenv, whr, typ.Bool)
+			res, err := andForm.Resolve(c, lenv, whr, typ.Bool)
 			if err != nil {
 				return err
 			}
@@ -251,7 +252,7 @@ func (m *memTable) execCount(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 		for _, l := range m.data {
 			// skip if it does not resolve to true
 			lenv := &exp.DataScope{env, l}
-			res, err := andForm.ResolveCall(c, lenv, whr, typ.Bool)
+			res, err := andForm.Resolve(c, lenv, whr, typ.Bool)
 			if err != nil {
 				return err
 			}
@@ -278,14 +279,14 @@ func (m *memTable) execCount(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 var andForm *exp.Spec
 
 func init() {
-	andForm = exp.Core("and")
+	andForm = std.Core("and")
 }
 
 func prepareWhr(env exp.Env, q *qry.Query) (x *exp.Call, null bool, _ error) {
 	if len(q.Whr.Els) == 0 {
 		return nil, false, nil
 	}
-	x = &exp.Call{Def: exp.DefSpec(andForm), Args: q.Whr.Els}
+	x = &exp.Call{Spec: andForm, Args: q.Whr.Els}
 	res, err := exp.Resolve(env, x)
 	if err != nil {
 		if err != exp.ErrUnres {

@@ -3,6 +3,7 @@ package qry
 import (
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/lit"
+	"github.com/mb0/xelf/std"
 	"github.com/mb0/xelf/typ"
 	"github.com/mb0/xelf/utl"
 )
@@ -11,7 +12,7 @@ var Builtin = exp.Builtin{
 	QryLookup,
 	utl.StrLib.Lookup(),
 	utl.TimeLib.Lookup(),
-	exp.Std, exp.Core,
+	std.Core, std.Decl,
 }
 
 func NewEnv(env exp.Env, bend Backend) *PlanEnv {
@@ -43,7 +44,7 @@ func (s *PlanEnv) Get(sym string) *exp.Def {
 		return nil
 	}
 	if len(sym) == 1 {
-		return exp.DefLit(s.Result)
+		return exp.NewDef(s.Result)
 	}
 	path, err := lit.ReadPath(sym[1:])
 	if err != nil {
@@ -81,7 +82,7 @@ func (s *TaskEnv) Get(sym string) *exp.Def {
 		if s.Param != nil {
 			l, err := lit.Select(s.Param, sym)
 			if err == nil {
-				return exp.DefLit(l)
+				return exp.NewDef(l)
 			}
 		} else {
 			// otherwise check query result type
@@ -119,9 +120,9 @@ func taskDef(t *Task, path lit.Path) *exp.Def {
 			if err != nil {
 				return nil
 			}
-			return exp.DefLit(l)
+			return exp.NewDef(l)
 		}
-		return exp.DefLit(t.Result)
+		return exp.NewDef(t.Result)
 	}
 	if len(path) != 0 {
 		l, err := lit.SelectPath(t.Type, path)

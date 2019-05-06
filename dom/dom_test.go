@@ -3,7 +3,6 @@ package dom
 import (
 	"testing"
 
-	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/lit"
 	"github.com/mb0/xelf/typ"
 )
@@ -30,7 +29,7 @@ func TestDom(t *testing.T) {
 				Node: Node{Name: "Dir"},
 				Type: typ.Type{typ.KindBits, &typ.Info{
 					Ref: "test.Dir",
-					Consts: cor.Consts(map[string]int64{
+					Consts: typ.Consts(map[string]int64{
 						"North": 1, "East": 2,
 						"South": 4, "West": 8,
 					}),
@@ -46,7 +45,7 @@ func TestDom(t *testing.T) {
 				Node: Node{Name: "Dir"},
 				Type: typ.Type{typ.KindEnum, &typ.Info{
 					Ref: "test.Dir",
-					Consts: cor.Consts(map[string]int64{
+					Consts: typ.Consts(map[string]int64{
 						"North": 1, "East": 2,
 						"South": 3, "West": 4,
 					}),
