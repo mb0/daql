@@ -17,16 +17,16 @@ type Backend struct {
 	tables map[string]*memTable
 }
 
-func (b *Backend) Add(m *dom.Model, list lit.Idxr) error {
+func (b *Backend) Add(m *dom.Model, list *lit.List) error {
 	if b.tables == nil {
 		b.tables = make(map[string]*memTable)
 	}
-	for i, v := range list {
+	for i, v := range list.Data {
 		v, err := lit.Convert(v, m.Type, 0)
 		if err != nil {
 			return err
 		}
-		list[i] = v
+		list.Data[i] = v
 	}
 	b.tables[m.Type.Key()] = &memTable{m.Type, list}
 	return nil
@@ -102,8 +102,8 @@ func (b *Backend) execQuery(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 	} else {
 		rt, _ = rt.Deopt()
 	}
-	result := make(lit.Idxr, 0, len(m.data))
-	for _, l := range m.data {
+	result := make([]lit.Lit, 0, len(m.data.Data))
+	for _, l := range m.data.Data {
 		if whr != nil {
 			lenv := &exp.DataScope{env, l}
 			res, err := andForm.Resolve(c, lenv, whr, typ.Bool)
@@ -159,7 +159,7 @@ func (b *Backend) execQuery(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 		}
 		return nil
 	}
-	return t.Result.Assign(result)
+	return t.Result.Assign(&lit.List{Data: result})
 }
 
 func (m *Backend) collectSel(c *exp.Ctx, env exp.Env, tt *qry.Task, a lit.Assignable, l lit.Lit,
@@ -198,7 +198,7 @@ func (m *Backend) collectSel(c *exp.Ctx, env exp.Env, tt *qry.Task, a lit.Assign
 	}
 	return nil
 }
-func orderResult(list lit.Idxr, sel []qry.Ord) (res error) {
+func orderResult(list []lit.Lit, sel []qry.Ord) (res error) {
 	// TODO order on more than one field
 	ord := sel[0]
 	sort.SliceStable(list, func(i, j int) bool {
@@ -233,7 +233,7 @@ func orderResult(list lit.Idxr, sel []qry.Ord) (res error) {
 
 type memTable struct {
 	rec  typ.Type
-	data lit.Idxr
+	data *lit.List
 }
 
 func (m *memTable) execCount(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
@@ -247,9 +247,9 @@ func (m *memTable) execCount(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 	}
 	var result int
 	if whr == nil {
-		result = len(m.data)
+		result = len(m.data.Data)
 	} else {
-		for _, l := range m.data {
+		for _, l := range m.data.Data {
 			// skip if it does not resolve to true
 			lenv := &exp.DataScope{env, l}
 			res, err := andForm.Resolve(c, lenv, whr, typ.Bool)

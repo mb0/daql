@@ -28,10 +28,10 @@ func TypString(t typ.Type) (string, error) {
 		return "timestamptz", nil
 	case typ.KindSpan:
 		return "interval", nil
-	case typ.KindAny, typ.KindIdxr, typ.KindKeyr, typ.KindDict, typ.KindRec, typ.KindObj:
+	case typ.KindAny, typ.KindDict, typ.KindRec, typ.KindObj:
 		return "jsonb", nil
 	case typ.KindList:
-		if n := t.Elem(); n.Kind&typ.KindPrim != 0 {
+		if n := t.Elem(); n != typ.Any && n.Kind&typ.KindPrim != 0 {
 			res, err := TypString(n)
 			if err != nil {
 				return "", err
@@ -74,15 +74,13 @@ func WriteLit(b *gen.Ctx, l lit.Lit) error {
 		return writeSuffix(b, l, "::timestamptz")
 	case typ.KindSpan:
 		return writeSuffix(b, l, "::interval")
-	case typ.KindIdxr:
-		return writeJSONB(b, l)
 	case typ.KindList:
-		if t.Elem().Kind&typ.KindPrim != 0 {
+		if k := t.Elem().Kind; k != typ.KindAny && k&typ.KindPrim != 0 {
 			// use postgres array for one dimensional primitive arrays
 			return writeArray(b, l.(lit.Appender))
 		}
 		return writeJSONB(b, l) // otherwise use jsonb
-	case typ.KindKeyr, typ.KindDict, typ.KindRec, typ.KindObj:
+	case typ.KindDict, typ.KindRec, typ.KindObj:
 		return writeJSONB(b, l)
 	}
 	return cor.Errorf("unexpected lit %s", l)

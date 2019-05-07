@@ -127,7 +127,7 @@ func resolveConstVal(c *exp.Ctx, env *ModelEnv, args []exp.El, idx int) (_ lit.I
 }
 
 var bitRule = utl.KeyRule{
-	KeyPrepper: utl.FlagPrepper(typ.Consts(bitConsts)),
+	KeyPrepper: utl.FlagPrepper(typ.Constants(bitConsts)),
 	KeySetter:  utl.FlagSetter("bits"),
 }
 var fieldRules = utl.TagRules{
@@ -194,7 +194,7 @@ func idxPrepper(c *exp.Ctx, env exp.Env, n *exp.Named) (lit.Lit, error) {
 	uniq := n.Key() == "uniq"
 	k := l.Typ().Kind
 	if k&typ.KindIdxr != 0 {
-		return &lit.Keyr{List: []lit.Keyed{{"keys", l}, {"unique", lit.Bool(uniq)}}}, nil
+		return &lit.Dict{List: []lit.Keyed{{"keys", l}, {"unique", lit.Bool(uniq)}}}, nil
 	}
 	return l, nil
 }

@@ -211,7 +211,7 @@ func writeFlagConsts(c *gen.Ctx, t typ.Type, ref string) {
 			}
 		} else {
 			c.WriteString(" = ")
-			for j, cr := range typ.GetFlags(t.Consts[:i], mask) {
+			for j, cr := range t.Consts[:i].Flags(mask) {
 				if j != 0 {
 					c.WriteString(" | ")
 				}

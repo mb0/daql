@@ -257,7 +257,7 @@ func writeSet(b *gen.Ctx, env exp.Env, e *exp.Call) error {
 	}
 	// Collect literals and other decls. We can merge all literal directly,
 	// but need to use jsonb_set for references and other expressions.
-	dict := &lit.Keyr{}
+	dict := &lit.Dict{}
 	var rest []*exp.Named
 	for _, d := range decls {
 		switch v := d.El.(type) {

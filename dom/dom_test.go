@@ -15,7 +15,7 @@ func TestDom(t *testing.T) {
 	}{
 		{`(schema 'test')`, `{name:'test'}`, &Schema{Node: Node{Name: "test"}}},
 		{`(schema 'test' :label 'Test Schema')`, `{name:'test' label:'Test Schema'}`,
-			&Schema{Node: Node{Name: "test", Extra: &lit.Keyr{List: []lit.Keyed{
+			&Schema{Node: Node{Name: "test", Extra: &lit.Dict{List: []lit.Keyed{
 				{"label", lit.Str("Test Schema")},
 			}}}},
 		},
@@ -29,7 +29,7 @@ func TestDom(t *testing.T) {
 				Node: Node{Name: "Dir"},
 				Type: typ.Type{typ.KindBits, &typ.Info{
 					Ref: "test.Dir",
-					Consts: typ.Consts(map[string]int64{
+					Consts: typ.Constants(map[string]int64{
 						"North": 1, "East": 2,
 						"South": 4, "West": 8,
 					}),
@@ -45,7 +45,7 @@ func TestDom(t *testing.T) {
 				Node: Node{Name: "Dir"},
 				Type: typ.Type{typ.KindEnum, &typ.Info{
 					Ref: "test.Dir",
-					Consts: typ.Consts(map[string]int64{
+					Consts: typ.Constants(map[string]int64{
 						"North": 1, "East": 2,
 						"South": 3, "West": 4,
 					}),
@@ -58,7 +58,7 @@ func TestDom(t *testing.T) {
 				`prop:'something'}]}`,
 			&Schema{Node: Node{Name: "test"}, Models: []*Model{{
 				Node: Node{Name: "Named",
-					Extra: &lit.Keyr{List: []lit.Keyed{
+					Extra: &lit.Dict{List: []lit.Keyed{
 						{"prop", lit.Str("something")},
 					}},
 				},
@@ -173,7 +173,7 @@ func TestDom(t *testing.T) {
 			t.Errorf("parse %s err: %v", test.str, err)
 		}
 		ss := &Schema{}
-		err = ss.FromDict(res.(*lit.Keyr))
+		err = ss.FromDict(res.(*lit.Dict))
 		if err != nil {
 			t.Errorf("assign %s err: %v", res, err)
 		}

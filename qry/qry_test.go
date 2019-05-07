@@ -27,7 +27,7 @@ func init() {
 	memBed = &qrymem.Backend{}
 	s := f.Schema("prod")
 	for _, kl := range f.ProdFix.List {
-		err = memBed.Add(s.Model(kl.Key), kl.Lit.(lit.Idxr))
+		err = memBed.Add(s.Model(kl.Key), kl.Lit.(*lit.List))
 		if err != nil {
 			log.Fatalf("add %s error: %v", kl.Key, err)
 		}
