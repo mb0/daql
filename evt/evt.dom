@@ -1,5 +1,5 @@
 (schema 'evt'
-(+Detail :doc `Detail holds extra information for audits and transations.`
+(+Detail :doc `Detail holds extra information for audits and translations.`
 	+Created? time
 	+Arrived? time
 	+Acct?    uuid
@@ -47,12 +47,12 @@ It usually is a data operation on a record identified by a topic and primary key
 )
 (+Result
 	+Rev time
-	+Val any
+	+Val ~any
 )
-(+Qry   func +Arg dyn  + @Result?)
-(+Meta  func +Rev time + @Audit?)
-(+Hist  func + @Sig    + @Update?)
-(+Pub   func + @Trans  + @Update?)
-(+Sub   func +List list|@Watch + @Update?)
-(+Unsub func +List list|@Watch + bool)
+(+Qry  func +Arg ~dyn + @Result?)
+(+Meta func +Rev time + @Audit?)
+(+Hist func + @Sig    + @Update?)
+(+Pub  func + @Trans  + @Update?)
+(+Sub  func +List list|@Watch + @Update?)
+(+Uns  func +List list|@Watch + bool)
 )

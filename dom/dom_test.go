@@ -68,6 +68,23 @@ func TestDom(t *testing.T) {
 				}},
 				Elems: []*Elem{{}},
 			}}}},
+		{`(schema 'test' (+Named :prop :doc "something" +Name str))`,
+			`{name:'test' models:[{name:'Named' typ:'obj' ` +
+				`elems:[{name:'Name' typ:'str'}] ` +
+				`prop:true doc:'something'}]}`,
+			&Schema{Node: Node{Name: "test"}, Models: []*Model{{
+				Node: Node{Name: "Named",
+					Extra: &lit.Dict{List: []lit.Keyed{
+						{"prop", lit.True},
+						{"doc", lit.Str("something")},
+					}},
+				},
+				Type: typ.Type{typ.KindObj, &typ.Info{
+					Ref:    "test.Named",
+					Params: []typ.Param{{Name: "Name", Type: typ.Str}},
+				}},
+				Elems: []*Elem{{}},
+			}}}},
 		{`(schema 'test' (+Point +X int +Y int))`,
 			`{name:'test' models:[{name:'Point' typ:'obj' ` +
 				`elems:[{name:'X' typ:'int'} {name:'Y' typ:'int'}]}]}`,
@@ -117,9 +134,9 @@ func TestDom(t *testing.T) {
 				}},
 				Elems: []*Elem{{}},
 			}}}},
-		{`(schema 'test' (+Foo +A str) (+Bar +B @Foo))`, `{name:'test' models:[` +
+		{`(schema 'test' (+Foo +A str) (+Bar +B ~test.Foo))`, `{name:'test' models:[` +
 			`{name:'Foo' typ:'obj' elems:[{name:'A' typ:'str'}]} ` +
-			`{name:'Bar' typ:'obj' elems:[{name:'B' typ:'@Foo'}]}]}`,
+			`{name:'Bar' typ:'obj' elems:[{name:'B' typ:'~test.Foo'}]}]}`,
 			&Schema{Node: Node{Name: "test"}, Models: []*Model{{
 				Node: Node{Name: "Foo"},
 				Type: typ.Type{typ.KindObj, &typ.Info{
@@ -134,7 +151,7 @@ func TestDom(t *testing.T) {
 				Type: typ.Type{typ.KindObj, &typ.Info{
 					Ref: "test.Bar",
 					Params: []typ.Param{
-						{Name: "B", Type: typ.Obj("Foo")},
+						{Name: "B", Type: typ.Obj("test.Foo")},
 					}},
 				},
 				Elems: []*Elem{{}},

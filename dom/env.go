@@ -88,8 +88,8 @@ type ModelEnv struct {
 
 func (r *ModelEnv) Get(sym string) *exp.Def {
 	if sym[0] != '~' {
-		d := modelElem(r.Model, sym[1:])
-		if r != nil {
+		d := modelElem(r.Model, sym)
+		if d != nil {
 			return d
 		}
 	}

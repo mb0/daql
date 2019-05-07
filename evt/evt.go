@@ -3,10 +3,9 @@
 package evt
 
 import (
-	"time"
-
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/lit"
+	"time"
 )
 
 type Detail struct {
@@ -105,11 +104,11 @@ type SubRes struct {
 	Err string  `json:"err,omitempty"`
 }
 
-type UnsubReq struct {
+type UnsReq struct {
 	List []Watch `json:"list"`
 }
 
-type UnsubRes struct {
+type UnsRes struct {
 	Res bool   `json:"res,omitempty"`
 	Err string `json:"err,omitempty"`
 }

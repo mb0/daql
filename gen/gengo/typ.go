@@ -1,7 +1,6 @@
 package gengo
 
 import (
-	"log"
 	"strings"
 
 	"github.com/mb0/daql/gen"
@@ -47,8 +46,9 @@ func WriteType(c *gen.Ctx, t typ.Type) error {
 	case typ.KindKeyr:
 		return c.Fmt(Import(c, "*lit.Dict"))
 	case typ.KindDict:
-		c.WriteString("map[string]")
-		return WriteType(c, t.Elem())
+		//c.WriteString("map[string]")
+		//return WriteType(c, t.Elem())
+		return c.Fmt(Import(c, "*lit.Dict"))
 	case typ.KindRec:
 		if k&typ.KindOpt != 0 {
 			c.WriteByte('*')
@@ -85,10 +85,9 @@ func WriteType(c *gen.Ctx, t typ.Type) error {
 		return nil
 	case typ.KindBits, typ.KindEnum, typ.KindObj:
 		r = Import(c, refName(t))
-		log.Printf("got ref %s for %s", r, t)
 	}
 	if r == "" {
-		return errors.Errorf("type %s cannot be represented in go", t)
+		return errors.Errorf("type %s %s cannot be represented in go", t, t.Kind)
 	}
 	if k&typ.KindOpt != 0 {
 		c.WriteByte('*')

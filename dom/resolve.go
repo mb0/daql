@@ -165,14 +165,17 @@ func typPrepper(c *exp.Ctx, env exp.Env, n *exp.Named) (_ lit.Lit, err error) {
 		return nil, cor.Errorf("expect type for model kind")
 	}
 	fst := args[0]
-	fst, err = c.Resolve(env, fst, typ.Typ)
+	fst, err = c.Resolve(env, fst, typ.Void)
 	if err != nil && err != exp.ErrUnres {
 		return nil, err
 	}
 	if t, ok := fst.(typ.Type); ok {
 		return t, nil
 	}
-	return nil, cor.Errorf("expect type for model kind, got %T", args[0])
+	if s, ok := fst.(*exp.Sym); ok && s.Type != typ.Void {
+		return s.Type, nil
+	}
+	return nil, cor.Errorf("expect type, got %s %[1]T in %s %[2]T", fst, n.El)
 }
 func typSetter(o utl.Node, key string, l lit.Lit) error {
 	switch m := o.Ptr().(type) {

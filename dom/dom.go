@@ -264,8 +264,8 @@ func (m *Model) WriteBfr(b *bfr.Ctx) error {
 				b.WriteByte(' ')
 			}
 			b.WriteString("typ:")
-			if p.HasRef() {
-				b.Quote("@" + p.Ref)
+			if p.Kind&typ.KindCtx != 0 {
+				b.Quote("~" + p.Ref)
 			} else {
 				b.Quote(p.Type.String())
 			}
