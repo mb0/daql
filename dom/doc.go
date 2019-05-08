@@ -11,11 +11,12 @@ project. A model can refer to models in other previously declared schemas within
 Models should be used for any data that crosses environments, such as persisted data used in both
 the database and program environment or protocol data used to communicate between processes.
 
-Models have a numeric version which should never be explicitly declared or updated. Instead the
-model versions are automatically determined in comparison to historic model information. The schemas
-and projects also have a numeric version derived in a similar fashion. The number 0 is used if no
-history is provided. Otherwise we compare to the latest history version and use its version or
-increment by one when there are changes.
+All nodes have a numeric version which never needs to be explicitly declared or updated. Instead the
+node versions are automatically determined in comparison to the last recorded version's hash of the
+node's qualified name and its contents. For models the default string representation is used as
+written to the hash, which means that any change to a model results in a new hash. For schemas all
+model hashes are used as contents, and for projects all schema hashes.  The '0' version indicates
+that the node's version was not yet determined.
 
 Models, schemas and projects have a JSON representations that can be sent to clients. Models can
 have basic validation hints, but more detailed display and form logic should always use another
