@@ -242,7 +242,7 @@ func writeApd(b *gen.Ctx, env exp.Env, e *exp.Call) error {
 	return nil
 }
 
-var setSig = exp.MustSig("(form '' :a ~keyr :unis : void)")
+var setSig = exp.MustSig("(form 'set' @1:keyr :plain? :tags?  @1)")
 
 func writeSet(b *gen.Ctx, env exp.Env, e *exp.Call) error {
 	// First arg can only be a jsonb obj

@@ -17,8 +17,8 @@ func TestWriteType(t *testing.T) {
 		imports []string
 	}{
 		{typ.Any, "lit.Lit", []string{"xelf/lit"}},
-		{typ.Idxer, "lit.List", []string{"xelf/lit"}},
-		{typ.Keyer, "*lit.Dict", []string{"xelf/lit"}},
+		{typ.Idxr(typ.Any), "lit.List", []string{"xelf/lit"}},
+		{typ.Keyr(typ.Any), "*lit.Dict", []string{"xelf/lit"}},
 		{typ.Bool, "bool", nil},
 		{typ.Span, "time.Duration", []string{"time"}},
 		{typ.List(typ.Time), "[]time.Time", []string{"time"}},
