@@ -89,7 +89,7 @@ func (b *Backend) execQuery(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 	if q.Ref[0] == '#' {
 		return m.execCount(c, env, t)
 	}
-	whr, null, err := prepareWhr(env, q)
+	whr, null, err := prepareWhr(c, env, q)
 	if err != nil {
 		return err
 	}
@@ -106,7 +106,7 @@ func (b *Backend) execQuery(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 	for _, l := range m.data.Data {
 		if whr != nil {
 			lenv := &exp.DataScope{env, l}
-			res, err := andForm.Resolve(c, lenv, whr, typ.Bool)
+			res, err := c.Resolve(lenv, whr, typ.Bool)
 			if err != nil {
 				return err
 			}
@@ -238,7 +238,7 @@ type memTable struct {
 
 func (m *memTable) execCount(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 	// we can ignore order and selection completely
-	whr, null, err := prepareWhr(env, t.Query)
+	whr, null, err := prepareWhr(c, env, t.Query)
 	if err != nil {
 		return err
 	}
@@ -252,7 +252,7 @@ func (m *memTable) execCount(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 		for _, l := range m.data.Data {
 			// skip if it does not resolve to true
 			lenv := &exp.DataScope{env, l}
-			res, err := andForm.Resolve(c, lenv, whr, typ.Bool)
+			res, err := c.Resolve(lenv, whr, typ.Void)
 			if err != nil {
 				return err
 			}
@@ -276,18 +276,15 @@ func (m *memTable) execCount(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 	return t.Result.Assign(lit.Int(result))
 }
 
-var andForm *exp.Spec
+var andSpeck = std.Core("and")
 
-func init() {
-	andForm = std.Core("and")
-}
-
-func prepareWhr(env exp.Env, q *qry.Query) (x *exp.Call, null bool, _ error) {
+func prepareWhr(c *exp.Ctx, env exp.Env, q *qry.Query) (x *exp.Call, null bool, _ error) {
 	if len(q.Whr.Els) == 0 {
 		return nil, false, nil
 	}
-	x = &exp.Call{Spec: andForm, Args: q.Whr.Els}
-	res, err := exp.Resolve(env, x)
+	x = &exp.Call{Spec: andSpeck, Args: q.Whr.Els}
+	c = c.WithExec(false)
+	res, err := c.Resolve(env, x, c.New())
 	if err != nil {
 		if err != exp.ErrUnres {
 			return nil, false, err
