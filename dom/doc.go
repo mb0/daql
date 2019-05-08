@@ -1,7 +1,7 @@
 /*
 Package dom provides code for domain model declaration and registration.
 
-Models are the primary focus of this package, they are used to define the flag, enum and record
+Models are the primary focus of this package, they are used to define the flag, enum and object
 schema types as well as service contracts. In addition to the schema type information, models hold
 meta data for display, indexing, constraints and other application relevant aspects.
 

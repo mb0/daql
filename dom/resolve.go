@@ -209,7 +209,7 @@ func idxSetter(o utl.Node, key string, l lit.Lit) error {
 		return cor.Errorf("assign idx to %s: %w", l, err)
 	}
 	if m.Rec == nil {
-		m.Rec = &Record{}
+		m.Rec = &Object{}
 	}
 	m.Rec.Indices = append(m.Rec.Indices, &idx)
 	return nil

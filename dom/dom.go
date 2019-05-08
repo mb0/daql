@@ -1,6 +1,7 @@
 package dom
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/mb0/xelf/bfr"
@@ -24,7 +25,7 @@ const (
 
 func (Bit) Flags() map[string]int64 { return bitConsts }
 
-// Keys is a slice of field keys used for indices and order by definitions.
+// Keys is a slice of field keys used for indices and order.
 type Keys []string
 
 // Elem holds additional information for either constants or type paramters.
@@ -40,55 +41,67 @@ type Index struct {
 	Unique bool   `json:"unique,omitempty"`
 }
 
-// Node represents the common name and version of a model, schema or project.
-type Node struct {
+// Common represents the common name and version of model, schema or project nodes.
+type Common struct {
 	Vers  int64     `json:"vers,omitempty"`
 	Extra *lit.Dict `json:"extra,omitempty"`
 	Name  string    `json:"name,omitempty"`
 	key   string
 }
 
-func (n *Node) Key() string {
-	if n.key == "" && n.Name != "" {
-		n.key = strings.ToLower(n.Name)
+func (c *Common) Version() int64 { return c.Vers }
+
+func (c *Common) Key() string {
+	if c.key == "" && c.Name != "" {
+		c.key = strings.ToLower(c.Name)
 	}
-	return n.key
+	return c.key
+}
+
+type Node interface {
+	Qualified() string
+	Version() int64
+	String() string
+	WriteBfr(b *bfr.Ctx) error
 }
 
 // Model represents either a flag, enum or record type and has extra domain information.
 type Model struct {
-	Node
+	Common
 	typ.Type `json:"typ"`
 	Elems    []*Elem `json:"elems,omitempty"`
-	Rec      *Record `json:"rec,omitempty"`
+	Rec      *Object `json:"rec,omitempty"`
 	schema   string
 }
 
-// Record holds data specific to record types for grouping.
-type Record struct {
+// Object holds data specific to object types for grouping.
+type Object struct {
 	Indices []*Index `json:"indices,omitempty"`
 	OrderBy Keys     `json:"orderby,omitempty"`
 	// TODO add triggers and references
 
 }
 
-func (m *Model) Qual() string {
-	return m.schema
-}
+func (m *Model) Qual() string      { return m.schema }
+func (m *Model) Qualified() string { return fmt.Sprintf("%s.%s", m.schema, m.Key()) }
 
 // Schema is a namespace for models.
 type Schema struct {
-	Node
+	Common
 	Path   string   `json:"path,omitempty"`
 	Use    Keys     `json:"use,omitempty"`
 	Models []*Model `json:"models"`
 }
 
+func (s *Schema) Qualified() string { return s.Key() }
+
 // Project is a collection of schemas.
 type Project struct {
-	Node
+	Common
 	Schemas []*Schema `json:"schemas"`
 }
+
+func (p *Project) Qualified() string { return fmt.Sprintf("%s$", p.Key()) }
 
 // Schema returns a schema for key or nil.
 func (p *Project) Schema(key string) *Schema {
@@ -157,7 +170,7 @@ var bitConsts = map[string]int64{
 	"RO":   BitRO,
 }
 
-func setNode(n *Node, x lit.Keyed) error {
+func setNode(n *Common, x lit.Keyed) error {
 	switch x.Key {
 	case "name":
 		n.Name = x.Lit.(lit.Character).Char()
@@ -236,7 +249,7 @@ func (m *Model) FromDict(d *lit.Dict) (err error) {
 				return addElemFromDict(m, el.(*lit.Dict))
 			})
 		default:
-			err = setNode(&m.Node, x)
+			err = setNode(&m.Common, x)
 		}
 		if err != nil {
 			return err
@@ -313,7 +326,7 @@ func (s *Schema) FromDict(d *lit.Dict) (err error) {
 				return err
 			})
 		default:
-			err = setNode(&s.Node, x)
+			err = setNode(&s.Common, x)
 		}
 		if err != nil {
 			return err
@@ -362,7 +375,7 @@ func (p *Project) FromDict(d *lit.Dict) (err error) {
 				return err
 			})
 		default:
-			err = setNode(&p.Node, x)
+			err = setNode(&p.Common, x)
 		}
 		if err != nil {
 			return err
