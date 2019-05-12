@@ -41,7 +41,7 @@ func TestGenQuery(t *testing.T) {
 			continue
 		}
 		env := qry.NewEnv(denv, nil)
-		c := &exp.Ctx{Part: true}
+		c := exp.NewCtx(true, false)
 		_, err = c.Resolve(env, ex, typ.Void)
 		if err != nil && err != exp.ErrExec {
 			t.Errorf("resolve %s error %+v", test.raw, err)

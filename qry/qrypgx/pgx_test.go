@@ -45,7 +45,7 @@ func TestPgx(t *testing.T) {
 			continue
 		}
 		env := qry.NewEnv(domEnv, pgxBed)
-		c := &exp.Ctx{Exec: true}
+		c := exp.NewCtx(false, true)
 		l, err := c.Resolve(env, el, typ.Void)
 		if err != nil {
 			t.Errorf("resolve %s error %+v\n%v", el, err, c.Unres)

@@ -41,25 +41,8 @@ var testQry = `(qry
 	+top10 *prod.cat :lim 10
 	+page3 *prod.cat :off 20 :lim 10
 	+named ?prod.cat (eq .name 'a')
-	+param ?prod.prod (eq .name 'A') :desc cat :asc .name
-	+numc  #prod.prod (eq cat 3)
-	+infoLabel (*prod.label +id +label ('Label: ' .name))
-	+leanLabel (*prod.label +tmpl)
-	+nest (?prod.cat (eq .name 'a')
-		+prods (*prod.prod (eq .cat ..id) :asc .name +id +name)
-	)
-	+top10prods *prod.prod (in .cat /top10/id) :asc .name
-)`
-
-var testQry1 = `(qry
-	+cat   ?prod.cat
-	+name  ?prod.cat.name
-	+all   *prod.cat
-	+top10 *prod.cat :lim 10)
-	+page3 *prod.cat :off 20 :lim 10
-	+named ?prod.cat (eq .name 'a')
-	+param ?prod.prod (eq .name 'A') :desc cat :asc .name
-	+numc  #prod.prod (eq cat 3)
+	+param ?prod.prod (eq .name 'A') :desc .cat :asc .name
+	+numc  #prod.prod (eq .cat 3)
 	+infoLabel (*prod.label +id +label ('Label: ' .name))
 	+leanLabel (*prod.label +tmpl)
 	+nest (?prod.cat (eq .name 'a')
@@ -101,10 +84,10 @@ func TestQry(t *testing.T) {
 			continue
 		}
 		env := NewEnv(domEnv, memBed)
-		c := &exp.Ctx{Exec: true}
+		c := exp.NewCtx(false, true)
 		l, err := c.Resolve(env, el, typ.Void)
 		if err != nil {
-			t.Errorf("resolve %s error %+v", test.raw, err)
+			t.Errorf("resolve %s error %+v\n%v", test.raw, err, c.Ctx)
 			continue
 		}
 		if test.want == "" {

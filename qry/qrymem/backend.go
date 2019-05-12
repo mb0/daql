@@ -249,6 +249,7 @@ func (m *memTable) execCount(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 	if whr == nil {
 		result = len(m.data.Data)
 	} else {
+		// c = c.WithPart(true).WithExec(false)
 		for _, l := range m.data.Data {
 			// skip if it does not resolve to true
 			lenv := &exp.DataScope{env, l}
@@ -276,14 +277,19 @@ func (m *memTable) execCount(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 	return t.Result.Assign(lit.Int(result))
 }
 
-var andSpeck = std.Core("and")
+var boolSpeck = std.Core("(bool)")
 
-func prepareWhr(c *exp.Ctx, env exp.Env, q *qry.Query) (x *exp.Call, null bool, _ error) {
+func prepareWhr(c *exp.Ctx, env exp.Env, q *qry.Query) (x exp.El, null bool, _ error) {
 	if len(q.Whr.Els) == 0 {
 		return nil, false, nil
 	}
-	x = &exp.Call{Spec: andSpeck, Args: q.Whr.Els}
-	c = c.WithExec(false)
+	if len(q.Whr.Els) == 1 && isBool(q.Whr.Els[0]) {
+		x = q.Whr.Els[0]
+	}
+	if x == nil {
+		x = &exp.Call{Spec: boolSpeck, Args: q.Whr.Els}
+	}
+	c = c.WithPart(true).WithExec(false)
 	res, err := c.Resolve(env, x, c.New())
 	if err != nil {
 		if err != exp.ErrUnres {
@@ -302,4 +308,17 @@ func modelName(q *qry.Query) (model, rest string) {
 	}
 	rest = s[2]
 	return model[:len(model)-len(rest)-1], rest
+}
+
+func isBool(el exp.El) bool {
+	t := el.Typ()
+	switch t.Kind {
+	case typ.KindTyp:
+		t = el.(typ.Type)
+	case typ.KindSym:
+		t = el.(*exp.Sym).Type
+	case typ.KindCall:
+		t = el.(*exp.Call).Spec.Res()
+	}
+	return t == typ.Bool
 }

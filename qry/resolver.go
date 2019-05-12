@@ -11,7 +11,7 @@ import (
 	"github.com/mb0/xelf/typ"
 )
 
-var qrySpec = exp.Implement("(form 'qry' :args? :decls? : @)", false,
+var qrySpec = exp.Implement("(form 'qry' :args? :decls? : @1)", false,
 	func(c *exp.Ctx, env exp.Env, x *exp.Call, lo *exp.Layout, hint typ.Type) (exp.El, error) {
 		penv := FindEnv(env)
 		if penv == nil {
@@ -75,7 +75,7 @@ var qrySpec = exp.Implement("(form 'qry' :args? :decls? : @)", false,
 		return p.Result, nil
 	})
 
-var taskSig = exp.MustSig("(form '_' :ref? @ :args? :decls? : void)")
+var taskSig = exp.MustSig("(form '_' :ref? @1 :args? :decls? : void)")
 
 func resolveTask(c *exp.Ctx, env exp.Env, d *exp.Named) (t *Task, err error) {
 	t = &Task{}
@@ -206,15 +206,6 @@ func resolveQuery(c *exp.Ctx, env exp.Env, t *Task, ref string, lo *exp.Layout) 
 		t.Type = typ.List(rt)
 	case '#':
 		t.Type = typ.Int
-	}
-	// simplify where clause
-	if len(q.Whr.Els) != 0 {
-		x := &exp.Call{Spec: andSpec, Args: q.Whr.Els}
-		res, err := exp.Resolve(env, x)
-		if err != nil && err != exp.ErrUnres {
-			return err
-		}
-		q.Whr.Els = []exp.El{res}
 	}
 	return nil
 }

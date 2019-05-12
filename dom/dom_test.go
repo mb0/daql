@@ -156,6 +156,32 @@ func TestDom(t *testing.T) {
 				},
 				Elems: []*Elem{{}},
 			}}}},
+		{`(schema 'test' (+Group +ID str :pk) (+Entry +ID int :pk +Group str :ref '..group'))`,
+			`{name:'test' models:[` +
+				`{name:'Group' typ:'obj' elems:[{name:'ID' typ:'str' bits:2}]} ` +
+				`{name:'Entry' typ:'obj' elems:[` +
+				`{name:'ID' typ:'int' bits:2} ` +
+				`{name:'Group' typ:'str' ref:'..group'}]}]}`,
+			&Schema{Common: Common{Name: "test"}, Models: []*Model{{
+				Common: Common{Name: "Group"},
+				Type: typ.Type{typ.KindObj, &typ.Info{
+					Ref: "test.Group",
+					Params: []typ.Param{
+						{Name: "ID", Type: typ.Str},
+					}},
+				},
+				Elems: []*Elem{{Bits: BitPK}},
+			}, {
+				Common: Common{Name: "Entry"},
+				Type: typ.Type{typ.KindObj, &typ.Info{
+					Ref: "test.Entry",
+					Params: []typ.Param{
+						{Name: "ID", Type: typ.Int},
+						{Name: "Group", Type: typ.Str},
+					}},
+				},
+				Elems: []*Elem{{Bits: BitPK}, {Ref: "..group"}},
+			}}}},
 		{`(schema 'test' (+Spam func +Egg str + bool))`, `{name:'test' models:[` +
 			`{name:'Spam' typ:'func' elems:[{name:'Egg' typ:'str'} {typ:'bool'}]}]}`,
 			&Schema{Common: Common{Name: "test"}, Models: []*Model{{
@@ -180,7 +206,7 @@ func TestDom(t *testing.T) {
 		got := s.String()
 		want := test.want.String()
 		if got != want {
-			t.Errorf("string equal want %s got %s", want, got)
+			t.Errorf("string equal want\n%s\n\tgot\n%s", want, got)
 		}
 		if got != test.str {
 			t.Errorf("string equal want %s got %s", test.str, got)
@@ -196,7 +222,7 @@ func TestDom(t *testing.T) {
 		}
 		got = ss.String()
 		if got != want {
-			t.Errorf("parsed string equal want %s got %s", want, got)
+			t.Errorf("parsed string equal want\n%s\n\tgot\n%s", want, got)
 			continue
 		}
 	}

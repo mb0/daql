@@ -32,6 +32,7 @@ type Keys []string
 type Elem struct {
 	Bits  Bit       `json:"bits,omitempty"`
 	Extra *lit.Dict `json:"extra,omitempty"`
+	Ref   string    `json:"ref,omitempty"`
 }
 
 // Index represents a record model index, mainly used for databases.
@@ -197,6 +198,8 @@ func addElemFromDict(m *Model, d *lit.Dict) error {
 			c.Name = p.Name
 		case "val":
 			c.Val = int64(x.Lit.(lit.Numeric).Num())
+		case "ref":
+			el.Ref = x.Lit.(lit.Character).Char()
 		case "typ":
 			t, err := typ.ParseSym(x.Lit.(lit.Character).Char(), nil)
 			if err != nil {
@@ -293,6 +296,9 @@ func (m *Model) WriteBfr(b *bfr.Ctx) error {
 		}
 		if e.Bits != 0 {
 			b.Fmt(" bits:%d", e.Bits)
+		}
+		if e.Ref != "" {
+			b.Fmt(" ref:'%s'", e.Ref)
 		}
 		err := writeExtra(b, e.Extra)
 		if err != nil {
@@ -407,13 +413,17 @@ func (p *Project) WriteBfr(b *bfr.Ctx) error {
 	return err
 }
 
-func writeExtra(b *bfr.Ctx, extra *lit.Dict) error {
+func writeExtra(b *bfr.Ctx, extra *lit.Dict) (err error) {
 	if extra != nil && len(extra.List) > 0 {
 		for _, x := range extra.List {
 			b.WriteByte(' ')
 			b.WriteString(x.Key)
 			b.WriteByte(':')
-			err := x.Lit.WriteBfr(b)
+			if x.Lit.Typ().Kind&typ.KindAny != 0 {
+				err = x.Lit.WriteBfr(b)
+			} else {
+				err = b.Quote(x.Lit.String())
+			}
 			if err != nil {
 				return err
 			}

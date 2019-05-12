@@ -24,7 +24,7 @@ func Execute(env exp.Env, r io.Reader) (*Schema, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := &exp.Ctx{Exec: true}
+	c := exp.NewCtx(true, true)
 	l, err := c.Resolve(env, x, typ.Void)
 	if err != nil {
 		return nil, cor.Errorf("%s: %v", c.Unres, err)

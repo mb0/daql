@@ -46,7 +46,7 @@ var schemaRules = utl.NodeRules{
 			tmp := make([]exp.El, 0, len(args)+1)
 			tmp = append(tmp, lit.Str(n.Name[1:]))
 			tmp = append(tmp, args...)
-			call := &exp.Call{Spec: modelSpec, Args: tmp}
+			call := &exp.Call{Spec: modelSpec, Type: c.Inst(modelSpec.Type), Args: tmp}
 			e, err := modelSpec.Resolve(c, env, call, typ.Void)
 			if err != nil {
 				return nil, err

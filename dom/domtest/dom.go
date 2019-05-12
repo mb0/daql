@@ -12,7 +12,7 @@ const ProdRaw = `(schema 'prod'
 		+Name str)
 	(+Prod  +ID   int :pk
 		+Name str
-		+Cat  int)
+		+Cat  int :ref @Cat)
 	(+Label	+ID   int :pk
 		+Name str
 		+Tmpl raw)
