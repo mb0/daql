@@ -277,7 +277,7 @@ func (m *memTable) execCount(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 	return t.Result.Assign(lit.Int(result))
 }
 
-var boolSpeck = std.Core("(bool)")
+var boolSpeck = std.Core(":bool")
 
 func prepareWhr(c *exp.Ctx, env exp.Env, q *qry.Query) (x exp.El, null bool, _ error) {
 	if len(q.Whr.Els) == 0 {

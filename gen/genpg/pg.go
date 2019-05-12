@@ -47,7 +47,7 @@ func WriteRef(b *gen.Ctx, env exp.Env, r *exp.Sym) error {
 func WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Call) error {
 	key := e.Spec.Key()
 	if key == "bool" {
-		key = "(bool)"
+		key = ":bool"
 	}
 	r := exprWriterMap[key]
 	if r != nil {
@@ -69,27 +69,27 @@ func init() {
 		// I found no better way sql expression to fail when resolved but not otherwise.
 		// Sadly we cannot transport any failure message, but it suffices, because this is
 		// only meant to be a test helper.
-		"fail":   writeRaw{"3.2=1/0", PrecCmp}, // 3..2..1..boom!
-		"if":     writeFunc(renderIf),
-		"and":    writeLogic{" AND ", false, PrecAnd},
-		"or":     writeLogic{" OR ", false, PrecOr},
-		"(bool)": writeLogic{" AND ", false, PrecAnd},
-		"not":    writeLogic{" AND ", true, PrecAnd},
-		"add":    writeArith{" + ", PrecAdd},
-		"sub":    writeArith{" - ", PrecAdd},
-		"mul":    writeArith{" * ", PrecMul},
-		"div":    writeArith{" / ", PrecMul},
-		"eq":     writeEq{" = ", false},
-		"ne":     writeEq{" != ", false},
-		"equal":  writeEq{" = ", true},
-		"lt":     writeCmp(" < "),
-		"gt":     writeCmp(" > "),
-		"le":     writeCmp(" <= "),
-		"ge":     writeCmp(" >= "),
-		"as":     writeFunc(writeAs),
-		"cat":    writeFunc(writeCat),
-		"apd":    writeFunc(writeApd),
-		"set":    writeFunc(writeSet),
+		"fail":  writeRaw{"3.2=1/0", PrecCmp}, // 3..2..1..boom!
+		"if":    writeFunc(renderIf),
+		"and":   writeLogic{" AND ", false, PrecAnd},
+		"or":    writeLogic{" OR ", false, PrecOr},
+		":bool": writeLogic{" AND ", false, PrecAnd},
+		"not":   writeLogic{" AND ", true, PrecAnd},
+		"add":   writeArith{" + ", PrecAdd},
+		"sub":   writeArith{" - ", PrecAdd},
+		"mul":   writeArith{" * ", PrecMul},
+		"div":   writeArith{" / ", PrecMul},
+		"eq":    writeEq{" = ", false},
+		"ne":    writeEq{" != ", false},
+		"equal": writeEq{" = ", true},
+		"lt":    writeCmp(" < "),
+		"gt":    writeCmp(" > "),
+		"le":    writeCmp(" <= "),
+		"ge":    writeCmp(" >= "),
+		"as":    writeFunc(writeAs),
+		"cat":   writeFunc(writeCat),
+		"apd":   writeFunc(writeApd),
+		"set":   writeFunc(writeSet),
 	}
 }
 
