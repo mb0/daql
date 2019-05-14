@@ -9,6 +9,7 @@ import (
 	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/lit"
+	"github.com/mb0/xelf/prx"
 	"github.com/mb0/xelf/std"
 	"github.com/mb0/xelf/typ"
 )
@@ -154,7 +155,7 @@ func (b *Backend) execQuery(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 	switch q.Ref[0] {
 	case '?':
 		if len(result) != 0 {
-			err := lit.AssignTo(result[0], t.Result)
+			err := prx.AssignTo(result[0], t.Result)
 			return err
 		}
 		return nil
@@ -289,7 +290,7 @@ func prepareWhr(c *exp.Ctx, env exp.Env, q *qry.Query) (x exp.El, null bool, _ e
 	if x == nil {
 		x = &exp.Call{Spec: boolSpeck, Args: q.Whr.Els}
 	}
-	c = c.WithPart(true).WithExec(false)
+	c = c.With(true, false)
 	res, err := c.Resolve(env, x, c.New())
 	if err != nil {
 		if err != exp.ErrUnres {

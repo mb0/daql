@@ -6,6 +6,7 @@ import (
 	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/lit"
+	"github.com/mb0/xelf/prx"
 	"github.com/mb0/xelf/typ"
 	"github.com/mb0/xelf/utl"
 )
@@ -204,7 +205,7 @@ func idxPrepper(c *exp.Ctx, env exp.Env, n *exp.Named) (lit.Lit, error) {
 func idxSetter(o utl.Node, key string, l lit.Lit) error {
 	m := o.Ptr().(*Model)
 	var idx Index
-	err := lit.AssignTo(l, &idx)
+	err := prx.AssignTo(l, &idx)
 	if err != nil {
 		return cor.Errorf("assign idx to %s: %w", l, err)
 	}
