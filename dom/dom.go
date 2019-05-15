@@ -116,6 +116,15 @@ func (p *Project) Schema(key string) *Schema {
 	return nil
 }
 
+// Model returns a model for the qualified key or nil.
+func (p *Project) Model(key string) *Model {
+	split := strings.SplitN(key, ".", 2)
+	if len(split) == 2 {
+		return p.Schema(split[0]).Model(split[1])
+	}
+	return nil
+}
+
 // Model returns a model for key or nil.
 func (s *Schema) Model(key string) *Model {
 	if s != nil {

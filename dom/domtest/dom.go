@@ -26,3 +26,10 @@ func Fixture(raw, fix string) (*Proj, error) {
 	res.Fix = l.(*lit.Dict)
 	return res, nil
 }
+
+func Must(pro *Proj, err error) *Proj {
+	if err != nil {
+		panic(err)
+	}
+	return pro
+}
