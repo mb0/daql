@@ -24,7 +24,7 @@ func TestPgx(t *testing.T) {
 		t.Fatalf("parse prod fixture error: %v", err)
 	}
 	defer setup(t, db, &f.Project)()
-	err = CopyFrom(db, f.Schema("prod"), f.ProdFix)
+	err = CopyFrom(db, f.Schema("prod"), f.Fix)
 	if err != nil {
 		t.Fatalf("copy fixtures error: %v", err)
 	}
