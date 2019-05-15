@@ -126,7 +126,7 @@ func modelElem(m *Model, key string) *exp.Def {
 
 func constLit(m *Model, c *typ.Const) lit.Lit {
 	if m.Kind != typ.KindEnum {
-		return lit.FlagInt{m.Type, lit.Int(c.Val)}
+		return lit.BitsInt{m.Type, lit.Int(c.Val)}
 	}
 	return lit.EnumStr{m.Type, lit.Str(c.Key())}
 }

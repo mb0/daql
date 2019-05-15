@@ -20,8 +20,8 @@ func TestDom(t *testing.T) {
 			}}}},
 		},
 
-		{`(schema 'test' (+Dir flag +North +East +South +West))`,
-			`{name:'test' models:[{name:'Dir' typ:'flag' elems:[` +
+		{`(schema 'test' (+Dir bits +North +East +South +West))`,
+			`{name:'test' models:[{name:'Dir' typ:'bits' elems:[` +
 				`{name:'North' val:1} {name:'East' val:2} ` +
 				`{name:'South' val:4} {name:'West' val:8}]` +
 				`}]}`,

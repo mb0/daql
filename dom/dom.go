@@ -10,7 +10,7 @@ import (
 	"github.com/mb0/xelf/typ"
 )
 
-// Bit is a flag used for a number of field options.
+// Bit is a bit set used for a number of field options.
 type Bit uint64
 
 const (
@@ -23,7 +23,7 @@ const (
 	BitRO
 )
 
-func (Bit) Flags() map[string]int64 { return bitConsts }
+func (Bit) Bits() map[string]int64 { return bitConsts }
 
 // Keys is a slice of field keys used for indices and order.
 type Keys []string
@@ -66,7 +66,7 @@ type Node interface {
 	WriteBfr(b *bfr.Ctx) error
 }
 
-// Model represents either a flag, enum or record type and has extra domain information.
+// Model represents either a bits, enum or record type and has extra domain information.
 type Model struct {
 	Common
 	typ.Type `json:"typ"`

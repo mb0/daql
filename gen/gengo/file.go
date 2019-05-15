@@ -63,7 +63,7 @@ func WriteFile(c *gen.Ctx, fname string, s *dom.Schema) error {
 
 // RenderFile writes the elements to a go file with package and import declarations.
 //
-// For now only flag, enum and rec type definitions are supported
+// For now only bits, enum and rec type definitions are supported
 func RenderFile(c *gen.Ctx, s *dom.Schema) error {
 	b := bfr.Get()
 	defer bfr.Put(b)
@@ -106,8 +106,8 @@ func RenderFile(c *gen.Ctx, s *dom.Schema) error {
 	return nil
 }
 
-// DeclareType writes a type declaration for flag, enum and rec types.
-// For flag and enum types the declaration includes the constant declarations.
+// DeclareType writes a type declaration for bits, enum and rec types.
+// For bits and enum types the declaration includes the constant declarations.
 func DeclareType(c *gen.Ctx, m *dom.Model) (err error) {
 	t := m.Type
 	switch m.Kind {
@@ -115,7 +115,7 @@ func DeclareType(c *gen.Ctx, m *dom.Model) (err error) {
 		c.WriteString("type ")
 		c.WriteString(m.Name)
 		c.WriteString(" uint64\n\n")
-		writeFlagConsts(c, t, m.Name)
+		writeBitsConsts(c, t, m.Name)
 	case typ.KindEnum:
 		c.WriteString("type ")
 		c.WriteString(m.Name)
@@ -194,7 +194,7 @@ func refName(t typ.Type) string {
 	return n
 }
 
-func writeFlagConsts(c *gen.Ctx, t typ.Type, ref string) {
+func writeBitsConsts(c *gen.Ctx, t typ.Type, ref string) {
 	mono := true
 	c.WriteString("const (")
 	for i, cst := range t.Consts {
@@ -211,7 +211,7 @@ func writeFlagConsts(c *gen.Ctx, t typ.Type, ref string) {
 			}
 		} else {
 			c.WriteString(" = ")
-			for j, cr := range t.Consts[:i].Flags(mask) {
+			for j, cr := range t.Consts[:i].Bits(mask) {
 				if j != 0 {
 					c.WriteString(" | ")
 				}

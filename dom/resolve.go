@@ -128,8 +128,8 @@ func resolveConstVal(c *exp.Ctx, env *ModelEnv, args []exp.El, idx int) (_ lit.I
 }
 
 var bitRule = utl.KeyRule{
-	KeyPrepper: utl.FlagPrepper(typ.Constants(bitConsts)),
-	KeySetter:  utl.FlagSetter("bits"),
+	KeyPrepper: utl.BitsPrepper(typ.Constants(bitConsts)),
+	KeySetter:  utl.BitsSetter("bits"),
 }
 var fieldRules = utl.TagRules{
 	IdxKeyer: utl.OffsetKeyer(1),

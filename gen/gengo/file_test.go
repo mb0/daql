@@ -11,7 +11,7 @@ import (
 )
 
 const fooRaw = `(schema 'foo'
-	(+Align flag
+	(+Align bits
 		+A
 		+B
 		(+C 3))
@@ -21,8 +21,8 @@ const fooRaw = `(schema 'foo'
 		+C)
 	(+Node1 +Name? str)
 	(+Node2 +Start time)
-	(+Node3 +Kind  (flag 'bar.Kind'))
-	(+Node4 +Kind  (flag 'foo.Kind'))
+	(+Node3 +Kind  (bits 'bar.Kind'))
+	(+Node4 +Kind  (bits 'foo.Kind'))
 )`
 
 func TestWriteFile(t *testing.T) {

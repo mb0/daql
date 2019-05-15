@@ -112,7 +112,7 @@ func WriteLit(c *gen.Ctx, l lit.Lit) error {
 	case typ.KindBits, typ.KindEnum:
 		valer, ok := l.(interface{ Val() interface{} })
 		if !ok {
-			return cor.Errorf("expect flag or enum to implement val method got %T", l)
+			return cor.Errorf("expect bits or enum to implement val method got %T", l)
 		}
 		tref := Import(c, t.Ref)
 		if opt {
@@ -130,7 +130,7 @@ func WriteLit(c *gen.Ctx, l lit.Lit) error {
 				c.WriteString(tref)
 				c.WriteString(e.Cased())
 			} else {
-				for i, f := range t.Consts.Flags(uint64(v)) {
+				for i, f := range t.Consts.Bits(uint64(v)) {
 					if i > 0 {
 						c.WriteString(" | ")
 					}
