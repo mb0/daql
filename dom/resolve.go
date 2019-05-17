@@ -14,84 +14,98 @@ import (
 var schemaSpec = exp.Implement("(form 'schema' :args? :decls? : @)", false,
 	func(c *exp.Ctx, env exp.Env, x *exp.Call, lo *exp.Layout, h typ.Type) (exp.El, error) {
 		s := &Schema{}
-		env = &SchemaEnv{parent: env, Schema: s}
-		n, err := utl.NodeResolverFunc(schemaRules, s)(c, env, x, h)
+		senv := &SchemaEnv{parent: env, Schema: s}
+		n, err := utl.GetNode(s)
 		if err != nil {
-			return n, err
+			return nil, err
 		}
+
+		err = schemaRules.Resolve(c, senv, lo.Tags(0), n)
+		if err != nil {
+			return nil, err
+		}
+		decls, err := lo.Decls(1)
+		if err != nil {
+			return nil, err
+		}
+		qual := s.Key()
+		// first initialize the models...
+		s.Models = make([]*Model, 0, len(decls))
+		for _, d := range decls {
+			name := d.Name[1:]
+			m := &Model{
+				Common: Common{Name: name}, schema: qual,
+				Type: typ.Type{typ.KindObj, &typ.Info{
+					Ref: qual + "." + name,
+				}},
+			}
+			s.Models = append(s.Models, m)
+		}
+		// ...then resolve the models with all other schema model names in scope
+		for i, m := range s.Models {
+			err = resolveModel(c, senv, m, decls[i].Args())
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		pro := FindEnv(env)
 		if pro != nil {
-			pro.Schemas = append(pro.Schemas, n.(utl.Node).Ptr().(*Schema))
+			pro.Schemas = append(pro.Schemas, s)
 		}
 		return n, nil
 	})
 
-var modelSpec = exp.Implement("(form 'model' :args? :decls? :tail? : @)", false,
-	func(c *exp.Ctx, env exp.Env, x *exp.Call, lo *exp.Layout, h typ.Type) (exp.El, error) {
-		s := env.(*SchemaEnv)
-		m := &Model{Type: typ.Type{typ.KindObj, &typ.Info{}}}
-		env = &ModelEnv{SchemaEnv: s, Model: m}
-		return utl.NodeResolverFunc(modelRules, m)(c, env, x, h)
-	})
-
-var schemaRules = utl.NodeRules{
-	Tags: utl.TagRules{
-		IdxKeyer: utl.OffsetKeyer(2),
-		KeyRule: utl.KeyRule{
-			KeySetter: utl.ExtraMapSetter("extra"),
-		},
-	},
-	Decl: utl.KeyRule{
-		KeyPrepper: func(c *exp.Ctx, env exp.Env, n *exp.Named) (lit.Lit, error) {
-			args := n.Args()
-			tmp := make([]exp.El, 0, len(args)+1)
-			tmp = append(tmp, lit.Str(n.Name[1:]))
-			tmp = append(tmp, args...)
-			call := &exp.Call{Spec: modelSpec, Type: c.Inst(modelSpec.Type), Args: tmp}
-			e, err := modelSpec.Resolve(c, env, call, typ.Void)
-			if err != nil {
-				return nil, err
-			}
-			return e.(lit.Lit), nil
-		},
-		KeySetter: func(n utl.Node, key string, el lit.Lit) error {
-			m := el.(utl.Node).Ptr().(*Model)
-			s := n.Ptr().(*Schema)
-			m.schema = s.Key()
-			m.Type.Ref = m.schema + "." + m.Name
-			s.Models = append(s.Models, m)
-			return nil
-		},
-	},
+func resolveModel(c *exp.Ctx, env *SchemaEnv, m *Model, args []exp.El) error {
+	menv := &ModelEnv{SchemaEnv: env, Model: m}
+	n, err := utl.GetNode(m)
+	if err != nil {
+		return err
+	}
+	lo, err := exp.LayoutArgs(modelSig, args)
+	if err != nil {
+		return err
+	}
+	err = modelRules.Resolve(c, menv, lo.Tags(0), n)
+	if err != nil {
+		return err
+	}
+	decls, err := lo.Decls(1)
+	if err != nil {
+		return err
+	}
+	for _, d := range decls {
+		switch m.Kind {
+		case typ.KindBits, typ.KindEnum:
+			_, err = resolveConst(c, menv, d)
+		case typ.KindObj, typ.KindFunc:
+			_, err = resolveField(c, menv, d)
+		default:
+			err = cor.Errorf("unexpected model kind %s", m.Kind)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return defaultRules.Resolve(c, menv, lo.Tags(2), n)
 }
 
-var modelRules = utl.NodeRules{
-	Tags: utl.TagRules{
-		IdxKeyer: utl.OffsetKeyer(2),
-		KeyRule: utl.KeyRule{
-			KeySetter: utl.ExtraMapSetter("extra"),
-		},
-		Rules: map[string]utl.KeyRule{
-			"typ": {KeyPrepper: typPrepper, KeySetter: typSetter},
-			"idx": {KeyPrepper: idxPrepper, KeySetter: idxSetter},
-		},
-	},
-	Decl: utl.KeyRule{
-		KeyPrepper: func(c *exp.Ctx, env exp.Env, n *exp.Named) (lit.Lit, error) {
-			m := env.(*ModelEnv)
-			switch m.Model.Kind {
-			case typ.KindBits, typ.KindEnum:
-				return resolveConst(c, m, n)
-			case typ.KindObj, typ.KindFunc:
-				return resolveField(c, m, n)
-			}
-			return nil, cor.Errorf("unexpected model kind %s", m.Model.Kind)
-		},
-		KeySetter: noopSetter,
-	},
+var modelSig = exp.MustSig("(form 'model' :args? :decls? :tail? : @)")
+
+var schemaRules = utl.TagRules{
+	IdxKeyer: utl.OffsetKeyer(2),
+	KeyRule:  utl.KeyRule{KeySetter: utl.ExtraMapSetter("extra")},
 }
 
-func noopSetter(n utl.Node, key string, el lit.Lit) error { return nil }
+var modelRules = utl.TagRules{
+	IdxKeyer: utl.OffsetKeyer(3),
+	KeyRule:  utl.KeyRule{KeySetter: utl.ExtraMapSetter("extra")},
+	Rules: map[string]utl.KeyRule{
+		"typ": {typPrepper, typSetter},
+		"idx": {idxPrepper, idxSetter},
+	},
+}
+var defaultRules utl.TagRules
 
 func resolveConst(c *exp.Ctx, env *ModelEnv, n *exp.Named) (lit.Lit, error) {
 	d, err := resolveConstVal(c, env, n.Args(), len(env.Model.Consts))
