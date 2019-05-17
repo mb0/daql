@@ -17,6 +17,10 @@ func WriteType(c *gen.Ctx, t typ.Type) error {
 		return c.Fmt(Import(c, "lit.Lit"))
 	case typ.KindDyn:
 		return c.Fmt(Import(c, "exp.Dyn"))
+	case typ.KindTyp:
+		return c.Fmt(Import(c, "typ.Type"))
+	case typ.KindExpr:
+		return c.Fmt(Import(c, "exp.El"))
 	}
 	var r string
 	switch k & typ.MaskRef {
