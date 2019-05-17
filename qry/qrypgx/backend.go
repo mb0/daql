@@ -24,26 +24,9 @@ func New(db *pgx.ConnPool, proj *dom.Project) *Backend {
 	return &Backend{DB: db, Proj: proj}
 }
 
-func (b *Backend) ExecPlan(c *exp.Ctx, env exp.Env, p *qry.Plan) error {
-	if p.Simple {
-		t := p.Root[0]
-		t.Result = p.Result
-		return b.execTask(c, env, t)
-	}
-	keyer, ok := p.Result.(lit.Keyer)
-	if !ok {
-		return cor.Errorf("want keyer plan result got %T", p.Result)
-	}
-	for _, t := range p.Root {
-		r, err := keyer.Key(strings.ToLower(t.Name))
-		if err != nil {
-			return err
-		}
-		t.Result, ok = r.(lit.Assignable)
-		if !ok {
-			return cor.Errorf("want assignable task result got %s from %T", r, keyer)
-		}
-		err = b.execTask(c, env, t)
+func (b *Backend) ExecPlan(c *qry.Ctx, env exp.Env) error {
+	for _, t := range c.Root {
+		err := b.execTask(c, env, t, c.Data)
 		if err != nil {
 			return err
 		}
@@ -51,27 +34,22 @@ func (b *Backend) ExecPlan(c *exp.Ctx, env exp.Env, p *qry.Plan) error {
 	return nil
 }
 
-func (b *Backend) execTask(c *exp.Ctx, env exp.Env, t *qry.Task) error {
+func (b *Backend) execTask(c *qry.Ctx, env exp.Env, t *qry.Task, par lit.Proxy) error {
+	res, err := qry.Prep(par, t)
+	if err != nil {
+		return err
+	}
 	if t.Query != nil {
-		err := b.execQuery(c, env, t)
-		if err != nil {
-			return err
-		}
-	} else {
-		el, err := c.Resolve(env, t.Expr, t.Type)
-		if err != nil {
-			return err
-		}
-		err = t.Result.Assign(el.(lit.Lit))
-		if err != nil {
-			return err
-		}
+		return b.execQuery(c, env, t, res)
 	}
-	t.Done = true
-	return nil
+	el, err := c.Resolve(env, t.Expr, t.Type)
+	if err != nil {
+		return err
+	}
+	return res.Assign(el.(lit.Lit))
 }
 
-func (b *Backend) execQuery(c *exp.Ctx, env exp.Env, t *qry.Task) error {
+func (b *Backend) execQuery(c *qry.Ctx, env exp.Env, t *qry.Task, res lit.Proxy) error {
 	q := t.Query
 	schema, model, rest := splitName(q)
 	m := b.Proj.Schema(schema).Model(model)
@@ -84,7 +62,7 @@ func (b *Backend) execQuery(c *exp.Ctx, env exp.Env, t *qry.Task) error {
 	var sb strings.Builder
 	// write query.
 	// XXX could we cache and clearly identify prepared statements?
-	err := genQuery(&gen.Ctx{Ctx: bfr.Ctx{B: &sb}}, c, env, t)
+	err := genQuery(&gen.Ctx{Ctx: bfr.Ctx{B: &sb}}, c.Ctx, env, t)
 	if err != nil {
 		return err
 	}
@@ -98,21 +76,25 @@ func (b *Backend) execQuery(c *exp.Ctx, env exp.Env, t *qry.Task) error {
 		if !rows.Next() {
 			return cor.Errorf("no result for count query %s", q.Ref)
 		}
-		err = rows.Scan(t.Result.Ptr())
+		err = rows.Scan(res.Ptr())
 		if err != nil {
 			return cor.Errorf("scan: %w", err)
 		}
 		if rows.Next() {
 			return cor.Errorf("additional results for count query")
 		}
-		return rows.Err()
+		if err = rows.Err(); err != nil {
+			return err
+		}
+		c.SetDone(t, res)
+		return nil
 	case '?':
 		if !rows.Next() {
 			return rows.Err()
 		}
-		k, ok := lit.Deopt(t.Result).(lit.Keyer)
+		k, ok := lit.Deopt(res).(lit.Keyer)
 		if !ok {
-			return cor.Errorf("expect keyer result got %T", t.Result)
+			return cor.Errorf("expect keyer result got %T", res)
 		}
 		args := make([]interface{}, 0, len(q.Sel))
 		for _, s := range q.Sel {
@@ -120,7 +102,7 @@ func (b *Backend) execQuery(c *exp.Ctx, env exp.Env, t *qry.Task) error {
 			if err != nil {
 				return cor.Errorf("prep scan: %w", err)
 			}
-			v, ok := el.(lit.Assignable)
+			v, ok := el.(lit.Proxy)
 			if !ok {
 				return cor.Errorf("expect assignable result got %T", el)
 			}
@@ -134,14 +116,18 @@ func (b *Backend) execQuery(c *exp.Ctx, env exp.Env, t *qry.Task) error {
 		if rows.Next() {
 			return cor.Errorf("additional results for count query")
 		}
-		return rows.Err()
+		if err = rows.Err(); err != nil {
+			return err
+		}
+		c.SetDone(t, res)
+		return nil
 	}
 	// result should be an assignable arr
-	a, ok := lit.Deopt(t.Result).(lit.Appender)
+	a, ok := lit.Deopt(res).(lit.Appender)
 	if !ok {
-		return cor.Errorf("expect arr result got %T", t.Result)
+		return cor.Errorf("expect arr result got %T", res)
 	}
-	n := a.Len()
+	nn := a.Len()
 	args := make([]interface{}, len(q.Sel))
 	for rows.Next() {
 		null := lit.ZeroProxy(a.Typ().Elem())
@@ -149,7 +135,7 @@ func (b *Backend) execQuery(c *exp.Ctx, env exp.Env, t *qry.Task) error {
 		if err != nil {
 			return err
 		}
-		el, err := a.Idx(n)
+		el, err := a.Idx(nn)
 		if err != nil {
 			return err
 		}
@@ -163,7 +149,7 @@ func (b *Backend) execQuery(c *exp.Ctx, env exp.Env, t *qry.Task) error {
 			if err != nil {
 				return cor.Errorf("prep scan: %w", err)
 			}
-			v, ok := el.(lit.Assignable)
+			v, ok := el.(lit.Proxy)
 			if !ok {
 				return cor.Errorf("expect assignable result got %T", el)
 			}
@@ -174,12 +160,13 @@ func (b *Backend) execQuery(c *exp.Ctx, env exp.Env, t *qry.Task) error {
 		if err != nil {
 			return cor.Errorf("scan: %w", err)
 		}
-		n++
+		nn++
 	}
 	if err = rows.Err(); err != nil {
 		return err
 	}
-	return t.Result.Assign(a)
+	c.SetDone(t, res)
+	return nil
 }
 
 func splitName(q *qry.Query) (schema, model, rest string) {

@@ -18,7 +18,6 @@ func TestPgx(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse prod fixture error: %v", err)
 	}
-	domEnv := dom.NewEnv(qry.Builtin, &f.Project)
 	db, err := Open(dsn, nil)
 	if err != nil {
 		t.Fatalf("parse prod fixture error: %v", err)
@@ -39,12 +38,12 @@ func TestPgx(t *testing.T) {
 	}
 	pgxBed := New(db, &f.Project)
 	for _, test := range tests {
-		el, err := exp.ParseString(domEnv, test.raw)
+		env := qry.NewEnv(nil, &f.Project, pgxBed)
+		el, err := exp.ParseString(env, test.raw)
 		if err != nil {
 			t.Errorf("parse %s error %+v", test.raw, err)
 			continue
 		}
-		env := qry.NewEnv(domEnv, pgxBed)
 		c := exp.NewCtx(false, true)
 		l, err := c.Resolve(env, el, typ.Void)
 		if err != nil {
@@ -63,10 +62,9 @@ func setup(t *testing.T, db *pgx.ConnPool, p *dom.Project) func() {
 		t.Fatalf("create project err: %v", err)
 	}
 	return func() {
-		/*
-			err := DropProject(db, p)
-			if err != nil {
-				t.Errorf("drop schema err %v", err)
-			}*/
+		err := DropProject(db, p)
+		if err != nil {
+			t.Errorf("drop schema err %v", err)
+		}
 	}
 }

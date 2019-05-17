@@ -1,6 +1,7 @@
 package qry
 
 import (
+	"github.com/mb0/daql/dom"
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/lit"
 	"github.com/mb0/xelf/std"
@@ -9,42 +10,43 @@ import (
 )
 
 var Builtin = exp.Builtin{
-	QryLookup,
 	utl.StrLib.Lookup(),
 	utl.TimeLib.Lookup(),
 	std.Core, std.Decl,
 }
 
-func NewEnv(env exp.Env, bend Backend) *PlanEnv {
+func NewEnv(env exp.Env, pr *dom.Project, bend Backend) *PlanEnv {
 	if env == nil {
 		env = Builtin
 	}
-	s := &exp.ParamScope{exp.NewScope(env), nil}
-	return &PlanEnv{s, &Plan{}, bend}
-}
-
-func QryLookup(sym string) *exp.Spec {
-	if sym == "qry" {
-		return qrySpec
-	}
-	return nil
+	domEnv := dom.NewEnv(env, pr)
+	s := &exp.ParamScope{exp.NewScope(domEnv), nil}
+	return &PlanEnv{s, pr, &Plan{}, nil, bend}
 }
 
 type PlanEnv struct {
-	Par exp.Env
+	Par     exp.Env
+	Project *dom.Project
 	*Plan
+	*Result
 	Backend
 }
 
-func (p *PlanEnv) Parent() exp.Env    { return p.Par }
-func (*PlanEnv) Supports(x byte) bool { return x == '/' }
+func (s *PlanEnv) Parent() exp.Env      { return s.Par }
+func (s *PlanEnv) Supports(x byte) bool { return x == '/' }
 func (s *PlanEnv) Get(sym string) *exp.Def {
+	if sym == "qry" {
+		return exp.NewDef(qrySpec)
+	}
 	// resolve from added tasks
 	if sym[0] != '/' {
 		return nil
 	}
 	if len(sym) == 1 {
-		return exp.NewDef(s.Result)
+		if s.Result != nil && s.Done {
+			return exp.NewDef(s.Data)
+		}
+		return &exp.Def{Type: s.Type}
 	}
 	path, err := lit.ReadPath(sym[1:])
 	if err != nil {
@@ -53,14 +55,15 @@ func (s *PlanEnv) Get(sym string) *exp.Def {
 	sym = path[0].Key
 	for _, t := range s.Root {
 		if t.Name == sym {
-			return taskDef(t, path[1:])
+			return taskDef(t, path[1:], s)
 		}
 	}
 	return nil
 }
 
 type TaskEnv struct {
-	Par exp.Env
+	Par  exp.Env
+	Penv *PlanEnv
 	*Task
 	Param lit.Lit
 }
@@ -76,7 +79,7 @@ func (s *TaskEnv) Get(sym string) *exp.Def {
 	if s.Query != nil {
 		for _, t := range s.Query.Sel {
 			if t.Name == sym {
-				return taskDef(t, nil)
+				return taskDef(t, nil, s.Penv)
 			}
 		}
 		if s.Param != nil {
@@ -113,23 +116,20 @@ func FindEnv(env exp.Env) *PlanEnv {
 	return nil
 }
 
-func taskDef(t *Task, path lit.Path) *exp.Def {
-	if t.Done {
-		if len(path) != 0 {
-			l, err := lit.SelectPath(t.Result, path)
+func taskDef(t *Task, path lit.Path, r *PlanEnv) *exp.Def {
+	if r.Result != nil {
+		nfo := r.Info[t]
+		if nfo.Done {
+			l, err := lit.SelectPath(nfo.Data, path)
 			if err != nil {
 				return nil
 			}
 			return exp.NewDef(l)
 		}
-		return exp.NewDef(t.Result)
 	}
-	if len(path) != 0 {
-		l, err := lit.SelectPath(t.Type, path)
-		if err != nil {
-			return nil
-		}
-		return &exp.Def{Type: l.(typ.Type)}
+	l, err := lit.SelectPath(t.Type, path)
+	if err != nil {
+		return nil
 	}
-	return &exp.Def{Type: t.Type}
+	return &exp.Def{Type: l.(typ.Type)}
 }

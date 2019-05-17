@@ -3,7 +3,6 @@ package qry
 import (
 	"strings"
 
-	"github.com/mb0/daql/dom"
 	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/lit"
@@ -19,7 +18,6 @@ var qrySpec = exp.Implement("(form 'qry' :args? :decls? : @1)", false,
 		}
 		p := penv.Plan
 		args := lo.Args(0)
-		var rt typ.Type
 		if len(args) > 0 {
 			// simple query
 			if len(lo.Args(1)) > 0 {
@@ -30,9 +28,8 @@ var qrySpec = exp.Implement("(form 'qry' :args? :decls? : @1)", false,
 			if err != nil {
 				return nil, err
 			}
-			p.Simple = true
 			p.Root = []*Task{t}
-			rt = t.Type
+			p.Type = t.Type
 		} else {
 			decls, err := lo.Decls(1)
 			if err != nil {
@@ -47,20 +44,7 @@ var qrySpec = exp.Implement("(form 'qry' :args? :decls? : @1)", false,
 				p.Root = append(p.Root, t)
 				ps = append(ps, typ.Param{Name: t.Name, Type: t.Type})
 			}
-			rt = typ.Rec(ps)
-		}
-		if p.Result == nil {
-			// create a synthetic result literal
-			p.Result = lit.ZeroProxy(rt)
-		} else {
-			// compare to expected result
-			cmp := typ.Compare(rt, p.Result.Typ())
-			if cmp < typ.LvlCheck {
-				return nil, cor.Errorf(
-					"cannot convert query result type %s to expected result type",
-					rt, p.Result.Typ(),
-				)
-			}
+			p.Type = typ.Rec(ps)
 		}
 		if len(p.Root) == 0 {
 			return nil, cor.Error("empty plan")
@@ -68,11 +52,13 @@ var qrySpec = exp.Implement("(form 'qry' :args? :decls? : @1)", false,
 		if !c.Exec {
 			return x, exp.ErrExec
 		}
-		err := penv.ExecPlan(c, env, p)
+		ctx := NewCtx(c, p)
+		penv.Result = &ctx.Result
+		err := penv.ExecPlan(ctx, env)
 		if err != nil {
 			return nil, err
 		}
-		return p.Result, nil
+		return ctx.Data, nil
 	})
 
 var taskSig = exp.MustSig("(form '_' :ref? @1 :args? :decls? : void)")
@@ -95,7 +81,7 @@ func resolveTask(c *exp.Ctx, env exp.Env, d *exp.Named) (t *Task, err error) {
 		fst = lo.Arg(0)
 		switch sym := fst.String(); sym[0] {
 		case '?', '*', '#':
-			if d.Name == "" {
+			if d.Name == "+" {
 				t.Name = cor.LastKey(sym)
 			}
 			err = resolveQuery(c, env, t, sym, lo)
@@ -150,6 +136,8 @@ func resolveQuery(c *exp.Ctx, env exp.Env, t *Task, ref string, lo *exp.Layout) 
 	if name == "" {
 		return cor.Error("empty query reference")
 	}
+	// locate the plan environment for a project and find the model
+	penv := FindEnv(env)
 	switch name[0] {
 	case '.', '/', '$': // path
 		return cor.Error("path query reference not yet implemented")
@@ -159,12 +147,10 @@ func resolveQuery(c *exp.Ctx, env exp.Env, t *Task, ref string, lo *exp.Layout) 
 		if len(s) < 2 {
 			return cor.Errorf("unknown schema name %q", name)
 		}
-		// locate the project environment and find the model
-		pro := dom.FindEnv(env)
-		if pro == nil {
-			return cor.Error("no project environment")
+		if penv == nil || penv.Project == nil {
+			return cor.Errorf("no project found in plan env %v", penv)
 		}
-		m := pro.Schema(s[0]).Model(s[1])
+		m := penv.Project.Schema(s[0]).Model(s[1])
 		if m == nil {
 			break
 		}
@@ -182,7 +168,7 @@ func resolveQuery(c *exp.Ctx, env exp.Env, t *Task, ref string, lo *exp.Layout) 
 		return cor.Errorf("no type found for %q", ref)
 	}
 	args := lo.Args(1)
-	tenv := &TaskEnv{env, t, nil}
+	tenv := &TaskEnv{env, penv, t, nil}
 	err := resolveTag(c, tenv, q, args)
 	if err != nil {
 		return err

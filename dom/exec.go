@@ -37,7 +37,7 @@ func Execute(env exp.Env, r io.Reader) (*Schema, error) {
 }
 
 func getPtr(e exp.El) interface{} {
-	if a, ok := e.(lit.Assignable); ok {
+	if a, ok := e.(lit.Proxy); ok {
 		return a.Ptr()
 	}
 	return nil

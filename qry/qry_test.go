@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	domEnv exp.Env
-	memBed *qrymem.Backend
+	prodProj *dom.Project
+	memBed   *qrymem.Backend
 )
 
 func init() {
@@ -23,7 +23,7 @@ func init() {
 	if err != nil {
 		log.Fatalf("parse prod fixture error: %v", err)
 	}
-	domEnv = dom.NewEnv(Builtin, &f.Project)
+	prodProj = &f.Project
 	memBed = &qrymem.Backend{}
 	s := f.Schema("prod")
 	for _, kl := range f.Fix.List {
@@ -78,13 +78,13 @@ func TestQry(t *testing.T) {
 		{testQry, ``},
 	}
 	for _, test := range tests {
-		el, err := exp.ParseString(domEnv, test.raw)
+		el, err := exp.ParseString(Builtin, test.raw)
 		if err != nil {
 			t.Errorf("parse %s error %+v", test.raw, err)
 			continue
 		}
-		env := NewEnv(domEnv, memBed)
 		c := exp.NewCtx(false, true)
+		env := NewEnv(nil, prodProj, memBed)
 		l, err := c.Resolve(env, el, typ.Void)
 		if err != nil {
 			t.Errorf("resolve %s error %+v\n%v", test.raw, err, c.Ctx)

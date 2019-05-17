@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mb0/daql/dom"
 	"github.com/mb0/daql/dom/domtest"
 	"github.com/mb0/daql/gen"
 	"github.com/mb0/daql/qry"
@@ -18,7 +17,6 @@ func TestGenQuery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse prod fixture error: %v", err)
 	}
-	denv := dom.NewEnv(qry.Builtin, &f.Project)
 	tests := []struct {
 		raw  string
 		want string
@@ -35,12 +33,12 @@ func TestGenQuery(t *testing.T) {
 			`SELECT id, 'label: ' || name AS label FROM prod.cat`},
 	}
 	for _, test := range tests {
-		ex, err := exp.ParseString(denv, test.raw)
+		env := qry.NewEnv(nil, &f.Project, nil)
+		ex, err := exp.ParseString(env, test.raw)
 		if err != nil {
 			t.Errorf("parse %s error %+v", test.raw, err)
 			continue
 		}
-		env := qry.NewEnv(denv, nil)
 		c := exp.NewCtx(true, false)
 		_, err = c.Resolve(env, ex, typ.Void)
 		if err != nil && err != exp.ErrExec {
@@ -48,7 +46,7 @@ func TestGenQuery(t *testing.T) {
 			continue
 		}
 		p := env.Plan
-		if !p.Simple {
+		if len(p.Root) != 1 || p.Root[0].Name != "" {
 			t.Errorf("expecting simple query %s", test.raw)
 			continue
 		}

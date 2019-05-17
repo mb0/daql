@@ -9,7 +9,6 @@ import (
 	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/lit"
-	"github.com/mb0/xelf/prx"
 	"github.com/mb0/xelf/std"
 	"github.com/mb0/xelf/typ"
 )
@@ -33,26 +32,9 @@ func (b *Backend) Add(m *dom.Model, list *lit.List) error {
 	return nil
 }
 
-func (b *Backend) ExecPlan(c *exp.Ctx, env exp.Env, p *qry.Plan) error {
-	if p.Simple {
-		t := p.Root[0]
-		t.Result = p.Result
-		return b.execTask(c, env, t)
-	}
-	keyer, ok := p.Result.(lit.Keyer)
-	if !ok {
-		return cor.Errorf("want keyer plan result got %T", p.Result)
-	}
-	for _, t := range p.Root {
-		r, err := keyer.Key(strings.ToLower(t.Name))
-		if err != nil {
-			return err
-		}
-		t.Result, ok = r.(lit.Assignable)
-		if !ok {
-			return cor.Errorf("want assignable task result got %s from %T", r, keyer)
-		}
-		err = b.execTask(c, env, t)
+func (b *Backend) ExecPlan(c *qry.Ctx, env exp.Env) error {
+	for _, t := range c.Root {
+		err := b.execTask(c, env, t, c.Data)
 		if err != nil {
 			return err
 		}
@@ -60,27 +42,27 @@ func (b *Backend) ExecPlan(c *exp.Ctx, env exp.Env, p *qry.Plan) error {
 	return nil
 }
 
-func (b *Backend) execTask(c *exp.Ctx, env exp.Env, t *qry.Task) error {
+func (b *Backend) execTask(c *qry.Ctx, env exp.Env, t *qry.Task, par lit.Proxy) error {
+	res, err := qry.Prep(par, t)
+	if err != nil {
+		return err
+	}
 	if t.Query != nil {
-		err := b.execQuery(c, env, t)
-		if err != nil {
-			return err
-		}
-	} else {
-		el, err := c.Resolve(env, t.Expr, t.Type)
-		if err != nil {
-			return err
-		}
-		err = t.Result.Assign(el.(lit.Lit))
-		if err != nil {
-			return err
-		}
+		return b.execQuery(c, env, t, res)
 	}
-	t.Done = true
+	el, err := c.Resolve(env, t.Expr, t.Type)
+	if err != nil {
+		return err
+	}
+	err = res.Assign(el.(lit.Lit))
+	if err != nil {
+		return err
+	}
+	c.SetDone(t, res)
 	return nil
 }
 
-func (b *Backend) execQuery(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
+func (b *Backend) execQuery(c *qry.Ctx, env exp.Env, t *qry.Task, res lit.Proxy) (err error) {
 	q := t.Query
 	model, rest := modelName(q)
 	m := b.tables[model]
@@ -88,20 +70,19 @@ func (b *Backend) execQuery(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 		return cor.Errorf("mem table %s not found in %v", model, b.tables)
 	}
 	if q.Ref[0] == '#' {
-		return m.execCount(c, env, t)
+		return m.execCount(c, env, t, res)
 	}
 	whr, null, err := prepareWhr(c, env, q)
 	if err != nil {
 		return err
 	}
 	if null { // task result must already be initialized
+		c.SetDone(t, res)
 		return nil
 	}
 	rt := t.Type
 	if rt.Kind&typ.MaskElem == typ.KindList {
 		rt = rt.Elem()
-	} else {
-		rt, _ = rt.Deopt()
 	}
 	result := make([]lit.Lit, 0, len(m.data.Data))
 	for _, l := range m.data.Data {
@@ -123,13 +104,13 @@ func (b *Backend) execQuery(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 			}
 			z, err := lit.Convert(l, rt, 0)
 			if err != nil {
-				return err
+				return cor.Errorf("exec scalar query: %v", err)
 			}
 			result = append(result, z)
 		} else {
 			// TODO use proxy type if available
 			z := lit.ZeroProxy(rt)
-			err = b.collectSel(c, env, t, z, l)
+			err := b.collectSel(c, env, t, l, z)
 			if err != nil {
 				return err
 			}
@@ -152,49 +133,45 @@ func (b *Backend) execQuery(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 	if q.Lim > 0 && len(result) > q.Lim {
 		result = result[:q.Lim]
 	}
+	var l lit.Lit = lit.Null(res.Typ())
 	switch q.Ref[0] {
 	case '?':
 		if len(result) != 0 {
-			err := prx.AssignTo(result[0], t.Result)
-			return err
+			l = result[0]
 		}
-		return nil
+	case '*':
+		l = &lit.List{Elem: rt, Data: result}
 	}
-	return t.Result.Assign(&lit.List{Data: result})
+	err = res.Assign(l)
+	if err != nil {
+		return cor.Errorf("qrymem: %v", err)
+	}
+	c.SetDone(t, res)
+	return nil
 }
 
-func (m *Backend) collectSel(c *exp.Ctx, env exp.Env, tt *qry.Task, a lit.Assignable, l lit.Lit,
-) (err error) {
-	keyer, ok := a.(lit.Keyer)
-	if !ok {
-		return cor.Errorf("expect keyer got %s", a.Typ())
-	}
-	tenv := &qry.TaskEnv{env, tt, l}
-	sel := tt.Query.Sel
-	for _, t := range sel {
-		key := strings.ToLower(t.Name)
-		var res exp.El
-		if t.Expr != nil {
-			res, err = c.Resolve(tenv, t.Expr, t.Type)
-		} else if t.Query != nil {
-			res, err = keyer.Key(key)
+func (m *Backend) collectSel(c *qry.Ctx, env exp.Env, tt *qry.Task, l lit.Lit, z lit.Proxy) error {
+	tenv := &qry.TaskEnv{env, qry.FindEnv(env), tt, l}
+	for _, t := range tt.Query.Sel {
+		if t.Query == nil && t.Expr == nil {
+			el, err := lit.Select(l, cor.Keyed(t.Name))
 			if err != nil {
 				return err
 			}
-			t.Result, ok = res.(lit.Assignable)
-			if !ok {
-				return cor.Errorf("expect assignable got %T", res)
+			res, err := qry.Prep(z, t)
+			if err != nil {
+				return err
 			}
-			err = m.execQuery(c, tenv, t)
+			err = res.Assign(el.(lit.Lit))
+			if err != nil {
+				return err
+			}
+			c.SetDone(t, res)
 		} else {
-			res, err = lit.Select(l, key)
-		}
-		if err != nil {
-			return err
-		}
-		_, err = keyer.SetKey(key, res.(lit.Lit))
-		if err != nil {
-			return err
+			err := m.execTask(c, tenv, t, z)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -237,7 +214,7 @@ type memTable struct {
 	data *lit.List
 }
 
-func (m *memTable) execCount(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
+func (m *memTable) execCount(c *qry.Ctx, env exp.Env, t *qry.Task, res lit.Proxy) (err error) {
 	// we can ignore order and selection completely
 	whr, null, err := prepareWhr(c, env, t.Query)
 	if err != nil {
@@ -250,7 +227,6 @@ func (m *memTable) execCount(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 	if whr == nil {
 		result = len(m.data.Data)
 	} else {
-		// c = c.WithPart(true).WithExec(false)
 		for _, l := range m.data.Data {
 			// skip if it does not resolve to true
 			lenv := &exp.DataScope{env, l}
@@ -275,12 +251,17 @@ func (m *memTable) execCount(c *exp.Ctx, env exp.Env, t *qry.Task) (err error) {
 	if q.Lim > 0 && result > q.Lim {
 		result = q.Lim
 	}
-	return t.Result.Assign(lit.Int(result))
+	err = res.Assign(lit.Int(result))
+	if err != nil {
+		return err
+	}
+	c.SetDone(t, res)
+	return nil
 }
 
 var boolSpeck = std.Core(":bool")
 
-func prepareWhr(c *exp.Ctx, env exp.Env, q *qry.Query) (x exp.El, null bool, _ error) {
+func prepareWhr(c *qry.Ctx, env exp.Env, q *qry.Query) (x exp.El, null bool, _ error) {
 	if len(q.Whr.Els) == 0 {
 		return nil, false, nil
 	}
@@ -290,8 +271,7 @@ func prepareWhr(c *exp.Ctx, env exp.Env, q *qry.Query) (x exp.El, null bool, _ e
 	if x == nil {
 		x = &exp.Call{Spec: boolSpeck, Args: q.Whr.Els}
 	}
-	c = c.With(true, false)
-	res, err := c.Resolve(env, x, c.New())
+	res, err := c.With(true, false).Resolve(env, x, c.New())
 	if err != nil {
 		if err != exp.ErrUnres {
 			return nil, false, err
