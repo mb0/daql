@@ -226,7 +226,7 @@ func resolveTag(c *exp.Ctx, env exp.Env, q *Query, args []exp.El) (err error) {
 	return nil
 }
 
-func resolveInt(c *exp.Ctx, env exp.Env, args []exp.El) (int, error) {
+func resolveInt(c *exp.Ctx, env exp.Env, args []exp.El) (int64, error) {
 	el, err := c.Resolve(env, &exp.Dyn{Els: args}, typ.Int)
 	if err != nil {
 		return 0, err
@@ -235,7 +235,7 @@ func resolveInt(c *exp.Ctx, env exp.Env, args []exp.El) (int, error) {
 	if !ok {
 		return 0, cor.Errorf("expect int got %s", el.Typ())
 	}
-	return int(n.Num()), nil
+	return int64(n.Num()), nil
 }
 
 func resolveOrd(c *exp.Ctx, env exp.Env, q *Query, desc bool, args []exp.El) error {

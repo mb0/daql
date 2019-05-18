@@ -124,13 +124,13 @@ func (b *Backend) execQuery(c *qry.Ctx, env exp.Env, t *qry.Task, res lit.Proxy)
 		}
 	}
 	if q.Off > 0 {
-		if len(result) > q.Off {
+		if len(result) > int(q.Off) {
 			result = result[q.Off:]
 		} else {
 			result = nil
 		}
 	}
-	if q.Lim > 0 && len(result) > q.Lim {
+	if q.Lim > 0 && len(result) > int(q.Lim) {
 		result = result[:q.Lim]
 	}
 	var l lit.Lit = lit.Null(res.Typ())
@@ -223,9 +223,9 @@ func (m *memTable) execCount(c *qry.Ctx, env exp.Env, t *qry.Task, res lit.Proxy
 	if null {
 		return nil
 	}
-	var result int
+	var result int64
 	if whr == nil {
-		result = len(m.data.Data)
+		result = int64(len(m.data.Data))
 	} else {
 		for _, l := range m.data.Data {
 			// skip if it does not resolve to true

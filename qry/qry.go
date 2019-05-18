@@ -4,47 +4,24 @@ import (
 	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/lit"
-	"github.com/mb0/xelf/typ"
 )
 
-// Plan represents a whole query request, consisting of one or more tasks.
-type Plan struct {
-	Root []*Task
-	Type typ.Type
+// Collect returns a slice of all query tasks and all root task that may not be queries.
+func Collect(pl *Plan) []*Task {
+	res := make([]*Task, 0, len(pl.Root)*2)
+	return collectTasks(res, pl.Root, true)
 }
 
-// Task is a unit of work as a part of a greater query plan. Root tasks are either expression or
-// query tasks. Expression tasks consist of a xelf expressions, that cannot query the data source,
-// but can reference results of previous tasks. Query tasks do access the data source, and may have
-// a list of explicit selection tasks. The selection tasks can have only simple field names or an
-// expression or sub query. In effect building a tree of queries.
-type Task struct {
-	Name  string
-	Expr  exp.El
-	Query *Query
-
-	// Type is the task's result type or void if not yet resolved.
-	Type typ.Type
-}
-
-type Ord struct {
-	Key  string
-	Desc bool
-}
-
-type Query struct {
-	Ref string
-	// Type represents the query subject type.
-	Type typ.Type
-	// Whr is a list of expression elements treated as 'and' arguments.
-	// The whr clause can only refer to full subject but none of the extra selections.
-	Whr exp.Dyn
-	// Ord is a list of result symbols used for ordering. We may at some point allow references
-	// to the subject and not only the selection, like sql does in the ordering clause.
-	Ord []Ord
-	Off int
-	Lim int
-	Sel []*Task
+func collectTasks(dst, src []*Task, root bool) []*Task {
+	for _, t := range src {
+		if t.Query != nil {
+			dst = append(dst, t)
+			dst = collectTasks(dst, t.Query.Sel, false)
+		} else if root {
+			dst = append(dst, t)
+		}
+	}
+	return dst
 }
 
 func Prep(pa lit.Proxy, t *Task) (lit.Proxy, error) {
