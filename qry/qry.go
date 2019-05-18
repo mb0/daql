@@ -43,15 +43,12 @@ func Prep(pa lit.Proxy, t *Task) (lit.Proxy, error) {
 // TaskInfo holds task details during query execution.
 // Done indicatates whether the task and all its sub task are represented by data.
 type TaskInfo struct {
-	Parent *Task
-	Data   lit.Proxy
-	Path   lit.Path
-	Done   bool
+	Data lit.Proxy
+	Done bool
 }
 
 type Result struct {
 	Data lit.Proxy
-	Done bool
 	Info map[*Task]TaskInfo
 }
 
@@ -67,7 +64,7 @@ func NewCtx(c *exp.Ctx, p *Plan) *Ctx {
 	if opt {
 		data = lit.SomeProxy{data}
 	}
-	return &Ctx{c, p, Result{data, false, make(map[*Task]TaskInfo, len(p.Root)*3)}}
+	return &Ctx{c, p, Result{data, make(map[*Task]TaskInfo, len(p.Root)*3)}}
 }
 func (c *Ctx) SetDone(t *Task, val lit.Proxy) {
 	n := c.Info[t]

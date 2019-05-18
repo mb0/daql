@@ -43,9 +43,6 @@ func (s *PlanEnv) Get(sym string) *exp.Def {
 		return nil
 	}
 	if len(sym) == 1 {
-		if s.Result != nil && s.Done {
-			return exp.NewDef(s.Data)
-		}
 		return &exp.Def{Type: s.Type}
 	}
 	path, err := lit.ReadPath(sym[1:])
