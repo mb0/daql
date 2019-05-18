@@ -9,6 +9,7 @@ import (
 	"github.com/mb0/daql/gen"
 	"github.com/mb0/xelf/bfr"
 	"github.com/mb0/xelf/cor"
+	"github.com/mb0/xelf/lit"
 	"github.com/mb0/xelf/typ"
 	"github.com/pkg/errors"
 )
@@ -110,6 +111,13 @@ func RenderFile(c *gen.Ctx, s *dom.Schema) error {
 // For bits and enum types the declaration includes the constant declarations.
 func DeclareType(c *gen.Ctx, m *dom.Model) (err error) {
 	t := m.Type
+	doc, err := m.Extra.Key("doc")
+	if err == nil {
+		ch, ok := doc.(lit.Character)
+		if ok {
+			c.Prepend(ch.Char(), "// ")
+		}
+	}
 	switch m.Kind {
 	case typ.KindBits:
 		c.WriteString("type ")
