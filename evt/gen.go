@@ -24,17 +24,7 @@ func main() {
 }
 
 func writeGo(pr *dom.Project, s *dom.Schema) {
-	b := &gen.Ctx{
-		Project: pr,
-		Pkg:     "github.com/mb0/daql/evt",
-		Pkgs: map[string]string{
-			"cor": "github.com/mb0/xelf/cor",
-			"lit": "github.com/mb0/xelf/lit",
-			"exp": "github.com/mb0/xelf/exp",
-			"evt": "github.com/mb0/daql/evt",
-		},
-		Header: "// generated code\n\n",
-	}
+	b := gengo.NewCtx(pr, "evt", "github.com/mb0/daql/evt")
 	err := gengo.WriteFile(b, "evt.go", s)
 	if err != nil {
 		log.Fatalf("write file error: %v", err)

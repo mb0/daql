@@ -14,6 +14,20 @@ import (
 	"github.com/pkg/errors"
 )
 
+func NewCtx(pr *dom.Project, pkg, path string) *gen.Ctx {
+	return &gen.Ctx{
+		Project: pr, Pkg: path,
+		Pkgs: map[string]string{
+			"cor": "github.com/mb0/xelf/cor",
+			"lit": "github.com/mb0/xelf/lit",
+			"typ": "github.com/mb0/xelf/typ",
+			"exp": "github.com/mb0/xelf/exp",
+			pkg:   path,
+		},
+		Header: "// generated code\n\n",
+	}
+}
+
 // Import takes a qualified name of the form 'pkg.Decl', looks up a path from context packages
 // map if available, otherwise the name is used as path. If the package path is the same as the
 // context package it returns the 'Decl' part. Otherwise it adds the package path to the import
