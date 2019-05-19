@@ -12,19 +12,20 @@ import (
 
 var qrySpec = exp.Implement("(form 'qry' :args? :decls? : @1)", false,
 	func(c *exp.Ctx, env exp.Env, x *exp.Call, lo *exp.Layout, hint typ.Type) (exp.El, error) {
-		penv := FindEnv(env)
-		if penv == nil {
-			return nil, cor.Errorf("no plan environment for query %s", x)
+		qenv := FindEnv(env)
+		if qenv == nil {
+			return nil, cor.Errorf("no qry environment for query %s", x)
 		}
-		p := penv.Plan
+		p := qenv.Plan
 		args := lo.Args(0)
+		penv := &PlanEnv{env, qenv}
 		if len(args) > 0 {
 			// simple query
 			if len(lo.Args(1)) > 0 {
 				return nil, cor.Errorf("either use simple or compound query got %v rest %v",
 					args, lo.Args(1))
 			}
-			t, err := resolveTask(c, env, exp.NewNamed("", args...))
+			t, err := resolveTask(c, penv, exp.NewNamed("", args...))
 			if err != nil {
 				return nil, err
 			}
@@ -37,7 +38,7 @@ var qrySpec = exp.Implement("(form 'qry' :args? :decls? : @1)", false,
 			}
 			ps := make([]typ.Param, 0, len(decls))
 			for _, d := range decls {
-				t, err := resolveTask(c, env, d)
+				t, err := resolveTask(c, penv, d)
 				if err != nil {
 					return nil, err
 				}
@@ -53,8 +54,9 @@ var qrySpec = exp.Implement("(form 'qry' :args? :decls? : @1)", false,
 			return x, exp.ErrExec
 		}
 		ctx := NewCtx(c, p)
-		penv.Result = &ctx.Result
-		err := penv.ExecPlan(ctx, env)
+		qenv.Result = &ctx.Result
+		eenv := &ExecEnv{env, qenv}
+		err := qenv.ExecPlan(ctx, eenv)
 		if err != nil {
 			return nil, err
 		}
@@ -197,6 +199,9 @@ func resolveQuery(c *exp.Ctx, env exp.Env, t *Task, ref string, lo *exp.Layout) 
 }
 
 func resolveTag(c *exp.Ctx, env exp.Env, q *Query, args []exp.El) (err error) {
+	if q.Whr == nil {
+		q.Whr = &exp.Dyn{}
+	}
 	for _, arg := range args {
 		tag, ok := arg.(*exp.Named)
 		if !ok {

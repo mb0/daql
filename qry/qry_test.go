@@ -84,10 +84,11 @@ func TestQry(t *testing.T) {
 			continue
 		}
 		c := exp.NewCtx(false, true)
-		env := NewEnv(nil, prodProj, memBed)
-		l, err := c.Resolve(env, el, typ.Void)
+		penv := NewEnv(nil, prodProj, memBed)
+		l, err := c.Resolve(penv, el, typ.Void)
 		if err != nil {
-			t.Errorf("resolve %s error %+v\n%v", test.raw, err, c.Ctx)
+			t.Errorf("resolve %s error %+v\nUnresolved: %v\nType Context: %v",
+				test.raw, err, c.Unres, c.Ctx)
 			continue
 		}
 		if test.want == "" {

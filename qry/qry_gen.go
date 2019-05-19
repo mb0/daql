@@ -32,7 +32,7 @@ type Ord struct {
 type Query struct {
 	Ref  string   `json:"ref"`
 	Type typ.Type `json:"type"`
-	Whr  exp.Dyn  `json:"whr,omitempty"`
+	Whr  *exp.Dyn `json:"whr,omitempty"`
 	Ord  []Ord    `json:"ord,omitempty"`
 	Off  int64    `json:"off,omitempty"`
 	Lim  int64    `json:"lim,omitempty"`

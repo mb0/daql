@@ -262,7 +262,7 @@ func (m *memTable) execCount(c *qry.Ctx, env exp.Env, t *qry.Task, res lit.Proxy
 var boolSpeck = std.Core(":bool")
 
 func prepareWhr(c *qry.Ctx, env exp.Env, q *qry.Query) (x exp.El, null bool, _ error) {
-	if len(q.Whr.Els) == 0 {
+	if q.Whr == nil || len(q.Whr.Els) == 0 {
 		return nil, false, nil
 	}
 	if len(q.Whr.Els) == 1 && isBool(q.Whr.Els[0]) {
