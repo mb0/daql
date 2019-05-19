@@ -32,25 +32,33 @@ func (b *Backend) Add(m *dom.Model, list *lit.List) error {
 	return nil
 }
 
-func (b *Backend) ExecPlan(c *qry.Ctx, env exp.Env) error {
-	for _, t := range c.Root {
-		err := b.execTask(c, env, t, c.Data)
+func (b *Backend) ExecPlan(c *exp.Ctx, env exp.Env, p *qry.Plan) (*qry.Result, error) {
+	res := qry.NewResult(p)
+	ctx := ctx{c, &qry.ExecEnv{env, p, res}, res}
+	for _, t := range p.Root {
+		err := b.execTask(ctx, t, res.Data)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return res, nil
 }
 
-func (b *Backend) execTask(c *qry.Ctx, env exp.Env, t *qry.Task, par lit.Proxy) error {
-	res, err := qry.Prep(par, t)
+type ctx struct {
+	*exp.Ctx
+	exp.Env
+	*qry.Result
+}
+
+func (b *Backend) execTask(c ctx, t *qry.Task, par lit.Proxy) error {
+	res, err := c.Prep(par, t)
 	if err != nil {
 		return err
 	}
 	if t.Query != nil {
-		return b.execQuery(c, env, t, res)
+		return b.execQuery(c, t, res)
 	}
-	el, err := c.Ctx.Resolve(env, t.Expr, t.Type)
+	el, err := c.Resolve(c.Env, t.Expr, t.Type)
 	if err != nil {
 		return err
 	}
@@ -62,7 +70,7 @@ func (b *Backend) execTask(c *qry.Ctx, env exp.Env, t *qry.Task, par lit.Proxy) 
 	return nil
 }
 
-func (b *Backend) execQuery(c *qry.Ctx, env exp.Env, t *qry.Task, res lit.Proxy) (err error) {
+func (b *Backend) execQuery(c ctx, t *qry.Task, res lit.Proxy) (err error) {
 	q := t.Query
 	model, rest := modelName(q)
 	m := b.tables[model]
@@ -70,9 +78,9 @@ func (b *Backend) execQuery(c *qry.Ctx, env exp.Env, t *qry.Task, res lit.Proxy)
 		return cor.Errorf("mem table %s not found in %v", model, b.tables)
 	}
 	if q.Ref[0] == '#' {
-		return m.execCount(c, env, t, res)
+		return m.execCount(c, t, res)
 	}
-	whr, null, err := prepareWhr(c, env, q)
+	whr, null, err := prepareWhr(c.Ctx, c.Env, q)
 	if err != nil {
 		return err
 	}
@@ -87,8 +95,8 @@ func (b *Backend) execQuery(c *qry.Ctx, env exp.Env, t *qry.Task, res lit.Proxy)
 	result := make([]lit.Lit, 0, len(m.data.Data))
 	for _, l := range m.data.Data {
 		if whr != nil {
-			lenv := &exp.DataScope{env, l}
-			res, err := c.Ctx.Resolve(lenv, whr, typ.Bool)
+			lenv := &exp.DataScope{c.Env, l}
+			res, err := c.Resolve(lenv, whr, typ.Bool)
 			if err != nil {
 				return err
 			}
@@ -110,7 +118,7 @@ func (b *Backend) execQuery(c *qry.Ctx, env exp.Env, t *qry.Task, res lit.Proxy)
 		} else {
 			// TODO use proxy type if available
 			z := lit.ZeroProxy(rt)
-			err := b.collectSel(c, env, t, l, z)
+			err := b.collectSel(c, t, l, z)
 			if err != nil {
 				return err
 			}
@@ -150,15 +158,15 @@ func (b *Backend) execQuery(c *qry.Ctx, env exp.Env, t *qry.Task, res lit.Proxy)
 	return nil
 }
 
-func (m *Backend) collectSel(c *qry.Ctx, env exp.Env, tt *qry.Task, l lit.Lit, z lit.Proxy) error {
-	tenv := &qry.TaskEnv{env, qry.FindEnv(env), tt, l}
+func (m *Backend) collectSel(c ctx, tt *qry.Task, l lit.Lit, z lit.Proxy) error {
+	c.Env = &qry.TaskEnv{c.Env, c.Result, tt, l}
 	for _, t := range tt.Query.Sel {
 		if t.Query == nil && t.Expr == nil {
 			el, err := lit.Select(l, cor.Keyed(t.Name))
 			if err != nil {
 				return err
 			}
-			res, err := qry.Prep(z, t)
+			res, err := c.Prep(z, t)
 			if err != nil {
 				return err
 			}
@@ -168,7 +176,7 @@ func (m *Backend) collectSel(c *qry.Ctx, env exp.Env, tt *qry.Task, l lit.Lit, z
 			}
 			c.SetDone(t, res)
 		} else {
-			err := m.execTask(c, tenv, t, z)
+			err := m.execTask(c, t, z)
 			if err != nil {
 				return err
 			}
@@ -214,9 +222,9 @@ type memTable struct {
 	data *lit.List
 }
 
-func (m *memTable) execCount(c *qry.Ctx, env exp.Env, t *qry.Task, res lit.Proxy) (err error) {
+func (m *memTable) execCount(c ctx, t *qry.Task, res lit.Proxy) (err error) {
 	// we can ignore order and selection completely
-	whr, null, err := prepareWhr(c, env, t.Query)
+	whr, null, err := prepareWhr(c.Ctx, c.Env, t.Query)
 	if err != nil {
 		return err
 	}
@@ -229,8 +237,8 @@ func (m *memTable) execCount(c *qry.Ctx, env exp.Env, t *qry.Task, res lit.Proxy
 	} else {
 		for _, l := range m.data.Data {
 			// skip if it does not resolve to true
-			lenv := &exp.DataScope{env, l}
-			res, err := c.Ctx.Resolve(lenv, whr, typ.Void)
+			lenv := &exp.DataScope{c.Env, l}
+			res, err := c.Resolve(lenv, whr, typ.Void)
 			if err != nil {
 				return err
 			}
@@ -261,7 +269,7 @@ func (m *memTable) execCount(c *qry.Ctx, env exp.Env, t *qry.Task, res lit.Proxy
 
 var boolSpeck = std.Core(":bool")
 
-func prepareWhr(c *qry.Ctx, env exp.Env, q *qry.Query) (x exp.El, null bool, _ error) {
+func prepareWhr(c *exp.Ctx, env exp.Env, q *qry.Query) (x exp.El, null bool, _ error) {
 	if q.Whr == nil || len(q.Whr.Els) == 0 {
 		return nil, false, nil
 	}

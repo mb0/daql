@@ -24,32 +24,40 @@ func New(db *pgx.ConnPool, proj *dom.Project) *Backend {
 	return &Backend{DB: db, Proj: proj}
 }
 
-func (b *Backend) ExecPlan(c *qry.Ctx, env exp.Env) error {
-	for _, t := range c.Root {
-		err := b.execTask(c, env, t, c.Data)
+func (b *Backend) ExecPlan(c *exp.Ctx, env exp.Env, p *qry.Plan) (*qry.Result, error) {
+	res := qry.NewResult(p)
+	ctx := ctx{c, &qry.ExecEnv{env, p, res}, res}
+	for _, t := range p.Root {
+		err := b.execTask(ctx, t, res.Data)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return res, nil
 }
 
-func (b *Backend) execTask(c *qry.Ctx, env exp.Env, t *qry.Task, par lit.Proxy) error {
-	res, err := qry.Prep(par, t)
+type ctx struct {
+	*exp.Ctx
+	exp.Env
+	*qry.Result
+}
+
+func (b *Backend) execTask(c ctx, t *qry.Task, par lit.Proxy) error {
+	res, err := c.Prep(par, t)
 	if err != nil {
 		return err
 	}
 	if t.Query != nil {
-		return b.execQuery(c, env, t, res)
+		return b.execQuery(c, t, res)
 	}
-	el, err := c.Ctx.Resolve(env, t.Expr, t.Type)
+	el, err := c.Resolve(c.Env, t.Expr, t.Type)
 	if err != nil {
 		return err
 	}
 	return res.Assign(el.(lit.Lit))
 }
 
-func (b *Backend) execQuery(c *qry.Ctx, env exp.Env, t *qry.Task, res lit.Proxy) error {
+func (b *Backend) execQuery(c ctx, t *qry.Task, res lit.Proxy) error {
 	q := t.Query
 	schema, model, rest := splitName(q)
 	m := b.Proj.Schema(schema).Model(model)
@@ -62,7 +70,7 @@ func (b *Backend) execQuery(c *qry.Ctx, env exp.Env, t *qry.Task, res lit.Proxy)
 	var sb strings.Builder
 	// write query.
 	// XXX could we cache and clearly identify prepared statements?
-	err := genQuery(&gen.Ctx{Ctx: bfr.Ctx{B: &sb}}, c.Ctx, env, t)
+	err := genQuery(&gen.Ctx{Ctx: bfr.Ctx{B: &sb}}, c.Ctx, c.Env, t)
 	if err != nil {
 		return err
 	}

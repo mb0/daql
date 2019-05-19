@@ -10,33 +10,15 @@ import (
 	"github.com/mb0/xelf/typ"
 )
 
-func (pl *Plan) Resolve(c *exp.Ctx, env exp.Env, x *exp.Call, hint typ.Type) (exp.El, error) {
-	if !c.Exec {
-		return x, exp.ErrExec
-	}
-	qenv := FindEnv(env)
-	if qenv == nil {
-		return nil, cor.Errorf("no qry environment for query %s", x)
-	}
-	ctx := NewCtx(c, pl)
-	qenv.Result = &ctx.Result
-	eenv := &ExecEnv{env, qenv}
-	err := qenv.ExecPlan(ctx, eenv)
-	if err != nil {
-		return nil, err
-	}
-	return ctx.Data, nil
-}
-
 var qrySpec = exp.Implement("(form 'qry' :args? :decls? : @1)", false,
 	func(c *exp.Ctx, env exp.Env, x *exp.Call, lo *exp.Layout, hint typ.Type) (exp.El, error) {
 		qenv := FindEnv(env)
 		if qenv == nil {
 			return nil, cor.Errorf("no qry environment for query %s", x)
 		}
-		p := qenv.Plan
+		p := &Plan{}
 		args := lo.Args(0)
-		penv := &PlanEnv{env, qenv}
+		penv := &PlanEnv{env, p}
 		if len(args) > 0 {
 			// simple query
 			if len(lo.Args(1)) > 0 {
@@ -181,7 +163,7 @@ func resolveQuery(c *exp.Ctx, env exp.Env, t *Task, ref string, lo *exp.Layout) 
 		return cor.Errorf("no type found for %q", ref)
 	}
 	args := lo.Args(1)
-	tenv := &TaskEnv{env, penv, t, nil}
+	tenv := &TaskEnv{env, nil, t, nil}
 	err := resolveTag(c, tenv, q, args)
 	if err != nil {
 		return err

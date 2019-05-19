@@ -40,12 +40,12 @@ func TestGenQuery(t *testing.T) {
 			continue
 		}
 		c := exp.NewCtx(true, false)
-		_, err = c.Resolve(env, ex, typ.Void)
+		l, err := c.Resolve(env, ex, typ.Void)
 		if err != nil && err != exp.ErrExec {
 			t.Errorf("resolve %s error %+v", test.raw, err)
 			continue
 		}
-		p := env.Plan
+		p := l.(*exp.Spec).Resl.(*qry.Plan)
 		if len(p.Root) != 1 || p.Root[0].Name != "" {
 			t.Errorf("expecting simple query %s", test.raw)
 			continue

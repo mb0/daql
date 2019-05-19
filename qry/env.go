@@ -18,16 +18,14 @@ var Builtin = exp.Builtin{
 // QryEnv provide the qry form and the required facilities for resolving and executing queries.
 type QryEnv struct {
 	Project *dom.ProjectEnv
-	*Plan
-	*Result
-	Backend
+	Backend Backend
 }
 
 func NewEnv(env exp.Env, pr *dom.Project, bend Backend) *QryEnv {
 	if env == nil {
 		env = Builtin
 	}
-	return &QryEnv{dom.NewEnv(env, pr), &Plan{}, nil, bend}
+	return &QryEnv{dom.NewEnv(env, pr), bend}
 }
 
 func FindEnv(env exp.Env) *QryEnv {
@@ -54,7 +52,7 @@ func (qe *QryEnv) Get(sym string) *exp.Def {
 
 type PlanEnv struct {
 	Par exp.Env
-	*QryEnv
+	*Plan
 }
 
 func (pe *PlanEnv) Parent() exp.Env      { return pe.Par }
@@ -70,23 +68,21 @@ func (pe *PlanEnv) Get(sym string) *exp.Def {
 	if err != nil {
 		return nil
 	}
-	sym = path[0].Key
-	for _, t := range pe.Root {
-		if t.Name != sym {
-			continue
-		}
-		l, err := lit.SelectPath(t.Type, path[1:])
-		if err != nil {
-			return nil
-		}
-		return &exp.Def{Type: l.(typ.Type)}
+	t := pe.Find(path[0].Key)
+	if t == nil {
+		return nil
 	}
-	return nil
+	l, err := lit.SelectPath(t.Type, path[1:])
+	if err != nil {
+		return nil
+	}
+	return &exp.Def{Type: l.(typ.Type)}
 }
 
 type ExecEnv struct {
 	Par exp.Env
-	*QryEnv
+	*Plan
+	*Result
 }
 
 func (ee *ExecEnv) Parent() exp.Env      { return ee.Par }
@@ -102,26 +98,24 @@ func (ee *ExecEnv) Get(sym string) *exp.Def {
 	if err != nil {
 		return nil
 	}
-	sym = path[0].Key
-	for _, t := range ee.Root {
-		if t.Name != sym {
-			continue
-		}
-		nfo := ee.Info[t]
-		if nfo.Done {
-			l, err := lit.SelectPath(nfo.Data, path[1:])
-			if err != nil {
-				return nil
-			}
-			return exp.NewDef(l)
-		}
+	t := ee.Find(path[0].Key)
+	if t == nil {
+		return nil
 	}
-	return nil
+	n := ee.Info[t]
+	if !n.Done {
+		return nil
+	}
+	l, err := lit.SelectPath(n.Data, path[1:])
+	if err != nil {
+		return nil
+	}
+	return exp.NewDef(l)
 }
 
 type TaskEnv struct {
-	Par  exp.Env
-	Penv *QryEnv
+	Par    exp.Env
+	Result *Result
 	*Task
 	Param lit.Lit
 }
@@ -138,8 +132,8 @@ func (s *TaskEnv) Get(sym string) *exp.Def {
 			if t.Name != sym {
 				continue
 			}
-			if s.Penv.Result != nil {
-				nfo := s.Penv.Info[t]
+			if s.Result != nil {
+				nfo := s.Result.Info[t]
 				if nfo.Done {
 					return exp.NewDef(nfo.Data)
 				}
