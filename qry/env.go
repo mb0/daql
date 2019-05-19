@@ -17,8 +17,7 @@ var Builtin = exp.Builtin{
 
 // QryEnv provide the qry form and the required facilities for resolving and executing queries.
 type QryEnv struct {
-	Par     exp.Env
-	Project *dom.Project
+	Project *dom.ProjectEnv
 	*Plan
 	*Result
 	Backend
@@ -28,9 +27,7 @@ func NewEnv(env exp.Env, pr *dom.Project, bend Backend) *QryEnv {
 	if env == nil {
 		env = Builtin
 	}
-	domEnv := dom.NewEnv(env, pr)
-	s := &exp.ParamScope{exp.NewScope(domEnv), nil}
-	return &QryEnv{s, pr, &Plan{}, nil, bend}
+	return &QryEnv{dom.NewEnv(env, pr), &Plan{}, nil, bend}
 }
 
 func FindEnv(env exp.Env) *QryEnv {
@@ -46,7 +43,7 @@ func FindEnv(env exp.Env) *QryEnv {
 	return nil
 }
 
-func (qe *QryEnv) Parent() exp.Env      { return qe.Par }
+func (qe *QryEnv) Parent() exp.Env      { return qe.Project }
 func (qe *QryEnv) Supports(x byte) bool { return x == '?' }
 func (qe *QryEnv) Get(sym string) *exp.Def {
 	if sym == "qry" {

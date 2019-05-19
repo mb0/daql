@@ -50,7 +50,7 @@ func (b *Backend) execTask(c *qry.Ctx, env exp.Env, t *qry.Task, par lit.Proxy) 
 	if t.Query != nil {
 		return b.execQuery(c, env, t, res)
 	}
-	el, err := c.Resolve(env, t.Expr, t.Type)
+	el, err := c.Ctx.Resolve(env, t.Expr, t.Type)
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func (b *Backend) execQuery(c *qry.Ctx, env exp.Env, t *qry.Task, res lit.Proxy)
 	for _, l := range m.data.Data {
 		if whr != nil {
 			lenv := &exp.DataScope{env, l}
-			res, err := c.Resolve(lenv, whr, typ.Bool)
+			res, err := c.Ctx.Resolve(lenv, whr, typ.Bool)
 			if err != nil {
 				return err
 			}
@@ -230,7 +230,7 @@ func (m *memTable) execCount(c *qry.Ctx, env exp.Env, t *qry.Task, res lit.Proxy
 		for _, l := range m.data.Data {
 			// skip if it does not resolve to true
 			lenv := &exp.DataScope{env, l}
-			res, err := c.Resolve(lenv, whr, typ.Void)
+			res, err := c.Ctx.Resolve(lenv, whr, typ.Void)
 			if err != nil {
 				return err
 			}

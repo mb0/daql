@@ -50,6 +50,12 @@ func TestPgx(t *testing.T) {
 			t.Errorf("resolve %s error %+v\n%v", el, err, c.Unres)
 			continue
 		}
+		spec := l.(*exp.Spec)
+		l, err = spec.Resolve(c, env, &exp.Call{Spec: spec, Args: nil}, typ.Void)
+		if err != nil {
+			t.Errorf("execute %s error %+v\n%v", el, err, c.Unres)
+			continue
+		}
 		if got := l.String(); got != test.want {
 			t.Errorf("want %s got %s", test.want, got)
 		}

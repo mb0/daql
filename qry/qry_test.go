@@ -84,10 +84,17 @@ func TestQry(t *testing.T) {
 			continue
 		}
 		c := exp.NewCtx(false, true)
-		penv := NewEnv(nil, prodProj, memBed)
-		l, err := c.Resolve(penv, el, typ.Void)
+		env := NewEnv(nil, prodProj, memBed)
+		l, err := c.Resolve(env, el, typ.Void)
 		if err != nil {
 			t.Errorf("resolve %s error %+v\nUnresolved: %v\nType Context: %v",
+				test.raw, err, c.Unres, c.Ctx)
+			continue
+		}
+		spec := l.(*exp.Spec)
+		l, err = spec.Resolve(c, env, &exp.Call{Spec: spec, Args: nil}, typ.Void)
+		if err != nil {
+			t.Errorf("execute %s error %+v\nUnresolved: %v\nType Context: %v",
 				test.raw, err, c.Unres, c.Ctx)
 			continue
 		}

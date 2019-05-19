@@ -10,6 +10,24 @@ import (
 	"github.com/mb0/xelf/typ"
 )
 
+func (pl *Plan) Resolve(c *exp.Ctx, env exp.Env, x *exp.Call, hint typ.Type) (exp.El, error) {
+	if !c.Exec {
+		return x, exp.ErrExec
+	}
+	qenv := FindEnv(env)
+	if qenv == nil {
+		return nil, cor.Errorf("no qry environment for query %s", x)
+	}
+	ctx := NewCtx(c, pl)
+	qenv.Result = &ctx.Result
+	eenv := &ExecEnv{env, qenv}
+	err := qenv.ExecPlan(ctx, eenv)
+	if err != nil {
+		return nil, err
+	}
+	return ctx.Data, nil
+}
+
 var qrySpec = exp.Implement("(form 'qry' :args? :decls? : @1)", false,
 	func(c *exp.Ctx, env exp.Env, x *exp.Call, lo *exp.Layout, hint typ.Type) (exp.El, error) {
 		qenv := FindEnv(env)
@@ -50,17 +68,10 @@ var qrySpec = exp.Implement("(form 'qry' :args? :decls? : @1)", false,
 		if len(p.Root) == 0 {
 			return nil, cor.Error("empty plan")
 		}
-		if !c.Exec {
-			return x, exp.ErrExec
-		}
-		ctx := NewCtx(c, p)
-		qenv.Result = &ctx.Result
-		eenv := &ExecEnv{env, qenv}
-		err := qenv.ExecPlan(ctx, eenv)
-		if err != nil {
-			return nil, err
-		}
-		return ctx.Data, nil
+		return &exp.Spec{typ.Func("", []typ.Param{
+			{"arg", typ.Dict(typ.Any)},
+			{"", p.Type},
+		}), p}, nil
 	})
 
 var taskSig = exp.MustSig("(form '_' :ref? @1 :args? :decls? : void)")
