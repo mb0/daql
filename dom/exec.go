@@ -25,11 +25,11 @@ func Execute(env exp.Env, r io.Reader) (*Schema, error) {
 		return nil, err
 	}
 	c := exp.NewCtx(true, true)
-	l, err := c.Resolve(env, x, typ.Void)
+	a, err := c.Resolve(env, x, typ.Void)
 	if err != nil {
 		return nil, cor.Errorf("%s: %v", c.Unres, err)
 	}
-	s, ok := getPtr(l).(*Schema)
+	s, ok := getPtr(a).(*Schema)
 	if !ok {
 		return nil, cor.Errorf("expected *dom.Schema got %T", r)
 	}
@@ -37,8 +37,10 @@ func Execute(env exp.Env, r io.Reader) (*Schema, error) {
 }
 
 func getPtr(e exp.El) interface{} {
-	if a, ok := e.(lit.Proxy); ok {
-		return a.Ptr()
+	if a, ok := e.(*exp.Atom); ok {
+		if p, ok := a.Lit.(lit.Proxy); ok {
+			return p.Ptr()
+		}
 	}
 	return nil
 }

@@ -20,8 +20,8 @@ func WriteEl(b *gen.Ctx, env exp.Env, e exp.El) error {
 		return WriteRef(b, env, v)
 	case *exp.Call:
 		return WriteExpr(b, env, v)
-	case lit.Lit:
-		return WriteLit(b, v)
+	case *exp.Atom:
+		return WriteLit(b, v.Lit)
 	}
 	return cor.Errorf("unexpected element %[1]T %[1]s", e)
 }

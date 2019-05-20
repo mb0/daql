@@ -45,7 +45,7 @@ func TestGenQuery(t *testing.T) {
 			t.Errorf("resolve %s error %+v", test.raw, err)
 			continue
 		}
-		p := l.(*exp.Spec).Resl.(*qry.Plan)
+		p := l.(*exp.Atom).Lit.(*exp.Spec).Resl.(*qry.Plan)
 		if len(p.Root) != 1 || p.Root[0].Name != "" {
 			t.Errorf("expecting simple query %s", test.raw)
 			continue

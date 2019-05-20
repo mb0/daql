@@ -62,7 +62,7 @@ func (b *Backend) execTask(c ctx, t *qry.Task, par lit.Proxy) error {
 	if err != nil {
 		return err
 	}
-	err = res.Assign(el.(lit.Lit))
+	err = res.Assign(el.(*exp.Atom).Lit)
 	if err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func (b *Backend) execQuery(c ctx, t *qry.Task, res lit.Proxy) (err error) {
 			if err != nil {
 				return err
 			}
-			if res != lit.True {
+			if res.(*exp.Atom).Lit != lit.True {
 				continue
 			}
 		}
@@ -242,7 +242,7 @@ func (m *memTable) execCount(c ctx, t *qry.Task, res lit.Proxy) (err error) {
 			if err != nil {
 				return err
 			}
-			if res != lit.True {
+			if res.(*exp.Atom).Lit != lit.True {
 				continue
 			}
 			result++
@@ -286,7 +286,7 @@ func prepareWhr(c *exp.Ctx, env exp.Env, q *qry.Query) (x exp.El, null bool, _ e
 		}
 		return res.(*exp.Call), false, nil
 	}
-	return nil, res != lit.True, nil
+	return nil, res.(*exp.Atom).Lit != lit.True, nil
 }
 
 func modelName(q *qry.Query) (model, rest string) {
@@ -303,7 +303,7 @@ func isBool(el exp.El) bool {
 	t := el.Typ()
 	switch t.Kind {
 	case typ.KindTyp:
-		t = el.(typ.Type)
+		t = el.(*exp.Atom).Lit.(typ.Type)
 	case typ.KindSym:
 		t = el.(*exp.Sym).Type
 	case typ.KindCall:

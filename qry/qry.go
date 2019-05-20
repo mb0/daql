@@ -76,5 +76,5 @@ func (p *Plan) Resolve(c *exp.Ctx, env exp.Env, x *exp.Call, hint typ.Type) (exp
 	if err != nil {
 		return nil, err
 	}
-	return res.Data, nil
+	return &exp.Atom{Lit: res.Data}, nil
 }

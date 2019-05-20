@@ -173,7 +173,7 @@ func writeAs(b *gen.Ctx, env exp.Env, e *exp.Call) error {
 	if len(e.Args) == 0 {
 		return cor.Errorf("empty as expression")
 	}
-	t, ok := e.Args[0].(typ.Type)
+	t, ok := e.Args[0].(*exp.Atom).Lit.(typ.Type)
 	if !ok {
 		return cor.Errorf("as expression must start with a type")
 	}
@@ -304,7 +304,7 @@ func writeBool(b *gen.Ctx, env exp.Env, not bool, e exp.El) error {
 		t = v.Type
 	case *exp.Call:
 		t = v.Spec.Res()
-	case lit.Lit:
+	case *exp.Atom:
 		t = v.Typ()
 	default:
 		return cor.Errorf("unexpected element %s", e)

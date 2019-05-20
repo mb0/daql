@@ -91,7 +91,7 @@ func TestQry(t *testing.T) {
 				test.raw, err, c.Unres, c.Ctx)
 			continue
 		}
-		spec := l.(*exp.Spec)
+		spec := l.(*exp.Atom).Lit.(*exp.Spec)
 		l, err = spec.Resolve(c, env, &exp.Call{Spec: spec, Args: nil}, typ.Void)
 		if err != nil {
 			t.Errorf("execute %s error %+v\nUnresolved: %v\nType Context: %v",

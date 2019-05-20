@@ -50,10 +50,10 @@ var qrySpec = exp.Implement("(form 'qry' :args? :decls? : @1)", false,
 		if len(p.Root) == 0 {
 			return nil, cor.Error("empty plan")
 		}
-		return &exp.Spec{typ.Func("", []typ.Param{
+		return &exp.Atom{Lit: &exp.Spec{typ.Func("", []typ.Param{
 			{"arg", typ.Dict(typ.Any)},
 			{"", p.Type},
-		}), p}, nil
+		}), p}}, nil
 	})
 
 var taskSig = exp.MustSig("(form '_' :ref? @1 :args? :decls? : void)")
@@ -229,7 +229,7 @@ func resolveInt(c *exp.Ctx, env exp.Env, args []exp.El) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	n, ok := el.(lit.Numeric)
+	n, ok := el.(*exp.Atom).Lit.(lit.Numeric)
 	if !ok {
 		return 0, cor.Errorf("expect int got %s", el.Typ())
 	}

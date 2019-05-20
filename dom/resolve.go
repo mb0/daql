@@ -53,7 +53,7 @@ var schemaSpec = exp.Implement("(form 'schema' :args? :decls? : @)", false,
 		if pro != nil {
 			pro.Schemas = append(pro.Schemas, s)
 		}
-		return n, nil
+		return &exp.Atom{Lit: n}, nil
 	})
 
 func resolveModel(c *exp.Ctx, env *SchemaEnv, m *Model, args []exp.El) error {
@@ -134,7 +134,7 @@ func resolveConstVal(c *exp.Ctx, env *ModelEnv, args []exp.El, idx int) (_ lit.I
 	if err != nil {
 		return 0, err
 	}
-	n, ok := el.(lit.Num)
+	n, ok := el.(*exp.Atom).Lit.(lit.Num)
 	if !ok {
 		return 0, cor.Errorf("expect num got %T", el)
 	}
@@ -184,7 +184,7 @@ func typPrepper(c *exp.Ctx, env exp.Env, n *exp.Named) (_ lit.Lit, err error) {
 	if err != nil && err != exp.ErrUnres {
 		return nil, err
 	}
-	if t, ok := fst.(typ.Type); ok {
+	if t, ok := fst.(*exp.Atom).Lit.(typ.Type); ok {
 		return t, nil
 	}
 	if s, ok := fst.(*exp.Sym); ok && s.Type != typ.Void {
