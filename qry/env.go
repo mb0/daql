@@ -64,15 +64,8 @@ func (pe *PlanEnv) Get(sym string) *exp.Def {
 	if len(sym) == 1 {
 		return &exp.Def{Type: pe.Type}
 	}
-	path, err := lit.ReadPath(sym[1:])
-	if err != nil {
-		return nil
-	}
-	t := pe.Find(path[0].Key)
-	if t == nil {
-		return nil
-	}
-	l, err := lit.SelectPath(t.Type, path[1:])
+	t, path, err := RootTask(pe.Plan, sym)
+	l, err := lit.SelectPath(t.Type, path)
 	if err != nil {
 		return nil
 	}
@@ -94,19 +87,15 @@ func (ee *ExecEnv) Get(sym string) *exp.Def {
 	if len(sym) == 1 {
 		return exp.NewDef(ee.Data)
 	}
-	path, err := lit.ReadPath(sym[1:])
+	t, path, err := RootTask(ee.Plan, sym)
 	if err != nil {
-		return nil
-	}
-	t := ee.Find(path[0].Key)
-	if t == nil {
 		return nil
 	}
 	n := ee.Info[t]
 	if !n.Done {
 		return nil
 	}
-	l, err := lit.SelectPath(n.Data, path[1:])
+	l, err := lit.SelectPath(n.Data, path)
 	if err != nil {
 		return nil
 	}

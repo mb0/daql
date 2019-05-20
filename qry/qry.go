@@ -12,7 +12,7 @@ type Backend interface {
 }
 
 // TaskInfo holds task details during query execution.
-// Done indicatates whether the task and all its sub task are represented by data.
+// Done indicates whether the task and all its sub task are represented by data.
 type TaskInfo struct {
 	Data lit.Proxy
 	Done bool
@@ -62,6 +62,24 @@ func (p *Plan) Find(name string) *Task {
 		}
 	}
 	return nil
+}
+
+func RootTask(p *Plan, path string) (*Task, lit.Path, error) {
+	if path == "" || path == "/" {
+		return nil, nil, cor.Errorf("task not found %s", path)
+	}
+	if path[0] == '/' {
+		path = path[1:]
+	}
+	lp, err := lit.ReadPath(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	t := p.Find(lp[0].Key)
+	if t == nil {
+		return nil, lp, cor.Errorf("task not found %s", path)
+	}
+	return t, lp[1:], nil
 }
 
 func (p *Plan) Resolve(c *exp.Ctx, env exp.Env, x *exp.Call, hint typ.Type) (exp.El, error) {
