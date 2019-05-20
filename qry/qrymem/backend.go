@@ -1,3 +1,4 @@
+// Package qrymem provides a query backend using in-memory go data-structures.
 package qrymem
 
 import (

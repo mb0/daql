@@ -1,3 +1,4 @@
+// Package qrypgx provides a query backend using postgresql database using the pgx client package.
 package qrypgx
 
 import (

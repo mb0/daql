@@ -1,3 +1,4 @@
+// Package log provides a flexible logger interface and a default implementation using package log.
 package log
 
 import (

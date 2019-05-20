@@ -1,4 +1,4 @@
-// Package genpg provides conversions to postgres literals, expressions.
+// Package genpg provides code generation helpers postgresql query and schema generation.
 package genpg
 
 import (

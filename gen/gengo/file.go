@@ -1,3 +1,4 @@
+// Package gengo provides code generation helpers go code generation.
 package gengo
 
 import (

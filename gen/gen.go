@@ -1,4 +1,4 @@
-// Package gen provides code generation helpers and specific functions to generate go code.
+// Package gen provides generic code generation helpers.
 package gen
 
 import (

@@ -1,3 +1,4 @@
+// Package wshub provides a websocket server and client using gorilla/websocket for package hub.
 package wshub
 
 import (
