@@ -101,10 +101,16 @@ func RenderFile(c *gen.Ctx, s *dom.Schema) error {
 	f.WriteString("\n")
 	if len(c.Imports.List) > 0 {
 		f.WriteString("\nimport (\n")
-		for _, im := range c.Imports.List {
-			f.WriteString("\t\"")
-			f.WriteString(im)
-			f.WriteString("\"\n")
+		groups := groupImports(c.Imports.List, "github")
+		for i, gr := range groups {
+			if i != 0 {
+				f.WriteByte('\n')
+			}
+			for _, im := range gr {
+				f.WriteString("\t\"")
+				f.WriteString(im)
+				f.WriteString("\"\n")
+			}
 		}
 		f.WriteString(")\n")
 	}
@@ -120,6 +126,28 @@ func RenderFile(c *gen.Ctx, s *dom.Schema) error {
 		res = res[n:]
 	}
 	return nil
+}
+
+func groupImports(list []string, pres ...string) (res [][]string) {
+	other := make([]string, 0, len(list))
+	rest := make([]string, 0, len(list))
+Next:
+	for _, im := range list {
+		for _, pre := range pres {
+			if strings.HasPrefix(im, pre) {
+				rest = append(rest, im)
+				continue Next
+			}
+		}
+		other = append(other, im)
+	}
+	if len(other) > 0 {
+		res = append(res, other)
+	}
+	if len(rest) > 0 {
+		res = append(res, rest)
+	}
+	return res
 }
 
 // DeclareType writes a type declaration for bits, enum and rec types.
