@@ -191,11 +191,40 @@ func DeclareType(c *gen.Ctx, m *dom.Model) (err error) {
 		c.WriteString("\n\ntype ")
 		c.WriteString(m.Name)
 		c.WriteString("Res ")
+		res := m.Params[last].Type
 		err = WriteType(c, typ.Rec([]typ.Param{
-			{Name: "Res?", Type: m.Params[last].Type},
+			{Name: "Res?", Type: res},
 			{Name: "Err?", Type: typ.Str},
 		}))
-		c.WriteString("\n")
+		if err != nil {
+			break
+		}
+		c.WriteString("\n ")
+		var tmp strings.Builder
+		cc := *c
+		cc.B = &tmp
+		err = WriteType(&cc, res)
+		if err != nil {
+			break
+		}
+		c.Imports.Add("github.com/mb0/daql/hub")
+		c.Imports.Add("encoding/json")
+		c.Fmt(`
+type %[1]sFunc func(*hub.Msg, %[1]sReq) (%[2]s, error)
+
+func (f %[1]sFunc) Serve(m *hub.Msg) interface{} {
+	var req %[1]sReq
+	err := json.Unmarshal(m.Raw, &req)
+	if err != nil {
+		return %[1]sRes{Err: err.Error()}
+	}
+	res, err := f(m, req)
+	if err != nil {
+		return %[1]sRes{Err: err.Error()}
+	}
+	return %[1]sRes{Res: res}
+}
+`, m.Name, tmp.String())
 	default:
 		err = errors.Errorf("model kind %s cannot be declared", m.Kind)
 	}
