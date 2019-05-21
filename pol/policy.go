@@ -1,4 +1,5 @@
-package auth
+// Package pol provides a simple role based access control system.
+package pol
 
 import "github.com/mb0/xelf/cor"
 
