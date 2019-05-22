@@ -102,7 +102,7 @@ type Project struct {
 	Schemas []*Schema `json:"schemas"`
 }
 
-func (p *Project) Qualified() string { return fmt.Sprintf("%s$", p.Key()) }
+func (p *Project) Qualified() string { return fmt.Sprintf("@%s", p.Key()) }
 
 // Schema returns a schema for key or nil.
 func (p *Project) Schema(key string) *Schema {
@@ -403,9 +403,6 @@ func (p *Project) String() string { return bfr.String(p) }
 func (p *Project) WriteBfr(b *bfr.Ctx) error {
 	b.WriteString("{name:")
 	b.Quote(p.Name)
-	if p.Vers != 0 {
-		b.Fmt(" vers:%d", p.Vers)
-	}
 	b.WriteString(" schemas:[")
 	for i, s := range p.Schemas {
 		if i > 0 {
