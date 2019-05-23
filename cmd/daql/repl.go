@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
+	"path/filepath"
 
 	"github.com/mb0/daql/dom/domtest"
 	"github.com/mb0/daql/qry"
@@ -32,16 +34,13 @@ func repl(args []string) error {
 	// otherwise try the configured db
 	lin := liner.NewLiner()
 	defer lin.Close()
+	readReplHistory(lin)
 	lin.SetMultiLineMode(true)
-	var got string
-	for i := 0; ; i++ {
-		if i == 0 {
-			got, err = lin.PromptWithSuggestion("> ", "(qry )", 5)
-		} else {
-			got, err = lin.Prompt("> ")
-		}
+	for {
+		got, err := lin.Prompt("> ")
 		if err != nil {
 			if err == io.EOF {
+				writeReplHistory(lin)
 				fmt.Println()
 				return nil
 			}
@@ -62,4 +61,51 @@ func repl(args []string) error {
 		fmt.Printf("= %s\n\n", l)
 	}
 	return nil
+}
+
+func replHistoryPath() string {
+	path, err := os.UserCacheDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(path, "daql/repl.history")
+}
+
+func readReplHistory(lin *liner.State) {
+	path := replHistoryPath()
+	if path == "" {
+		return
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	_, err = lin.ReadHistory(f)
+	if err != nil {
+		log.Printf("error reading repl history file %q: %v\n", path, err)
+	}
+}
+
+func writeReplHistory(lin *liner.State) {
+	path := replHistoryPath()
+	if path == "" {
+		return
+	}
+	dir := filepath.Dir(path)
+	err := os.MkdirAll(dir, 0755)
+	if err != nil {
+		log.Printf("error creating dir for repl history %q: %v\n", dir, err)
+		return
+	}
+	f, err := os.Create(path)
+	if err != nil {
+		log.Printf("error creating file for repl history %q: %v\n", path, err)
+		return
+	}
+	defer f.Close()
+	_, err = lin.WriteHistory(f)
+	if err != nil {
+		log.Printf("error writing repl history file %q: %v\n", path, err)
+	}
 }
