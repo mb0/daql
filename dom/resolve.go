@@ -11,16 +11,14 @@ import (
 	"github.com/mb0/xelf/utl"
 )
 
-var schemaSpec = exp.Implement("(form 'schema' :args? :decls? : @)", false,
+var projectSpec = exp.Implement("(form 'project' :args? :decls? : @)", false,
 	func(c *exp.Ctx, env exp.Env, x *exp.Call, lo *exp.Layout, h typ.Type) (exp.El, error) {
-		s := &Schema{}
-		senv := &SchemaEnv{parent: env, Schema: s}
-		n, err := utl.GetNode(s)
+		p := FindEnv(env)
+		n, err := utl.GetNode(p.Project)
 		if err != nil {
 			return nil, err
 		}
-
-		err = schemaRules.Resolve(c, senv, lo.Tags(0), n)
+		err = commonRules.Resolve(c, env, lo.Tags(0), n)
 		if err != nil {
 			return nil, err
 		}
@@ -28,33 +26,75 @@ var schemaSpec = exp.Implement("(form 'schema' :args? :decls? : @)", false,
 		if err != nil {
 			return nil, err
 		}
-		qual := s.Key()
-		// first initialize the models...
-		s.Models = make([]*Model, 0, len(decls))
+		if p.Schemas == nil {
+			p.Schemas = make([]*Schema, 0, len(decls))
+		}
 		for _, d := range decls {
 			name := d.Name[1:]
-			m := &Model{
-				Common: Common{Name: name}, schema: qual,
-				Type: typ.Type{typ.KindObj, &typ.Info{
-					Ref: qual + "." + name,
-				}},
-			}
-			s.Models = append(s.Models, m)
-		}
-		// ...then resolve the models with all other schema model names in scope
-		for i, m := range s.Models {
-			err = resolveModel(c, senv, m, decls[i].Args())
+			s := &Schema{Common: Common{Name: name}}
+			slo, err := exp.LayoutArgs(schemaSpec.Type, d.Args())
 			if err != nil {
 				return nil, err
 			}
+			_, err = resolveSchema(c, env, s, slo)
+			if err != nil {
+				return nil, err
+			}
+			p.Schemas = append(p.Schemas, s)
 		}
+		return &exp.Atom{Lit: n}, nil
+	})
 
+var schemaSpec = exp.Implement("(form 'schema' :args? :decls? : @)", false,
+	func(c *exp.Ctx, env exp.Env, x *exp.Call, lo *exp.Layout, h typ.Type) (exp.El, error) {
+		s := &Schema{}
+		n, err := resolveSchema(c, env, s, lo)
+		if err != nil {
+			return nil, err
+		}
 		pro := FindEnv(env)
 		if pro != nil {
 			pro.Schemas = append(pro.Schemas, s)
 		}
 		return &exp.Atom{Lit: n}, nil
 	})
+
+func resolveSchema(c *exp.Ctx, env exp.Env, s *Schema, lo *exp.Layout) (utl.Node, error) {
+	n, err := utl.GetNode(s)
+	if err != nil {
+		return nil, err
+	}
+	senv := &SchemaEnv{parent: env, Schema: s}
+	err = commonRules.Resolve(c, senv, lo.Tags(0), n)
+	if err != nil {
+		return nil, err
+	}
+	decls, err := lo.Decls(1)
+	if err != nil {
+		return nil, err
+	}
+	qual := s.Key()
+	// first initialize the models...
+	s.Models = make([]*Model, 0, len(decls))
+	for _, d := range decls {
+		name := d.Name[1:]
+		m := &Model{
+			Common: Common{Name: name}, schema: qual,
+			Type: typ.Type{typ.KindObj, &typ.Info{
+				Ref: qual + "." + name,
+			}},
+		}
+		s.Models = append(s.Models, m)
+	}
+	// ...then resolve the models with all other schema model names in scope
+	for i, m := range s.Models {
+		err = resolveModel(c, senv, m, decls[i].Args())
+		if err != nil {
+			return nil, err
+		}
+	}
+	return n, nil
+}
 
 func resolveModel(c *exp.Ctx, env *SchemaEnv, m *Model, args []exp.El) error {
 	menv := &ModelEnv{SchemaEnv: env, Model: m}
@@ -92,7 +132,7 @@ func resolveModel(c *exp.Ctx, env *SchemaEnv, m *Model, args []exp.El) error {
 
 var modelSig = exp.MustSig("(form 'model' :args? :decls? :tail? : @)")
 
-var schemaRules = utl.TagRules{
+var commonRules = utl.TagRules{
 	IdxKeyer: utl.OffsetKeyer(2),
 	KeyRule:  utl.KeyRule{KeySetter: utl.ExtraMapSetter("extra")},
 }

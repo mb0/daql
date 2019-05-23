@@ -43,7 +43,10 @@ func (s *ProjectEnv) Parent() exp.Env      { return s.pa }
 func (s *ProjectEnv) Supports(x byte) bool { return x == '~' }
 
 func (s *ProjectEnv) Get(sym string) *exp.Def {
-	if sym == "schema" {
+	switch sym {
+	case "project":
+		return exp.NewDef(projectSpec)
+	case "schema":
 		return exp.NewDef(schemaSpec)
 	}
 	prefix := sym[0] == '~'
