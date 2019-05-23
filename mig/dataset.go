@@ -47,9 +47,9 @@ func ReadDataset(path string) (*Dataset, error) {
 func ReadZip(r *zip.Reader) (_ *Dataset, err error) {
 	var d Dataset
 	for _, f := range r.File {
-		s := ZipStream{newFileStream(f.Name, f.Name), f}
+		s := ZipStream{NewFileStream(f.Name, f.Name), f}
 		if s.Model == ".manifest" {
-			d.Manifest, err = readManifest(s.Iter())
+			d.Manifest, err = ReadManifest(s.Iter())
 			if err != nil {
 				return nil, err
 			}
@@ -69,9 +69,9 @@ func dirData(f *os.File, path string) (*Dataset, error) {
 	var d Dataset
 	for _, fi := range fis {
 		name := fi.Name()
-		s := newFileStream(name, filepath.Join(path, name))
+		s := NewFileStream(name, filepath.Join(path, name))
 		if s.Model == ".manifest" {
-			d.Manifest, err = readManifest(s.Iter())
+			d.Manifest, err = ReadManifest(s.Iter())
 			if err != nil {
 				return nil, err
 			}
@@ -82,7 +82,7 @@ func dirData(f *os.File, path string) (*Dataset, error) {
 	return &d, nil
 }
 
-func readManifest(it Iter, err error) (dom.Manifest, error) {
+func ReadManifest(it Iter, err error) (dom.Manifest, error) {
 	if err != nil {
 		return nil, err
 	}

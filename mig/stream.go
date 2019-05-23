@@ -34,7 +34,7 @@ type FileStream struct {
 	Path   string
 }
 
-func newFileStream(name, path string) FileStream {
+func NewFileStream(name, path string) FileStream {
 	var ext string
 	gz := strings.HasSuffix(name, ".gz")
 	if gz {
