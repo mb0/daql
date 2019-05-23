@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mb0/daql/dom/domtest"
 	"github.com/mb0/daql/qry"
@@ -36,9 +38,16 @@ func repl(args []string) error {
 	defer lin.Close()
 	readReplHistory(lin)
 	lin.SetMultiLineMode(true)
+	var buf bytes.Buffer
+	var multi bool
 	for {
-		got, err := lin.Prompt("> ")
+		prompt := "> "
+		if multi = buf.Len() > 0; multi {
+			prompt = "… "
+		}
+		got, err := lin.Prompt(prompt)
 		if err != nil {
+			buf.Reset()
 			if err == io.EOF {
 				writeReplHistory(lin)
 				fmt.Println()
@@ -47,12 +56,25 @@ func repl(args []string) error {
 			log.Printf("unexpected error reading prompt: %v", err)
 			continue
 		}
-		el, err := exp.ParseString(qry.Builtin, got)
+		got = strings.TrimSpace(got)
+		if got == "" {
+			continue
+		}
+		if multi {
+			buf.WriteByte(' ')
+		}
+		buf.WriteString(got)
+		el, err := exp.ParseString(qry.Builtin, buf.String())
 		if err != nil {
+			if cor.IsErr(err, io.EOF) {
+				continue
+			}
+			buf.Reset()
 			log.Printf("error parsing %s: %v", got, err)
 			continue
 		}
-		lin.AppendHistory(got)
+		lin.AppendHistory(buf.String())
+		buf.Reset()
 		l, err := exp.Execute(qry.NewEnv(qry.Builtin, &fix.Project, membed), el)
 		if err != nil {
 			log.Printf("error resolving %s: %v", got, err)
