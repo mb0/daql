@@ -96,7 +96,13 @@ type Schema struct {
 
 func (s *Schema) Qualified() string { return s.Key() }
 
-// Project is a collection of schemas.
+// Project is a collection of schemas and is the central place for any extra project configuration.
+//
+// The schema definition can either be declared as part of the project file, or included from an
+// external schema file. Includes should have syntax to filtering the included schema definition.
+//
+// Extra setting, usually include, but are not limited to, targets and output paths for code
+// generation, paths to look for the project's manifest and history.
 type Project struct {
 	Common
 	Schemas []*Schema `json:"schemas"`
