@@ -44,8 +44,8 @@ type Index struct {
 
 // Common represents the common name and version of model, schema or project nodes.
 type Common struct {
-	Extra *lit.Dict `json:"extra,omitempty"`
 	Name  string    `json:"name,omitempty"`
+	Extra *lit.Dict `json:"extra,omitempty"`
 	key   string
 }
 
