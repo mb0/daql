@@ -2,7 +2,6 @@ package main
 
 import (
 	"os"
-	"path/filepath"
 
 	"github.com/mb0/daql/dom"
 	"github.com/mb0/daql/mig"
@@ -10,40 +9,16 @@ import (
 )
 
 type Project struct {
-	Path string
-	*dom.Project
-	mig.Manifest
-	History *mig.History
+	mig.History
+	mig.Record
 }
 
 func project() (*Project, error) {
-	path := filepath.Clean(*dirFlag)
-	ppath := filepath.Join(path, "project.daql")
-	pf, err := os.Open(ppath)
-	if err != nil {
-		return nil, cor.Errorf("no project found at %s", ppath)
+	h, err := mig.ReadHistory(*dirFlag)
+	if err != nil && err != mig.ErrNoHistory {
+		return nil, err
 	}
-	defer pf.Close()
-	env := dom.NewEnv(dom.Env, &dom.Project{})
-	_, err = dom.Execute(env, pf)
-	if err != nil {
-		return nil, cor.Errorf("resolving project at %s: %v", ppath, err)
-	}
-	pr := &Project{Path: path, Project: env.Project}
-	mpath := filepath.Join(path, "manifest.daql")
-	_, err = os.Stat(mpath)
-	if err == nil {
-		st := mig.NewFileStream(mpath)
-		pr.Manifest, err = mig.ReadManifestStream(&st)
-		if err != nil {
-			return nil, cor.Errorf("reading manifest file %s: %v", mpath, err)
-		}
-	}
-	pr.Manifest, err = pr.Manifest.Update(pr.Project)
-	if err != nil {
-		return nil, cor.Errorf("updating manifest file %s: %v", mpath, err)
-	}
-	return pr, nil
+	return &Project{h, h.Curr()}, nil
 }
 
 func schema(args []string) (*dom.Schema, error) {

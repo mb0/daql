@@ -86,6 +86,6 @@ func main() {
 		fmt.Print(usage)
 	}
 	if err != nil {
-		log.Fatalf("%s error: %v\n", flag.Arg(0), err)
+		log.Fatalf("%s error: %+v\n", flag.Arg(0), err)
 	}
 }

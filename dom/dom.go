@@ -104,7 +104,7 @@ type Project struct {
 	Schemas []*Schema `json:"schemas"`
 }
 
-func (p *Project) Qualified() string { return fmt.Sprintf("@%s", p.Key()) }
+func (p *Project) Qualified() string { return fmt.Sprintf("_%s", p.Key()) }
 
 // Schema returns a schema for key or nil.
 func (p *Project) Schema(key string) *Schema {

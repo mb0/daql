@@ -22,6 +22,11 @@ type Stream interface {
 	Iter() (Iter, error)
 }
 
+type IOStream interface {
+	Stream
+	Open() (io.ReadCloser, error)
+}
+
 type Iter interface {
 	Scan() (lit.Lit, error)
 	Close() error
@@ -49,8 +54,9 @@ func NewFileStream(path string) FileStream {
 	return FileStream{name, path}
 }
 
-func (s *FileStream) Name() string        { return s.Model }
-func (s *FileStream) Iter() (Iter, error) { return OpenFileIter(s.Path) }
+func (s *FileStream) Name() string                 { return s.Model }
+func (s *FileStream) Open() (io.ReadCloser, error) { return os.Open(s.Path) }
+func (s *FileStream) Iter() (Iter, error)          { return OpenFileIter(s.Path) }
 
 // ZipStream is a zip file based stream implementation.
 type ZipStream struct {
@@ -58,8 +64,9 @@ type ZipStream struct {
 	*zip.File
 }
 
+func (s *ZipStream) Open() (io.ReadCloser, error) { return s.File.Open() }
 func (s *ZipStream) Iter() (Iter, error) {
-	f, err := s.File.Open()
+	f, err := s.Open()
 	if err != nil {
 		return nil, err
 	}
@@ -125,4 +132,4 @@ func (it *fileIter) Scan() (lit.Lit, error) {
 	return lit.Parse(tr)
 }
 
-func gzipped(path string) bool { return strings.HasPrefix(path, ".gz") }
+func gzipped(path string) bool { return strings.HasSuffix(path, ".gz") }

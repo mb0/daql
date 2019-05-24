@@ -1,8 +1,11 @@
 package mig
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	"io"
 	"time"
 
 	"github.com/mb0/daql/dom"
@@ -20,6 +23,22 @@ type Version struct {
 	Vers int64     `json:"vers"`
 	Hash string    `json:"hash"`
 	Date time.Time `json:"date,omitempty"`
+}
+
+// ReadVersion returns a version read from r or and error.
+func ReadVersion(r io.Reader) (v Version, err error) {
+	err = json.NewDecoder(r).Decode(&v)
+	return v, err
+}
+
+// WriteTo writes the version to w and returns the written bytes or an error.
+func (v Version) WriteTo(w io.Writer) (int64, error) {
+	var b bytes.Buffer
+	err := json.NewEncoder(w).Encode(&b)
+	if err != nil {
+		return 0, err
+	}
+	return b.WriteTo(w)
 }
 
 // Versioner sets and returns node version details, usually based on the last recorded manifest.

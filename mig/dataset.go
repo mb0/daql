@@ -10,12 +10,11 @@ import (
 	"strings"
 
 	"github.com/mb0/xelf/cor"
-	"github.com/mb0/xelf/prx"
 )
 
-// Dataset consists of a project record and one or more data streams of model objects.
+// Dataset consists of a project version and one or more json streams of model objects.
 type Dataset struct {
-	Record
+	Version // project version
 	Streams []Stream
 	Closer  io.Closer
 }
@@ -30,16 +29,18 @@ func (d *Dataset) Close() error {
 
 // ReadDataset returns a dataset with the manifest and data streams found at path or an error.
 //
-// Path must either point to directory or a zip file containing individual files for the manifest
-// and data steams. The manifest file must be named 'manifest' and the individual data streams use
-// the qualified model name with an extension for the format, that is either '.json' or '.xelf' with
-// an optional '.gz', for gzipped files. The returned data streams are first read when iterated.
+// Path must either point to directory or a zip file containing individual files for the project
+// version and data steams. The version file must be named 'version.json' and the individual data
+// streams use the qualified model name with the '.json' extension for the format and optional a
+// '.gz' extension, for gzipped files. The returned data streams are first read when iterated.
+// We only allow the json format, because the files usually machine written and read and to make
+// working with backups easier in other language.
 func ReadDataset(path string) (*Dataset, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, cor.Errorf("read data at path %q: %v", path, err)
 	}
-	if strings.HasSuffix(path, ".zip") {
+	if zipped(path) {
 		return zipData(f, path)
 	}
 	return dirData(f, path)
@@ -48,28 +49,36 @@ func ReadDataset(path string) (*Dataset, error) {
 // WriteDataset writes a dataset to path or returns an error.  If the path ends in '.zip' a zip file
 // is written, otherwise the dataset is written as individual gzipped file to the directory at path.
 func WriteDataset(path string, d *Dataset) error {
-	if strings.HasSuffix(path, ".zip") {
+	if zipped(path) {
 		return writeFile(path, func(f io.Writer) error {
 			w := zip.NewWriter(f)
 			defer w.Close()
 			return WriteZip(w, d)
 		})
 	}
-	gz := new(gzip.Writer)
-	defer gz.Close()
-	err := writeFileGz(filepath.Join(path, "manifest.json.gz"), gz, func(w io.Writer) error {
-		return WriteManifest(d.Manifest, w)
+	err := writeFile(filepath.Join(path, "version.json"), func(w io.Writer) error {
+		_, err := d.Version.WriteTo(w)
+		return err
 	})
 	if err != nil {
 		return err
 	}
 	for _, s := range d.Streams {
-		it, err := s.Iter()
-		if err != nil {
-			return err
-		}
 		name := fmt.Sprintf("%s.json.gz", s.Name())
-		err = writeFileGz(filepath.Join(path, name), gz, func(w io.Writer) error {
+		err = writeFileGz(filepath.Join(path, name), func(w io.Writer) error {
+			if ios, ok := s.(IOStream); ok {
+				f, err := ios.Open()
+				if err != nil {
+					return err
+				}
+				_, err = io.Copy(w, f)
+				f.Close()
+				return err
+			}
+			it, err := s.Iter()
+			if err != nil {
+				return err
+			}
 			return WriteIter(it, w)
 		})
 		if err != nil {
@@ -81,18 +90,25 @@ func WriteDataset(path string, d *Dataset) error {
 
 // ReadZip returns a dataset read from the given zip reader as described in ReadDataset or an error.
 // It is the caller's responsibility to close a zip read closer or any underlying reader.
-func ReadZip(r *zip.Reader) (_ *Dataset, err error) {
+func ReadZip(r *zip.Reader) (*Dataset, error) {
 	var d Dataset
 	for _, f := range r.File {
 		s := ZipStream{NewFileStream(f.Name), f}
-		if s.Model == "manifest" {
-			d.Manifest, err = ReadManifestStream(&s)
+		if s.Model == "version" {
+			r, err := s.Open()
+			if err != nil {
+				return nil, err
+			}
+			d.Version, err = ReadVersion(r)
+			r.Close()
 			if err != nil {
 				return nil, err
 			}
 			continue
 		}
-		d.Streams = append(d.Streams, &s)
+		if isStream(f.Name) {
+			d.Streams = append(d.Streams, &s)
+		}
 	}
 	return &d, nil
 }
@@ -100,11 +116,11 @@ func ReadZip(r *zip.Reader) (_ *Dataset, err error) {
 // WriteZip writes a dataset to the given zip file or returns an error.
 // It is the caller's responsibility to close the zip writer.
 func WriteZip(z *zip.Writer, d *Dataset) error {
-	w, err := z.Create("manifest.json")
+	w, err := z.Create("version.json")
 	if err != nil {
 		return err
 	}
-	err = WriteManifest(d.Manifest, w)
+	_, err = d.Version.WriteTo(w)
 	if err != nil {
 		return err
 	}
@@ -126,6 +142,11 @@ func WriteZip(z *zip.Writer, d *Dataset) error {
 	return nil
 }
 
+func zipped(path string) bool { return strings.HasSuffix(path, ".zip") }
+func isStream(path string) bool {
+	return strings.HasSuffix(path, ".json") || strings.HasSuffix(path, ".json.gz")
+}
+
 func dirData(f *os.File, path string) (*Dataset, error) {
 	defer f.Close()
 	fis, err := f.Readdir(0)
@@ -134,36 +155,26 @@ func dirData(f *os.File, path string) (*Dataset, error) {
 	}
 	var d Dataset
 	for _, fi := range fis {
-		s := NewFileStream(filepath.Join(path, fi.Name()))
-		if s.Model == "manifest" {
-			d.Manifest, err = ReadManifestStream(&s)
+		name := fi.Name()
+		path := filepath.Join(path, name)
+		if name == "version.json" {
+			f, err := os.Open(path)
+			if err != nil {
+				return nil, err
+			}
+			d.Version, err = ReadVersion(f)
+			f.Close()
 			if err != nil {
 				return nil, err
 			}
 			continue
 		}
-		d.Streams = append(d.Streams, &s)
+		if isStream(name) {
+			fs := NewFileStream(path)
+			d.Streams = append(d.Streams, &fs)
+		}
 	}
 	return &d, nil
-}
-
-func ReadManifestStream(s Stream) (Manifest, error) {
-	it, err := s.Iter()
-	if err != nil {
-		return nil, err
-	}
-	defer it.Close()
-	mf := make(Manifest, 0, 48)
-	for {
-		l, err := it.Scan()
-		if err != nil {
-			return nil, err
-		}
-		var v Version
-		prx.AssignTo(l, &v)
-		mf = append(mf, v)
-	}
-	return mf.Sort(), nil
 }
 
 func zipData(f *os.File, path string) (*Dataset, error) {
@@ -184,11 +195,11 @@ func zipData(f *os.File, path string) (*Dataset, error) {
 	return d, nil
 }
 
-func writeFileGz(path string, gz *gzip.Writer, wf func(io.Writer) error) error {
+func writeFileGz(path string, wf func(io.Writer) error) error {
 	return writeFile(path, func(w io.Writer) error {
-		gz.Reset(w)
+		gz := gzip.NewWriter(w)
 		err := wf(gz)
-		gz.Flush()
+		gz.Close()
 		return err
 	})
 }
