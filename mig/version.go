@@ -1,18 +1,33 @@
-package dom
+package mig
 
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"time"
 
+	"github.com/mb0/daql/dom"
 	"github.com/mb0/xelf/cor"
 )
+
+// Version contains essential details for a node to derive a new version number.
+//
+// The name is the node's qualified name, and date is an optional recording time. Vers is a positive
+// integer for known versions or zero if unknown. The hash is a lowercase hex string of an sha256
+// hash of the node's qualified name and its contents. For models the default string representation
+// is used as content, for schemas each model hash and for projects each schema hash.
+type Version struct {
+	Name string    `json:"name"`
+	Vers int64     `json:"vers"`
+	Hash string    `json:"hash"`
+	Date time.Time `json:"date,omitempty"`
+}
 
 // Versioner sets and returns node version details, usually based on the last recorded manifest.
 type Versioner interface {
 	// Manifest returns a fresh manifest with updated versions.
 	Manifest() Manifest
 	// Version sets and returns the node version details or an error.
-	Version(Node) (Version, error)
+	Version(dom.Node) (Version, error)
 }
 
 // NewVersioner returns a new versioner based on the given manifest.
@@ -44,7 +59,7 @@ func (mv manifestVersioner) Manifest() Manifest {
 
 }
 
-func (mv manifestVersioner) Version(n Node) (res Version, err error) {
+func (mv manifestVersioner) Version(n dom.Node) (res Version, err error) {
 	key := n.Qualified()
 	e := mv[key]
 	if e == nil {
@@ -59,15 +74,10 @@ func (mv manifestVersioner) Version(n Node) (res Version, err error) {
 	}
 	h := sha256.New()
 	h.Write([]byte(res.Name))
-	var c *Common
 	switch d := n.(type) {
-	case *Model:
-		c = &d.Common
-		m := *d // local copy so we can set the version for hashing
-		m.Vers = res.Vers
-		h.Write([]byte(m.String()))
-	case *Schema:
-		c = &d.Common
+	case *dom.Model:
+		h.Write([]byte(d.String()))
+	case *dom.Schema:
 		for _, m := range d.Models {
 			v, err := mv.Version(m)
 			if err != nil {
@@ -75,8 +85,7 @@ func (mv manifestVersioner) Version(n Node) (res Version, err error) {
 			}
 			h.Write([]byte(v.Hash))
 		}
-	case *Project:
-		c = &d.Common
+	case *dom.Project:
 		for _, s := range d.Schemas {
 			v, err := mv.Version(s)
 			if err != nil {
@@ -96,7 +105,6 @@ func (mv manifestVersioner) Version(n Node) (res Version, err error) {
 	} else {
 		e.cur = e.old
 	}
-	c.Vers = res.Vers
 	return res, nil
 }
 

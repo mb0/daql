@@ -133,12 +133,12 @@ func resolveModel(c *exp.Ctx, env *SchemaEnv, m *Model, args []exp.El) error {
 var modelSig = exp.MustSig("(form 'model' :args? :decls? :tail? : @)")
 
 var commonRules = utl.TagRules{
-	IdxKeyer: utl.OffsetKeyer(2),
+	IdxKeyer: utl.OffsetKeyer(1),
 	KeyRule:  utl.KeyRule{KeySetter: utl.ExtraMapSetter("extra")},
 }
 
 var modelRules = utl.TagRules{
-	IdxKeyer: utl.OffsetKeyer(3),
+	IdxKeyer: utl.OffsetKeyer(2),
 	KeyRule:  utl.KeyRule{KeySetter: utl.ExtraMapSetter("extra")},
 	Rules: map[string]utl.KeyRule{
 		"typ": {typPrepper, typSetter},

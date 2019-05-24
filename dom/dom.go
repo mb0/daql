@@ -44,13 +44,10 @@ type Index struct {
 
 // Common represents the common name and version of model, schema or project nodes.
 type Common struct {
-	Vers  int64     `json:"vers,omitempty"`
 	Extra *lit.Dict `json:"extra,omitempty"`
 	Name  string    `json:"name,omitempty"`
 	key   string
 }
-
-func (c *Common) Version() int64 { return c.Vers }
 
 func (c *Common) Key() string {
 	if c.key == "" && c.Name != "" {
@@ -61,7 +58,6 @@ func (c *Common) Key() string {
 
 type Node interface {
 	Qualified() string
-	Version() int64
 	String() string
 	WriteBfr(b *bfr.Ctx) error
 }
@@ -190,8 +186,6 @@ func setNode(n *Common, x lit.Keyed) error {
 	switch x.Key {
 	case "name":
 		n.Name = x.Lit.(lit.Character).Char()
-	case "vers":
-		n.Vers = int64(x.Lit.(lit.Numeric).Num())
 	default:
 		if n.Extra == nil {
 			n.Extra = &lit.Dict{}

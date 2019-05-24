@@ -1,23 +1,30 @@
 /*
-Package mig provides tools to record and migrate model schemas and rules for data migrations.
+Package mig provides tools to version, record and migrate a project schema, and also provides rules
+to migrate the project data.
 
-Model versions are sequential integers, that are automatically assigned as part of the schema
-history. If there are differences between the historic model and a given model or if there is no
-history model, the version is incremented. The schema and project versions work in a similar manner
-based on their children's versions. This way we can avoid explicitly declaring versions.
+Project dom nodes are assigned sequential version numbers, that are automatically determined based
+on the node's content and its last known version. The version starts at one for new nodes and is
+incremented if the old and new definition differ. The schema and project versions work in a similar
+manner, only on based on the hashes of their children. This way we can avoid explicitly declaring
+versions.
 
-Data stores like plain files or databases need to store model versions. Programs involved with
-schema migration have the full schema history to calculate any new versions, other programs only
-need a schema manifest that has the latest historic model versions and a hashes of their definition.
+A project manifest contains all details needed to determine version changes. It contains the version
+information for the project and all its nodes. The version information includes a sha256 hash. For
+models this hash is calculated based on the default string representation, which means that any
+change to the model results in a new hash. For schemas, the hash is based on the schema name and all
+its model hashes, and for projects similarly the name and schema hashes. Effectively only changes to
+models are automatically increment the version. Users should be able to force version updates for
+any dom node.
 
-The schema history and manifest are automatically managed by mig and are transparently represented
-as files. Changes need to be explicitly committed to the schema history and manifest. Uncommitted
-schema changes are automatically represent as a new version,
+All datasets like backups or databases should store at least the project versions. Programs involved
+with data migration have the full project history to calculate any new versions, other programs only
+need the project manifest.
 
-Diff can be used to calculate the difference of two models as is used to extract specific changes
-made.
-
-Rules can be used to migrate data on the schema level. Specific migration routines use these rules
-to migrate literals, events, or even their representations in specific environments like sql.
+The schema history and manifest are managed by the daql command and are written to files. Changes
+need to be explicitly recorded into the project history and manifest. Data migration rules should
+also be recorded for each version as part of the history. Simple migration rules can be expressed
+as xelf expressions and interpreted by the daql command. Complex migration rules call any command,
+usually a simple go script that migrates one or more model changes for a dataset. The daql command
+should be able to generate simple rules and migration templates.
 */
 package mig

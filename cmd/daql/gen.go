@@ -12,7 +12,7 @@ import (
 type Project struct {
 	Path string
 	*dom.Project
-	dom.Manifest
+	mig.Manifest
 	History *mig.History
 }
 
@@ -31,17 +31,17 @@ func project() (*Project, error) {
 	}
 	pr := &Project{Path: path, Project: env.Project}
 	mpath := filepath.Join(path, "manifest.daql")
-	fi, err := os.Stat(mpath)
+	_, err = os.Stat(mpath)
 	if err == nil {
-		fs := mig.NewFileStream(fi.Name(), mpath)
-		mf, err := mig.ReadManifest(fs.Iter())
+		st := mig.NewFileStream(mpath)
+		pr.Manifest, err = mig.ReadManifestStream(&st)
 		if err != nil {
 			return nil, cor.Errorf("reading manifest file %s: %v", mpath, err)
 		}
-		pr.Manifest, err = mf.Update(pr.Project)
-		if err != nil {
-			return nil, cor.Errorf("updating manifest file %s: %v", mpath, err)
-		}
+	}
+	pr.Manifest, err = pr.Manifest.Update(pr.Project)
+	if err != nil {
+		return nil, cor.Errorf("updating manifest file %s: %v", mpath, err)
 	}
 	return pr, nil
 }

@@ -1,22 +1,12 @@
-package dom
+package mig
 
 import (
+	"encoding/json"
+	"io"
 	"sort"
-	"time"
-)
 
-// Version contains essential details for a node to derive a new version number.
-//
-// The name is the node's qualified name, and date is an optional recording time. Vers is a positive
-// integer for known versions or zero if unknown. The hash is a lowercase hex string of an sha256
-// hash of the node's qualified name and its contents. For models the default string representation
-// is used as content, for schemas each model hash and for projects each schema hash.
-type Version struct {
-	Name string    `json:"name"`
-	Vers int64     `json:"vers"`
-	Hash string    `json:"hash"`
-	Date time.Time `json:"date,omitempty"`
-}
+	"github.com/mb0/daql/dom"
+)
 
 // Manifest is set of versions sorted by name, usually for all nodes of one project.
 type Manifest []Version
@@ -53,11 +43,39 @@ func (mf Manifest) Set(v Version) Manifest {
 }
 
 // Update sets the node versions in project and returns the updated manifest or an error.
-func (mf Manifest) Update(pr *Project) (Manifest, error) {
+func (mf Manifest) Update(pr *dom.Project) (Manifest, error) {
 	mv := NewVersioner(mf)
 	_, err := mv.Version(pr)
 	if err != nil {
 		return nil, err
 	}
 	return mv.Manifest(), nil
+}
+
+// ReadManifest returns a manifest read from r or an error.
+// Manifests are read as JSON stream of version objects.
+func ReadManifest(r io.Reader) (mf Manifest, err error) {
+	dec := json.NewDecoder(r)
+	for {
+		var v Version
+		err = dec.Decode(&v)
+		if err != nil {
+			return nil, err
+		}
+		mf = append(mf, v)
+	}
+	return mf, nil
+}
+
+// WriteManifest writes the manifest to w or returns an error.
+// Manifests are written as JSON stream of version objects.
+func WriteManifest(mf Manifest, w io.Writer) error {
+	enc := json.NewEncoder(w)
+	for _, v := range mf {
+		err := enc.Encode(v)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

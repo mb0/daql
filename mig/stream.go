@@ -3,13 +3,14 @@ package mig
 import (
 	"archive/zip"
 	"compress/gzip"
+	"encoding/json"
 	"io"
 	"os"
 	"strings"
 
+	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/lex"
 	"github.com/mb0/xelf/lit"
-	"github.com/mb0/xelf/prx"
 )
 
 // Steam represents a possibly large sequence model data object.
@@ -22,22 +23,19 @@ type Stream interface {
 }
 
 type Iter interface {
-	Scan(obj interface{}) error
+	Scan() (lit.Lit, error)
 	Close() error
 }
 
 // FileStream is a file based stream implementation.
 type FileStream struct {
-	Model  string
-	Format string
-	Gzip   bool
-	Path   string
+	Model string
+	Path  string
 }
 
-func NewFileStream(name, path string) FileStream {
-	var ext string
-	gz := strings.HasSuffix(name, ".gz")
-	if gz {
+func NewFileStream(path string) FileStream {
+	name := path
+	if strings.HasSuffix(name, ".gz") {
 		name = name[:len(name)-3]
 	}
 	idx := strings.LastIndexByte(name, '/')
@@ -46,19 +44,13 @@ func NewFileStream(name, path string) FileStream {
 	}
 	idx = strings.LastIndexByte(name, '.')
 	if idx > 0 {
-		name, ext = name[:idx], name[idx+1:]
+		name = name[:idx]
 	}
-	return FileStream{name, ext, gz, path}
+	return FileStream{name, path}
 }
 
-func (s *FileStream) Name() string { return s.Model }
-func (s *FileStream) Iter() (Iter, error) {
-	f, err := os.Open(s.Path)
-	if err != nil {
-		return nil, err
-	}
-	return newFileIter(s, f)
-}
+func (s *FileStream) Name() string        { return s.Model }
+func (s *FileStream) Iter() (Iter, error) { return OpenFileIter(s.Path) }
 
 // ZipStream is a zip file based stream implementation.
 type ZipStream struct {
@@ -71,30 +63,51 @@ func (s *ZipStream) Iter() (Iter, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newFileIter(&s.FileStream, f)
+	return NewFileIter(f, gzipped(s.Path))
+}
+
+func OpenFileIter(path string) (Iter, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	return NewFileIter(f, gzipped(path))
+}
+
+func NewFileIter(f io.ReadCloser, gzipped bool) (Iter, error) {
+	if !gzipped {
+		return &fileIter{f: f, lex: lex.New(f)}, nil
+	}
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		f.Close()
+		return nil, err
+	}
+	return &fileIter{f: f, gz: gz, lex: lex.New(gz)}, nil
+}
+
+func WriteIter(it Iter, w io.Writer) error {
+	enc := json.NewEncoder(w)
+	for {
+		l, err := it.Scan()
+		if err != nil {
+			if cor.IsErr(err, io.EOF) {
+				break
+			}
+			return err
+		}
+		err = enc.Encode(l)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type fileIter struct {
-	s   *FileStream
 	f   io.ReadCloser
 	gz  *gzip.Reader
 	lex *lex.Lexer
-}
-
-func newFileIter(s *FileStream, f io.ReadCloser) (_ *fileIter, err error) {
-	it := &fileIter{s: s, f: f}
-	if s.Gzip {
-		it.gz, err = gzip.NewReader(f)
-		if err != nil {
-			f.Close()
-			return nil, err
-		}
-		it.lex = lex.New(it.gz)
-	} else {
-		it.lex = lex.New(f)
-	}
-	return it, nil
-
 }
 
 func (it *fileIter) Close() error {
@@ -103,14 +116,13 @@ func (it *fileIter) Close() error {
 	}
 	return it.f.Close()
 }
-func (it *fileIter) Scan(obj interface{}) error {
+
+func (it *fileIter) Scan() (lit.Lit, error) {
 	tr, err := it.lex.Scan()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	l, err := lit.Parse(tr)
-	if err != nil {
-		return err
-	}
-	return prx.AssignTo(l, obj)
+	return lit.Parse(tr)
 }
+
+func gzipped(path string) bool { return strings.HasPrefix(path, ".gz") }
