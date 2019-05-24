@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/mb0/daql/mig"
@@ -12,29 +13,55 @@ func status(args []string) error {
 	if err != nil {
 		return err
 	}
-	curr := pr.First()
-	last := pr.Last().First()
+	cv := pr.First()
+	last := pr.Last()
+	lv := last.First()
 	var vers string
-	if last.Vers == 0 {
-		vers = fmt.Sprintf("v%d (unrecorded)", curr.Vers)
-	} else if curr.Vers != last.Vers {
-		vers = fmt.Sprintf("v%d (last recorded v%d %s)", curr.Vers, last.Vers,
-			last.Date.Format("2006-02-01 15:04"))
+	if lv.Vers == 0 {
+		vers = fmt.Sprintf("v%d (unrecorded)", cv.Vers)
+	} else if cv.Vers != lv.Vers {
+		vers = fmt.Sprintf("v%d (last recorded v%d %s)", cv.Vers, lv.Vers,
+			lv.Date.Format("2006-02-01 15:04"))
 	} else {
 		vers = fmt.Sprintf("v%d (unchanged, recorded %s)",
-			last.Vers, last.Date.Format("2006-02-01 15:04"))
+			lv.Vers, lv.Date.Format("2006-02-01 15:04"))
 	}
-	fmt.Printf("Project: %s %s\n\n", pr.Name, vers)
-	fmt.Printf("Models:\n")
+	fmt.Printf("Project: %s %s\n", pr.Name, vers)
+	changes := pr.Diff(pr.Last())
+	chg(changes, cv.Name)
+	fmt.Printf("Definition:\n")
+	const nodefmt = "       %c %s v%d\n"
 	for _, s := range pr.Schemas {
+		v, _ := pr.Get(s.Qualified())
+		fmt.Printf(nodefmt, chg(changes, v.Name), v.Name, v.Vers)
 		for _, m := range s.Models {
-			mv, _ := pr.Get(m.Qualified())
-			chg := "+"
-			fmt.Printf("       %s %s v%d\n", chg, mv.Name, mv.Vers)
+			v, _ = pr.Get(m.Qualified())
+			fmt.Printf(nodefmt, chg(changes, v.Name), v.Name, v.Vers)
 		}
 	}
 	fmt.Println()
+	if len(changes) > 0 {
+		fmt.Printf("Deletions:\n")
+		dels := make([]string, 0, len(changes))
+		for k := range changes {
+			dels = append(dels, k)
+		}
+		sort.Strings(dels)
+		for _, s := range dels {
+			v, _ := pr.Get(s)
+			fmt.Printf(nodefmt, '-', s, v.Vers)
+		}
+		fmt.Println()
+	}
 	return nil
+}
+
+func chg(cm map[string]byte, name string) byte {
+	if b, ok := cm[name]; ok {
+		delete(cm, name)
+		return b
+	}
+	return ' '
 }
 
 func record(args []string) error {

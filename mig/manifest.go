@@ -32,6 +32,9 @@ func ReadManifest(r io.Reader) (mf Manifest, err error) {
 	return mf.Sort(), nil
 }
 
+// First returns the first version of the manifest or a zero version if empty.
+// The first version is the project version, by the nature of the sort order, unless the manifest
+// is unnaturally contains none or many project versions.
 func (mf Manifest) First() (v Version) {
 	if len(mf) > 0 {
 		return mf[0]
@@ -78,6 +81,34 @@ func (mf Manifest) Set(v Version) Manifest {
 	}
 	mf[i] = v
 	return mf
+}
+
+// Diff returns a map of all changed version names to a byte indicating the kind of change.
+// The byte is the '+' for addition, '-' for deletion or '*' for modification.
+func (mf Manifest) Diff(old Manifest) map[string]byte {
+	a, b := mf.First(), old.First()
+	if a.Vers == b.Vers && a.Name == b.Name {
+		return nil
+	}
+	m := make(map[string]*Version, len(old))
+	for i := range old {
+		v := &old[i]
+		m[v.Name] = v
+	}
+	res := make(map[string]byte, len(mf))
+	for _, v := range mf {
+		w := m[v.Name]
+		if w == nil {
+			res[v.Name] = '+'
+		} else if v.Vers != w.Vers {
+			res[v.Name] = '*'
+			delete(m, v.Name)
+		}
+	}
+	for k := range m {
+		res[k] = '-'
+	}
+	return res
 }
 
 // Update sets the node versions in project and returns the updated manifest or an error.
