@@ -63,7 +63,7 @@ type Record struct {
 // The returned record represent the current malleable project state, and may contain unrecorded
 // changes and preliminary versions, not representing the eventually recorded version definition.
 func ReadProject(path string) (res Record, err error) {
-	res.Project, err = resolveProject(path)
+	res.Project, err = ResolveProject(path)
 	if err != nil {
 		return res, err
 	}
@@ -78,20 +78,6 @@ func ReadProject(path string) (res Record, err error) {
 	}
 	res.Manifest, err = res.Update(res.Project)
 	return res, err
-}
-
-func resolveProject(path string) (*dom.Project, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, cor.Errorf("open project file %s: %v", path, err)
-	}
-	defer f.Close()
-	// TODO read and include referenced schema files
-	pr, err := dom.Read(dom.Env, f)
-	if err != nil {
-		return nil, err
-	}
-	return pr, nil
 }
 
 // History provides project records.
@@ -121,7 +107,7 @@ func ReadHistory(path string) (_ History, err error) {
 	if err != nil {
 		return nil, cor.Errorf("no project file found for %q: %v", path, err)
 	}
-	h.curr.Project, err = resolveProject(h.path)
+	h.curr.Project, err = ResolveProject(h.path)
 	if err != nil {
 		return nil, err
 	}

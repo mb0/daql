@@ -45,7 +45,7 @@ func getPtr(e exp.El) interface{} {
 	return nil
 }
 
-func Read(env exp.Env, r io.Reader) (*Project, error) {
+func Read(r io.Reader, env exp.Env) (*Project, error) {
 	t, err := lex.New(r).Scan()
 	if err != nil {
 		return nil, err
@@ -54,10 +54,13 @@ func Read(env exp.Env, r io.Reader) (*Project, error) {
 	if err != nil {
 		return nil, err
 	}
-	pr := &Project{}
-	_, err = exp.NewCtx(true, true).Resolve(NewEnv(env, pr), x, typ.Void)
+	if env == nil {
+		env = Env
+	}
+	var pr Project
+	_, err = exp.NewCtx(true, true).Resolve(NewEnv(env, &pr), x, typ.Void)
 	if err != nil {
 		return nil, err
 	}
-	return pr, nil
+	return &pr, nil
 }
