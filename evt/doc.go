@@ -34,5 +34,3 @@ appropriate.
 
 */
 package evt
-
-//go:generate sh -c "go run gen.go evt.dom"

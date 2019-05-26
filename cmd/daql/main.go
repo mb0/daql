@@ -59,11 +59,11 @@ func main() {
 	case "record":
 		err = record(args)
 	case "gen":
-		err = gen(args)
+		err = generate(args)
 	case "gengo":
-		err = gengo(args)
+		err = genXX("go", args)
 	case "genpg":
-		err = genpg(args)
+		err = genXX("pg", args)
 	case "dump":
 		err = dump(args)
 	case "backup":

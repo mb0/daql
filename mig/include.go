@@ -57,7 +57,7 @@ func includeSchema(s *dom.Schema, path, name string) error {
 		return err
 	}
 	if fi.IsDir() {
-		return includeSchema(s, filepath.Join(path, fmt.Sprintf("%s.dom", name)), name)
+		return includeSchema(s, filepath.Join(path, fmt.Sprintf("%s.daql", name)), name)
 	}
 	f, err := os.Open(path)
 	if err != nil {
