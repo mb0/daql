@@ -252,7 +252,8 @@ func (h *hist) Record(vers int64) (null Record, _ error) {
 
 func (h *hist) Commit(slug string) error {
 	c := h.curr.First()
-	l := h.Last().First()
+	last := h.Last()
+	l := last.First()
 	if c.Vers == l.Vers {
 		return ErrNoChanges
 	}
@@ -262,8 +263,14 @@ func (h *hist) Commit(slug string) error {
 	}
 	now := time.Now()
 	rec := h.curr
-	rec.Manifest[0].Date = now
-	// TODO set recording date to all changed versions
+	// set recording date to all changed versions
+	changes := rec.Diff(last)
+	for i := range rec.Manifest {
+		v := &rec.Manifest[i]
+		if _, ok := changes[v.Name]; ok {
+			v.Date = now
+		}
+	}
 	err = writeFile(filepath.Join(h.hdir, "manifest.json"), func(w io.Writer) error {
 		_, err := rec.Manifest.WriteTo(w)
 		return err

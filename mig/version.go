@@ -21,8 +21,8 @@ import (
 type Version struct {
 	Name string    `json:"name"`
 	Vers int64     `json:"vers"`
-	Hash string    `json:"hash"`
 	Date time.Time `json:"date,omitempty"`
+	Hash string    `json:"hash"`
 }
 
 // ReadVersion returns a version read from r or and error.
