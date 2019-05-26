@@ -1,3 +1,4 @@
-(project :hist '.hist'
+(project 'daql' :hist '.hist'
 	+evt :inc 'evt'
+	+qry :inc 'qry'
 )

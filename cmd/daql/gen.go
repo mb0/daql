@@ -73,8 +73,6 @@ func gogen(pr *Project, ss []*dom.Schema) error {
 
 func pggen(pr *Project, ss []*dom.Schema) error {
 	for _, s := range pr.Schemas {
-		out := fmt.Sprintf("%s/%s_gen.sql", s.Name, s.Name)
-		b := &gen.Ctx{Project: pr.Project, Pkg: "evt", Header: "-- generated code\n\n"}
 		c := *s
 		c.Models = make([]*dom.Model, 0, len(s.Models))
 		for _, m := range s.Models {
@@ -84,6 +82,11 @@ func pggen(pr *Project, ss []*dom.Schema) error {
 			}
 			c.Models = append(c.Models, m)
 		}
+		if len(c.Models) == 0 {
+			continue
+		}
+		out := fmt.Sprintf("%s/%s_gen.sql", s.Name, s.Name)
+		b := &gen.Ctx{Project: pr.Project, Pkg: "evt", Header: "-- generated code\n\n"}
 		err := genpg.WriteFile(b, filepath.Join(pr.Dir, out), &c)
 		if err != nil {
 			return err

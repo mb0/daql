@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -156,6 +157,9 @@ func ReadHistory(path string) (_ History, err error) {
 			}
 		}
 	}
+	sort.Slice(h.recs, func(i, j int) bool {
+		return h.recs[i].First().Vers < h.recs[j].First().Vers
+	})
 	if len(h.recs) > 0 {
 		last := h.recs[len(h.recs)-1]
 		if v := h.curr.First(); v.Vers == 0 {

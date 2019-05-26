@@ -1,4 +1,4 @@
-{"name":"_","vers":1,"date":"2019-05-26T02:19:18.582799044+02:00","hash":"c1f15bdc179672588a8ebf18aff25c94f50471d877d8c47ebf93ab6bb66a77da"}
+{"name":"_daql","vers":2,"date":"2019-05-26T05:40:46.627615112+02:00","hash":"e1255d7f6282b506fdb1c62481c7c3ca3259415fcbfabc3bceca399b3b99d32b"}
 {"name":"evt","vers":1,"date":"2019-05-26T02:19:18.582799044+02:00","hash":"3d45718c0908308554d4c12cea88fe3cee1ccf0a31a57096494d12e9c1dc11ca"}
 {"name":"evt.action","vers":1,"date":"2019-05-26T02:19:18.582799044+02:00","hash":"6313fde3d5fb980ceb79c1d51822b67aa1a275abccf1d3bdaaccc24cd02b364a"}
 {"name":"evt.audit","vers":1,"date":"2019-05-26T02:19:18.582799044+02:00","hash":"e2ce47cb00a7b066d1d12a3335219b8376fcc8efb4f01f4072ac80b052fc9f0f"}
@@ -15,3 +15,9 @@
 {"name":"evt.uns","vers":1,"date":"2019-05-26T02:19:18.582799044+02:00","hash":"7dbc24eca903d64f74d7d53d685f07a2765dd6cafecb00dc34e999ac1be84773"}
 {"name":"evt.update","vers":1,"date":"2019-05-26T02:19:18.582799044+02:00","hash":"6033fa29ee86e89a33e8fabbad4cbcb99184499f1767b697ef660f3251296e20"}
 {"name":"evt.watch","vers":1,"date":"2019-05-26T02:19:18.582799044+02:00","hash":"55a9caa608643b6aa045312f6f8f5d3b75f515c6689c1c55104deec6547e169d"}
+{"name":"qry","vers":1,"date":"2019-05-26T05:40:46.627615112+02:00","hash":"4a3ba4f9dfea0ecd13b4c699e8c541bf92f39f0ce67f5ead12bee7bce019bfe4"}
+{"name":"qry.dep","vers":1,"date":"2019-05-26T05:40:46.627615112+02:00","hash":"25705279ee698034faff49e4474ebb13561eed5b443653f19c94d1af32d5b0fe"}
+{"name":"qry.ord","vers":1,"date":"2019-05-26T05:40:46.627615112+02:00","hash":"6a3b604871880c7d38b04d71600665eecf49daefa9b0aa3b8b52768f05e533cf"}
+{"name":"qry.plan","vers":1,"date":"2019-05-26T05:40:46.627615112+02:00","hash":"d9b205c4696e89744d06b47fde30b9a23a21cb4f5102114e8e7829d5164c0294"}
+{"name":"qry.query","vers":1,"date":"2019-05-26T05:40:46.627615112+02:00","hash":"2d8de2f274ef6a6254ebd34c153978d5985c0b7781a693423a5ca664827cedc5"}
+{"name":"qry.task","vers":1,"date":"2019-05-26T05:40:46.627615112+02:00","hash":"a5d90d269c3f707150d7044a12f81ac9a679a107e6d8e278812de49c6298c2b8"}

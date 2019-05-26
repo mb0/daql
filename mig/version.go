@@ -52,10 +52,14 @@ type Versioner interface {
 // NewVersioner returns a new versioner based on the given manifest.
 func NewVersioner(mf Manifest) Versioner {
 	mv := make(manifestVersioner, len(mf))
-	for _, v := range mf {
-		e := mv[v.Name]
+	for i, v := range mf {
+		key := v.Name
+		if i == 0 {
+			key = "_"
+		}
+		e := mv[key]
 		if e == nil {
-			mv[v.Name] = &entry{old: v}
+			mv[key] = &entry{old: v}
 		} else if e.old.Vers < v.Vers {
 			e.old = v
 		}
@@ -79,15 +83,18 @@ func (mv manifestVersioner) Manifest() Manifest {
 }
 
 func (mv manifestVersioner) Version(n dom.Node) (res Version, err error) {
-	key := n.Qualified()
+	res.Name = n.Qualified()
+	key := res.Name
+	if key[0] == '_' {
+		key = "_"
+	}
 	e := mv[key]
 	if e == nil {
-		res.Name = key
 		res.Vers = 1
 	} else if e.cur.Vers != 0 { // we already did the work
 		return e.cur, nil
 	} else if e.old.Vers != 0 {
-		res = e.old
+		res.Vers = e.old.Vers
 	} else {
 		return res, cor.Errorf("internal manifest error inconsistent state")
 	}
@@ -122,7 +129,8 @@ func (mv manifestVersioner) Version(n dom.Node) (res Version, err error) {
 		res.Vers++
 		e.cur = res
 	} else {
-		e.cur = e.old
+		res = e.old
+		e.cur = res
 	}
 	return res, nil
 }

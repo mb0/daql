@@ -100,10 +100,12 @@ func (mf Manifest) Diff(old Manifest) map[string]byte {
 		w := m[v.Name]
 		if w == nil {
 			res[v.Name] = '+'
-		} else if v.Vers != w.Vers {
-			res[v.Name] = '*'
-			delete(m, v.Name)
+			continue
 		}
+		if v.Vers != w.Vers {
+			res[v.Name] = '*'
+		}
+		delete(m, v.Name)
 	}
 	for k := range m {
 		res[k] = '-'

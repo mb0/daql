@@ -19,7 +19,7 @@ func status(args []string) error {
 	var vers string
 	if lv.Vers == 0 {
 		vers = fmt.Sprintf("v%d (unrecorded)", cv.Vers)
-	} else if cv.Vers != lv.Vers {
+	} else if cv.Vers != lv.Vers || cv.Name != lv.Name {
 		vers = fmt.Sprintf("v%d (last recorded v%d %s)", cv.Vers, lv.Vers,
 			lv.Date.Format("2006-02-01 15:04"))
 	} else {
@@ -40,6 +40,9 @@ func status(args []string) error {
 		}
 	}
 	fmt.Println()
+	if chg(changes, lv.Name) != ' ' {
+		fmt.Printf("Project renamed from %s to %s\n\n", lv.Name, cv.Name)
+	}
 	if len(changes) > 0 {
 		fmt.Printf("Deletions:\n")
 		dels := make([]string, 0, len(changes))
