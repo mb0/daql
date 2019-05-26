@@ -1,0 +1,3 @@
+(project :hist '.hist'
+	+evt :inc 'evt'
+)
