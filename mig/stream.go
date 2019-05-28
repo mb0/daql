@@ -1,7 +1,6 @@
 package mig
 
 import (
-	"archive/zip"
 	"compress/gzip"
 	"encoding/json"
 	"io"
@@ -13,64 +12,13 @@ import (
 	"github.com/mb0/xelf/lit"
 )
 
-// Steam represents a possibly large sequence model data object.
+// Iter is an iterator for a possibly large sequence of object literal data.
 //
 // This abstraction allows us to choose an appropriate implementation for any situation, without
 // being forced to load all the data into memory at once.
-type Stream interface {
-	Name() string // qualified name of an object model
-	Iter() (Iter, error)
-}
-
-type IOStream interface {
-	Stream
-	Open() (io.ReadCloser, error)
-}
-
 type Iter interface {
 	Scan() (lit.Lit, error)
 	Close() error
-}
-
-// FileStream is a file based stream implementation.
-type FileStream struct {
-	Model string
-	Path  string
-}
-
-func NewFileStream(path string) FileStream {
-	name := path
-	if strings.HasSuffix(name, ".gz") {
-		name = name[:len(name)-3]
-	}
-	idx := strings.LastIndexByte(name, '/')
-	if idx >= 0 {
-		name = name[idx+1:]
-	}
-	idx = strings.LastIndexByte(name, '.')
-	if idx > 0 {
-		name = name[:idx]
-	}
-	return FileStream{name, path}
-}
-
-func (s *FileStream) Name() string                 { return s.Model }
-func (s *FileStream) Open() (io.ReadCloser, error) { return os.Open(s.Path) }
-func (s *FileStream) Iter() (Iter, error)          { return OpenFileIter(s.Path) }
-
-// ZipStream is a zip file based stream implementation.
-type ZipStream struct {
-	FileStream
-	*zip.File
-}
-
-func (s *ZipStream) Open() (io.ReadCloser, error) { return s.File.Open() }
-func (s *ZipStream) Iter() (Iter, error) {
-	f, err := s.Open()
-	if err != nil {
-		return nil, err
-	}
-	return NewFileIter(f, gzipped(s.Path))
 }
 
 func OpenFileIter(path string) (Iter, error) {
@@ -130,6 +78,28 @@ func (it *fileIter) Scan() (lit.Lit, error) {
 		return nil, err
 	}
 	return lit.Parse(tr)
+}
+
+// fileStream is a file based stream implementation.
+type fileStream struct {
+	Model string
+	Path  string
+}
+
+func newFileStream(path string) fileStream {
+	name := path
+	if strings.HasSuffix(name, ".gz") {
+		name = name[:len(name)-3]
+	}
+	idx := strings.LastIndexByte(name, '/')
+	if idx >= 0 {
+		name = name[idx+1:]
+	}
+	idx = strings.LastIndexByte(name, '.')
+	if idx > 0 {
+		name = name[:idx]
+	}
+	return fileStream{name, path}
 }
 
 func gzipped(path string) bool { return strings.HasSuffix(path, ".gz") }

@@ -15,9 +15,14 @@ import (
 type Dataset interface {
 	// Version returns the project version of this dataset.
 	Version() Version
-	All() []Stream
-	Stream(string) Stream
+	Keys() []string
+	Iter(key string) (Iter, error)
 	Close() error
+}
+
+type IODataset interface {
+	Dataset
+	Open(key string) (io.ReadCloser, error)
 }
 
 // ReadDataset returns a dataset with the manifest and data streams found at path or an error.
@@ -26,8 +31,8 @@ type Dataset interface {
 // version and data steams. The version file must be named 'version.json' and the individual data
 // streams use the qualified model name with the '.json' extension for the format and optional a
 // '.gz' extension, for gzipped files. The returned data streams are first read when iterated.
-// We only allow the json format, because the files usually machine written and read and to make
-// working with backups easier in other language.
+// We only allow the json format, because the files are usually machine written and read, and to
+// make working with backups easier in other language.
 func ReadDataset(path string) (Dataset, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -56,11 +61,12 @@ func WriteDataset(path string, d Dataset) error {
 	if err != nil {
 		return err
 	}
-	for _, s := range d.All() {
-		name := fmt.Sprintf("%s.json.gz", s.Name())
+	iods, isIO := d.(IODataset)
+	for _, key := range d.Keys() {
+		name := fmt.Sprintf("%s.json.gz", key)
 		err = writeFileGz(filepath.Join(path, name), func(w io.Writer) error {
-			if ios, ok := s.(IOStream); ok {
-				f, err := ios.Open()
+			if isIO {
+				f, err := iods.Open(key)
 				if err != nil {
 					return err
 				}
@@ -68,7 +74,7 @@ func WriteDataset(path string, d Dataset) error {
 				f.Close()
 				return err
 			}
-			it, err := s.Iter()
+			it, err := d.Iter(key)
 			if err != nil {
 				return err
 			}
@@ -84,16 +90,17 @@ func WriteDataset(path string, d Dataset) error {
 // ReadZip returns a dataset read from the given zip reader as described in ReadDataset or an error.
 // It is the caller's responsibility to close a zip read closer or any underlying reader.
 func ReadZip(r *zip.Reader) (Dataset, error) { return readZip(r) }
-func readZip(r *zip.Reader) (*dataset, error) {
-	var d dataset
+func readZip(r *zip.Reader) (*datasetZip, error) {
+	var d datasetZip
+	d.files = make(map[string]*zip.File)
 	for _, f := range r.File {
-		s := ZipStream{NewFileStream(f.Name), f}
+		s := newFileStream(f.Name)
 		if s.Model == "version" {
-			r, err := s.Open()
+			r, err := f.Open()
 			if err != nil {
 				return nil, err
 			}
-			d.Project, err = ReadVersion(r)
+			d.Vers, err = ReadVersion(r)
 			r.Close()
 			if err != nil {
 				return nil, err
@@ -101,7 +108,8 @@ func readZip(r *zip.Reader) (*dataset, error) {
 			continue
 		}
 		if isStream(f.Name) {
-			d.Streams = append(d.Streams, &s)
+			d.files[s.Model] = f
+			d.streams = append(d.streams, s)
 		}
 	}
 	return &d, nil
@@ -118,12 +126,12 @@ func WriteZip(z *zip.Writer, d Dataset) error {
 	if err != nil {
 		return err
 	}
-	for _, s := range d.All() {
-		it, err := s.Iter()
+	for _, key := range d.Keys() {
+		it, err := d.Iter(key)
 		if err != nil {
 			return err
 		}
-		w, err = z.Create(fmt.Sprintf("%s.json", s.Name()))
+		w, err = z.Create(fmt.Sprintf("%s.json", key))
 		if err != nil {
 			return err
 		}
@@ -143,9 +151,8 @@ func isStream(path string) bool {
 
 // dataset consists of a project version and one or more json streams of model objects.
 type dataset struct {
-	Project Version
-	Streams []Stream
-	Closer  io.Closer
+	Vers    Version
+	streams []fileStream
 }
 
 func dirData(f *os.File, path string) (*dataset, error) {
@@ -163,7 +170,7 @@ func dirData(f *os.File, path string) (*dataset, error) {
 			if err != nil {
 				return nil, err
 			}
-			d.Project, err = ReadVersion(f)
+			d.Vers, err = ReadVersion(f)
 			f.Close()
 			if err != nil {
 				return nil, err
@@ -171,14 +178,58 @@ func dirData(f *os.File, path string) (*dataset, error) {
 			continue
 		}
 		if isStream(name) {
-			fs := NewFileStream(path)
-			d.Streams = append(d.Streams, &fs)
+			fs := newFileStream(path)
+			d.streams = append(d.streams, fs)
 		}
 	}
 	return &d, nil
 }
 
-func zipData(f *os.File, path string) (*dataset, error) {
+func (d *dataset) Version() Version { return d.Vers }
+func (d *dataset) Close() error     { return nil }
+func (d *dataset) Keys() []string {
+	res := make([]string, 0, len(d.streams))
+	for _, s := range d.streams {
+		res = append(res, s.Model)
+	}
+	return res
+}
+func (d *dataset) Open(key string) (io.ReadCloser, error) {
+	s, err := d.stream(key)
+	if err != nil {
+		return nil, err
+	}
+	return os.Open(s.Path)
+}
+
+func (d *dataset) Iter(key string) (Iter, error) {
+	s, err := d.stream(key)
+	if err != nil {
+		return nil, err
+	}
+	f, err := os.Open(s.Path)
+	if err != nil {
+		return nil, err
+	}
+	return NewFileIter(f, gzipped(s.Path))
+}
+
+func (d *dataset) stream(key string) (*fileStream, error) {
+	for i, s := range d.streams {
+		if s.Model == key {
+			return &d.streams[i], nil
+		}
+	}
+	return nil, cor.Errorf("no stream with key %s", key)
+}
+
+type datasetZip struct {
+	dataset
+	files  map[string]*zip.File
+	closer io.Closer
+}
+
+func zipData(f *os.File, path string) (*datasetZip, error) {
 	fi, err := f.Stat()
 	if err != nil {
 		return nil, cor.Errorf("stat zip data at path %q: %v", path, err)
@@ -192,25 +243,34 @@ func zipData(f *os.File, path string) (*dataset, error) {
 		f.Close()
 		return nil, err
 	}
-	d.Closer = f
+	d.closer = f
 	return d, nil
 }
 
-func (d *dataset) Version() Version { return d.Project }
-func (d *dataset) All() []Stream    { return d.Streams }
-func (d *dataset) Stream(key string) Stream {
-	for _, s := range d.Streams {
-		if s.Name() == key {
-			return s
-		}
+func (d *datasetZip) Open(key string) (io.ReadCloser, error) {
+	f := d.files[key]
+	if f == nil {
+		return nil, cor.Errorf("no stream with key %s", key)
 	}
-	return nil
+	return f.Open()
+}
+
+func (d *datasetZip) Iter(key string) (Iter, error) {
+	s, err := d.stream(key)
+	if err != nil {
+		return nil, err
+	}
+	f, err := d.Open(key)
+	if err != nil {
+		return nil, err
+	}
+	return NewFileIter(f, gzipped(s.Path))
 }
 
 // Close calls the closer, if configured, and should always be called.
-func (d *dataset) Close() error {
-	if d.Closer != nil {
-		return d.Closer.Close()
+func (d *datasetZip) Close() error {
+	if d.closer != nil {
+		return d.closer.Close()
 	}
 	return nil
 }
