@@ -14,7 +14,7 @@ func db() (string, error) {
 	return db, nil
 }
 
-func dataset(fname string) (*mig.Dataset, error) {
+func dataset(fname string) (mig.Dataset, error) {
 	return nil, nil
 }
 
