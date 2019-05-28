@@ -54,4 +54,4 @@ const ProdFixRaw = `{
 	]
 }`
 
-func ProdFixture() (*Proj, error) { return Fixture(ProdRaw, ProdFixRaw) }
+func ProdFixture() (*Fixture, error) { return New(ProdRaw, ProdFixRaw) }

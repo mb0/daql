@@ -9,7 +9,7 @@ import (
 
 func TestRelate(t *testing.T) {
 	tests := []struct {
-		fix *domtest.Proj
+		fix *domtest.Fixture
 	}{
 		{domtest.Must(domtest.ProdFixture())},
 		{domtest.Must(domtest.PersonFixture())},

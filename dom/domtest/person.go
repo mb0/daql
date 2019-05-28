@@ -54,4 +54,4 @@ const PersonFixRaw = `{
 	]
 }`
 
-func PersonFixture() (*Proj, error) { return Fixture(PersonRaw, PersonFixRaw) }
+func PersonFixture() (*Fixture, error) { return New(PersonRaw, PersonFixRaw) }
