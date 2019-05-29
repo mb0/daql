@@ -40,6 +40,7 @@ func repl(args []string) error {
 	lin.SetMultiLineMode(true)
 	var buf bytes.Buffer
 	var multi bool
+	env := &exp.DataScope{Par: qry.Builtin, Dot: &lit.Dict{}}
 	for {
 		prompt := "> "
 		if multi = buf.Len() > 0; multi {
@@ -64,7 +65,7 @@ func repl(args []string) error {
 			buf.WriteByte(' ')
 		}
 		buf.WriteString(got)
-		el, err := exp.ParseString(qry.Builtin, buf.String())
+		el, err := exp.ParseString(env, buf.String())
 		if err != nil {
 			if cor.IsErr(err, io.EOF) {
 				continue
@@ -75,7 +76,7 @@ func repl(args []string) error {
 		}
 		lin.AppendHistory(buf.String())
 		buf.Reset()
-		l, err := exp.Execute(qry.NewEnv(qry.Builtin, &fix.Project, membed), el)
+		l, err := exp.Execute(qry.NewEnv(env, &fix.Project, membed), el)
 		if err != nil {
 			log.Printf("error resolving %s: %v", got, err)
 			continue
