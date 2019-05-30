@@ -81,6 +81,8 @@ func ReadProject(path string) (res Record, err error) {
 	return res, err
 }
 
+func (r *Record) Version() Version { return r.First() }
+
 // History provides project records.
 type History interface {
 	Path() string
