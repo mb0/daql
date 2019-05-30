@@ -51,7 +51,7 @@ func TestGenQuery(t *testing.T) {
 			continue
 		}
 		var buf strings.Builder
-		err = genQuery(&gen.Ctx{Ctx: bfr.Ctx{B: &buf}}, c, env, p.Root[0])
+		err = genQuery(&gen.Ctx{Ctx: bfr.Ctx{B: &buf}}, c, env, p.Root[0].Query)
 		if err != nil {
 			t.Errorf("gen query %s error %+v", test.raw, err)
 			continue

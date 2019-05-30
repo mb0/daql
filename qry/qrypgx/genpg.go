@@ -6,6 +6,7 @@ import (
 	"github.com/mb0/daql/gen"
 	"github.com/mb0/daql/gen/genpg"
 	"github.com/mb0/daql/qry"
+	"github.com/mb0/xelf/bfr"
 	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/exp"
 )
@@ -32,8 +33,16 @@ complex joins and sub selects probably have specialized SQL generation functions
 specifically directed by the plan execer.
 */
 
-func genQuery(b *gen.Ctx, c *exp.Ctx, env exp.Env, t *qry.Task) error {
-	q := t.Query
+func genQueryStr(c *exp.Ctx, env exp.Env, q *qry.Query) (string, error) {
+	var sb strings.Builder
+	err := genQuery(&gen.Ctx{Ctx: bfr.Ctx{B: &sb}}, c, env, q)
+	if err != nil {
+		return "", err
+	}
+	return sb.String(), nil
+}
+
+func genQuery(b *gen.Ctx, c *exp.Ctx, env exp.Env, q *qry.Query) error {
 	if q == nil {
 		return cor.Errorf("expression tasks not implemented")
 	}

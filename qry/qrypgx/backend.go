@@ -2,34 +2,66 @@
 package qrypgx
 
 import (
-	"log"
+	"io"
 	"strings"
 
 	"github.com/jackc/pgx"
 	"github.com/mb0/daql/dom"
-	"github.com/mb0/daql/gen"
+	"github.com/mb0/daql/mig"
 	"github.com/mb0/daql/qry"
-	"github.com/mb0/xelf/bfr"
 	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/lit"
+	"github.com/mb0/xelf/typ"
 )
 
 // Backend is a specialized postresql backend using the pgx package.
 type Backend struct {
-	DB   *pgx.ConnPool
-	Proj *dom.Project
+	DB *pgx.ConnPool
+	mig.Record
+	tables map[string]*dom.Model
 }
 
 func New(db *pgx.ConnPool, proj *dom.Project) *Backend {
-	return &Backend{DB: db, Proj: proj}
+	tables := make(map[string]*dom.Model, len(proj.Schemas)*8)
+	for _, s := range proj.Schemas {
+		for _, m := range s.Models {
+			if m.Kind == typ.KindObj {
+				continue
+			}
+			// TODO check if model is actually part of the database
+			tables[m.Qualified()] = m
+		}
+	}
+	return &Backend{DB: db, Record: mig.Record{Project: proj}, tables: tables}
+}
+
+var _ mig.Dataset = (*Backend)(nil)
+
+// Close just implements dataset interface and does not close the underlying connection pool.
+func (b *Backend) Close() error { return nil }
+
+func (b *Backend) Keys() []string {
+	res := make([]string, 0, len(b.tables))
+	for k := range b.tables {
+		res = append(res, k)
+	}
+	return res
+}
+
+func (b *Backend) Iter(key string) (mig.Iter, error) {
+	m := b.tables[key]
+	if m != nil {
+		return openRowsIter(b.DB, m)
+	}
+	return nil, cor.Errorf("no table with key %s", key)
 }
 
 func (b *Backend) ExecPlan(c *exp.Ctx, env exp.Env, p *qry.Plan) (*qry.Result, error) {
 	res := qry.NewResult(p)
-	ctx := ctx{c, &qry.ExecEnv{env, p, res}, res}
+	ctx := ctx{b, c, &qry.ExecEnv{env, p, res}, res}
 	for _, t := range p.Root {
-		err := b.execTask(ctx, t, res.Data)
+		err := execTask(ctx, t, res.Data)
 		if err != nil {
 			return nil, err
 		}
@@ -38,153 +70,57 @@ func (b *Backend) ExecPlan(c *exp.Ctx, env exp.Env, p *qry.Plan) (*qry.Result, e
 }
 
 type ctx struct {
+	*Backend
 	*exp.Ctx
 	exp.Env
 	*qry.Result
 }
 
-func (b *Backend) execTask(c ctx, t *qry.Task, par lit.Proxy) error {
-	res, err := c.Prep(par, t)
+func openRowsIter(db *pgx.ConnPool, m *dom.Model) (*rowsIter, error) {
+	res, err := lit.MakeRec(m.Typ())
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if t.Query != nil {
-		return b.execQuery(c, t, res)
+	var b strings.Builder
+	b.WriteString("SELECT ")
+	for i, kv := range res.List {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(kv.Key)
 	}
-	el, err := c.Resolve(c.Env, t.Expr, t.Type)
+	b.WriteString(" FROM ")
+	b.WriteString(m.Qualified())
+
+	rows, err := db.Query(b.String())
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return res.Assign(el.(lit.Lit))
+	return &rowsIter{rows, res, nil}, err
 }
 
-func (b *Backend) execQuery(c ctx, t *qry.Task, res lit.Proxy) error {
-	q := t.Query
-	schema, model, rest := splitName(q)
-	m := b.Proj.Schema(schema).Model(model)
-	if m == nil {
-		return cor.Errorf("schema model for %s not found", q.Ref)
-	}
-	if rest != "" {
-		return cor.Errorf("field query not yet implemented for %s", q.Ref)
-	}
-	var sb strings.Builder
-	// write query.
-	// XXX could we cache and clearly identify prepared statements?
-	err := genQuery(&gen.Ctx{Ctx: bfr.Ctx{B: &sb}}, c.Ctx, c.Env, t)
-	if err != nil {
-		return err
-	}
-	qs := sb.String()
-	rows, err := b.DB.Query(qs)
-	if err != nil {
-		return cor.Errorf("query %s: %w", qs, err)
-	}
-	switch q.Ref[0] {
-	case '#':
-		if !rows.Next() {
-			return cor.Errorf("no result for count query %s", q.Ref)
-		}
-		err = rows.Scan(res.Ptr())
-		if err != nil {
-			return cor.Errorf("scan: %w", err)
-		}
-		if rows.Next() {
-			return cor.Errorf("additional results for count query")
-		}
-		if err = rows.Err(); err != nil {
-			return err
-		}
-		c.SetDone(t, res)
-		return nil
-	case '?':
-		if !rows.Next() {
-			return rows.Err()
-		}
-		k, ok := lit.Deopt(res).(lit.Keyer)
-		if !ok {
-			return cor.Errorf("expect keyer result got %T", res)
-		}
-		args := make([]interface{}, 0, len(q.Sel))
-		for _, s := range q.Sel {
-			el, err := k.Key(strings.ToLower(s.Name))
-			if err != nil {
-				return cor.Errorf("prep scan: %w", err)
-			}
-			v, ok := el.(lit.Proxy)
-			if !ok {
-				return cor.Errorf("expect assignable result got %T", el)
-			}
-			args = append(args, v.Ptr())
-		}
-		log.Printf("scan query %q with args %v", qs, args)
-		err = rows.Scan(args...)
-		if err != nil {
-			return cor.Errorf("scan: %w", err)
-		}
-		if rows.Next() {
-			return cor.Errorf("additional results for count query")
-		}
-		if err = rows.Err(); err != nil {
-			return err
-		}
-		c.SetDone(t, res)
-		return nil
-	}
-	// result should be an assignable arr
-	a, ok := lit.Deopt(res).(lit.Appender)
-	if !ok {
-		return cor.Errorf("expect arr result got %T", res)
-	}
-	nn := a.Len()
-	args := make([]interface{}, len(q.Sel))
-	for rows.Next() {
-		null := lit.ZeroProxy(a.Typ().Elem())
-		a, err = a.Append(null)
-		if err != nil {
-			return err
-		}
-		el, err := a.Idx(nn)
-		if err != nil {
-			return err
-		}
-		k, ok := lit.Deopt(el).(lit.Keyer)
-		if !ok {
-			return cor.Errorf("expect keyer result got %T", el)
-		}
-		args = args[:0]
-		for _, s := range q.Sel {
-			el, err := k.Key(strings.ToLower(s.Name))
-			if err != nil {
-				return cor.Errorf("prep scan: %w", err)
-			}
-			v, ok := el.(lit.Proxy)
-			if !ok {
-				return cor.Errorf("expect assignable result got %T", el)
-			}
-			args = append(args, v.Ptr())
-		}
-		log.Printf("scan query %q with args %v", qs, args)
-		err = rows.Scan(args...)
-		if err != nil {
-			return cor.Errorf("scan: %w", err)
-		}
-		nn++
-	}
-	if err = rows.Err(); err != nil {
-		return err
-	}
-	c.SetDone(t, res)
-	return nil
+type rowsIter struct {
+	*pgx.Rows
+	res  *lit.Rec
+	args []interface{}
 }
 
-func splitName(q *qry.Query) (schema, model, rest string) {
-	s := strings.SplitN(q.Ref[1:], ".", 3)
-	if len(s) < 2 {
-		return q.Ref[1:], "", ""
+func (it *rowsIter) Scan() (lit.Lit, error) {
+	if !it.Next() {
+		return nil, io.EOF
 	}
-	if len(s) > 2 {
-		rest = s[2]
+	res := it.res.New().(*lit.Rec)
+	if it.args == nil {
+		it.args = make([]interface{}, len(res.List))
 	}
-	return s[0], s[1], rest
+	args := it.args[:]
+	for _, kv := range res.List {
+		args = append(args, kv.Lit.(lit.Proxy).Ptr())
+	}
+	err := it.Rows.Scan(args...)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
 }
+func (it *rowsIter) Close() error { it.Rows.Close(); return nil }
