@@ -34,7 +34,7 @@ func ReadVersion(r io.Reader) (v Version, err error) {
 // WriteTo writes the version to w and returns the written bytes or an error.
 func (v Version) WriteTo(w io.Writer) (int64, error) {
 	var b bytes.Buffer
-	err := json.NewEncoder(w).Encode(&b)
+	err := json.NewEncoder(&b).Encode(v)
 	if err != nil {
 		return 0, err
 	}

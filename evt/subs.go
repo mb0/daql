@@ -124,7 +124,7 @@ func (subs *Subscribers) Unsub(c hub.Conn, ws []Watch) {
 
 // Btrig trigger fires a delayed, de-duped broadcast request with header _bcast.
 func (subs *Subscribers) Btrig(from hub.Conn) {
-	if subs.btrig != nil && time.Now().Sub(subs.bcast) < 2*time.Second {
+	if subs.btrig != nil && time.Since(subs.bcast) < 2*time.Second {
 		subs.btrig.Stop()
 	}
 	subs.btrig = time.AfterFunc(200*time.Millisecond, func() {

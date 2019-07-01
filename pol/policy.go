@@ -5,7 +5,7 @@ import "github.com/mb0/xelf/cor"
 
 // Policy allows users to execute an action or returns an error.
 type Policy interface {
-	Allow(user, action string) error
+	Police(user, action string) error
 }
 
 // Rules implements a role base policy.

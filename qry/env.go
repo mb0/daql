@@ -65,6 +65,9 @@ func (pe *PlanEnv) Get(sym string) *exp.Def {
 		return &exp.Def{Type: pe.Type}
 	}
 	t, path, err := RootTask(pe.Plan, sym)
+	if err != nil {
+		return nil
+	}
 	l, err := lit.SelectPath(t.Type, path)
 	if err != nil {
 		return nil
