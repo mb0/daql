@@ -17,11 +17,6 @@ type Task struct {
 	Expr  exp.El   `json:"expr,omitempty"`
 	Query *Query   `json:"query,omitempty"`
 	Type  typ.Type `json:"type,omitempty"`
-	Deps  []Dep    `json:"deps,omitempty"`
-}
-
-type Dep struct {
-	Task *Task `json:"task"`
 }
 
 type Ord struct {

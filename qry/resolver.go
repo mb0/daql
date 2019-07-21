@@ -50,10 +50,6 @@ var qrySpec = exp.Implement("(form 'qry' :args? :decls? : @1)", false,
 		if len(p.Root) == 0 {
 			return nil, cor.Error("empty plan")
 		}
-		err := analyseDeps(p)
-		if err != nil {
-			return nil, err
-		}
 		return &exp.Atom{Lit: &exp.Spec{typ.Func("", []typ.Param{
 			{"arg", typ.Dict(typ.Any)},
 			{"", p.Type},

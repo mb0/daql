@@ -6,15 +6,11 @@ query tasks. Expression tasks consist of a xelf expressions, that cannot query t
 but can reference results of previous tasks. Query tasks do access the data source, and may have
 a list of explicit selection tasks. The selection tasks can have only simple field names or an
 expression or sub query. In effect building a tree of queries.`
-	+Name   str
-	+Expr?  ~expr
-	+Query? @Query?
-	+Type?  ~typ :doc `
-		Type is the task's result type or void if not yet resolved.`
-	+Deps?  list|@Dep)
-
-(+Dep
-	+Task @Task?)
+	+Name    str
+	+Expr?   ~expr
+	+Query?  @Query?
+	+Type?   ~typ :doc `
+		Type is the task's result type or void if not yet resolved.`)
 
 (+Ord
 	+Key   str
