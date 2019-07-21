@@ -224,13 +224,15 @@ func typPrepper(c *exp.Ctx, env exp.Env, n *exp.Named) (_ lit.Lit, err error) {
 	if err != nil && err != exp.ErrUnres {
 		return nil, err
 	}
-	if t, ok := fst.(*exp.Atom).Lit.(typ.Type); ok {
-		return t, nil
+	if a, ok := fst.(*exp.Atom); ok {
+		if t, ok := a.Lit.(typ.Type); ok {
+			return t, nil
+		}
 	}
 	if s, ok := fst.(*exp.Sym); ok && s.Type != typ.Void {
 		return s.Type, nil
 	}
-	return nil, cor.Errorf("expect type, got %s %[1]T in %s %[2]T", fst, n.El)
+	return nil, cor.Errorf("expect type, got %q %T", fst, fst)
 }
 func typSetter(o utl.Node, key string, l lit.Lit) error {
 	switch m := o.Ptr().(type) {
@@ -263,9 +265,9 @@ func idxSetter(o utl.Node, key string, l lit.Lit) error {
 	if err != nil {
 		return cor.Errorf("assign idx to %s: %w", l, err)
 	}
-	if m.Rec == nil {
-		m.Rec = &Object{}
+	if m.Object == nil {
+		m.Object = &Object{}
 	}
-	m.Rec.Indices = append(m.Rec.Indices, &idx)
+	m.Object.Indices = append(m.Object.Indices, &idx)
 	return nil
 }

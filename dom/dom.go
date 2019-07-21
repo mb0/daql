@@ -26,7 +26,7 @@ const (
 func (Bit) Bits() map[string]int64 { return bitConsts }
 
 // Keys is a slice of field keys used for indices and order.
-type Keys []string
+type Keys = []string
 
 // Elem holds additional information for either constants or type paramters.
 type Elem struct {
@@ -67,7 +67,7 @@ type Model struct {
 	Common
 	typ.Type `json:"typ"`
 	Elems    []*Elem `json:"elems,omitempty"`
-	Rec      *Object `json:"rec,omitempty"`
+	Object   *Object `json:"rec,omitempty"`
 	schema   string
 }
 

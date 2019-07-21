@@ -2,7 +2,6 @@ package dom
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/mb0/xelf/cor"
@@ -99,7 +98,6 @@ func Relate(pro *Project) (Relations, error) {
 			}
 		}
 		if len(bs) < 2 {
-			log.Printf("got %d rels for %s, %v", len(bs), rel.Model.Qualified(), rel.Out)
 			continue
 		}
 		// TODO add intermediate relation for all combinations
