@@ -36,9 +36,25 @@ func New(db *pgx.ConnPool, proj *dom.Project) *Backend {
 	return &Backend{DB: db, Record: mig.Record{Project: proj}, tables: tables}
 }
 
+func (b *Backend) Exec(c *exp.Ctx, env exp.Env, d *qry.Doc) (*qry.Result, error) {
+	p, err := Analyse(d)
+	if err != nil {
+		return nil, err
+	}
+	res := qry.NewResult(d)
+	ctx := &execer{b, c, &qry.ExecEnv{env, d, res}, res, nil}
+	for _, j := range p.Jobs {
+		err := ctx.execJob(j, res.Data)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
 var _ mig.Dataset = (*Backend)(nil)
 
-// Close just implements dataset interface and does not close the underlying connection pool.
+// Close satisfies the dataset interface but does not close the underlying connection pool.
 func (b *Backend) Close() error { return nil }
 
 func (b *Backend) Keys() []string {
@@ -55,25 +71,6 @@ func (b *Backend) Iter(key string) (mig.Iter, error) {
 		return openRowsIter(b.DB, m)
 	}
 	return nil, cor.Errorf("no table with key %s", key)
-}
-
-func (b *Backend) ExecPlan(c *exp.Ctx, env exp.Env, p *qry.Plan) (*qry.Result, error) {
-	res := qry.NewResult(p)
-	ctx := ctx{b, c, &qry.ExecEnv{env, p, res}, res}
-	for _, t := range p.Root {
-		err := execTask(ctx, t, res.Data)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return res, nil
-}
-
-type ctx struct {
-	*Backend
-	*exp.Ctx
-	exp.Env
-	*qry.Result
 }
 
 func openRowsIter(db *pgx.ConnPool, m *dom.Model) (*rowsIter, error) {

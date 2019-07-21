@@ -7,7 +7,6 @@ import (
 	"github.com/mb0/daql/gen/genpg"
 	"github.com/mb0/daql/qry"
 	"github.com/mb0/xelf/bfr"
-	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/exp"
 )
 
@@ -33,49 +32,110 @@ complex joins and sub selects probably have specialized SQL generation functions
 specifically directed by the plan execer.
 */
 
-func genQueryStr(c *exp.Ctx, env exp.Env, q *qry.Query) (string, error) {
+func genQueryStr(c *exp.Ctx, env exp.Env, j *Job) (_ string, err error) {
 	var sb strings.Builder
-	err := genQuery(&gen.Ctx{Ctx: bfr.Ctx{B: &sb}}, c, env, q)
+	b := &gen.Ctx{Ctx: bfr.Ctx{B: &sb}}
+	err = genSelect(b, c, env, j)
 	if err != nil {
 		return "", err
 	}
 	return sb.String(), nil
 }
 
-func genQuery(b *gen.Ctx, c *exp.Ctx, env exp.Env, q *qry.Query) error {
-	if q == nil {
-		return cor.Errorf("expression tasks not implemented")
-	}
+func genSelect(b *gen.Ctx, c *exp.Ctx, env exp.Env, j *Job) error {
+	prefix := j.Kind&(KindJoin|KindInline) != 0 || j.Parent != nil
 	b.WriteString("SELECT ")
-	if q.Ref[0] == '#' {
-		b.WriteString("COUNT(*)")
+	if j.IsScalar() {
+		sc := getScalarName(j.Query)
+		if j.Kind&KindCount != 0 {
+			if sc == "" {
+				sc = "*"
+			}
+			b.WriteString("COUNT(")
+			b.WriteString(sc)
+			b.WriteByte(')')
+		} else if j.Kind&KindJSON != 0 {
+			b.WriteString("jsonb_agg(")
+			if prefix {
+				b.WriteString(j.Alias[j.Task])
+				b.WriteByte('.')
+			}
+			b.WriteString(sc)
+			b.WriteByte(')')
+		} else {
+			if prefix {
+				b.WriteString(j.Alias[j.Task])
+				b.WriteByte('.')
+			}
+			b.WriteString(sc)
+		}
 	} else {
-		for i, s := range q.Sel {
+		jenv := &jobEnv{Job: j, Task: j.Task, Env: env, Prefix: prefix}
+		if j.Kind&KindJSON != 0 {
+			b.WriteString("jsonb_agg(_.*) FROM (SELECT ")
+		}
+		for i, col := range j.Cols {
 			if i > 0 {
 				b.WriteString(", ")
 			}
-			if s.Query != nil {
-				return cor.Errorf("unexpected sub query %v", s)
-			} else if s.Expr != nil {
-				err := genpg.WriteEl(b, env, s.Expr)
+			if col.Job.Kind&KindInlined != 0 && col.Job.Parent == j {
+				b.WriteByte('(')
+				err := genSelect(b, c, env, col.Job)
 				if err != nil {
 					return err
 				}
-				b.Fmt(" AS %s", strings.ToLower(s.Name))
-			} else { // must be table column
-				b.WriteString(strings.ToLower(s.Name))
+				b.WriteByte(')')
+				continue
 			}
+			if col.Expr != nil {
+				err := genpg.WriteEl(b, jenv, col.Expr)
+				if err != nil {
+					return err
+				}
+				continue
+			}
+			if prefix {
+				b.WriteString(j.Alias[col.Job.Task])
+				b.WriteByte('.')
+			}
+			b.WriteString(col.Key)
+		}
+		if j.Kind&KindJSON != 0 {
+			defer b.WriteString(") _")
 		}
 	}
 	b.WriteString(" FROM ")
-	b.WriteString(strings.ToLower(q.Ref[1:]))
-	if len(q.Whr.Els) > 0 {
-		b.WriteString(" WHERE ")
-		err := genpg.WriteEl(b, env, q.Whr.Els[0])
-		if err != nil {
-			return err
+	whr := make([]*qry.Task, 0, len(j.Tabs))
+	for i, tab := range j.Tabs {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(getTableName(tab.Query))
+		if prefix {
+			b.WriteByte(' ')
+			b.WriteString(j.Alias[tab])
+		}
+		if len(tab.Query.Whr.Els) > 0 {
+			whr = append(whr, tab)
 		}
 	}
+	if len(whr) != 0 {
+		b.WriteString(" WHERE ")
+		for i, w := range whr {
+			if i > 0 {
+				b.WriteString(" AND ")
+			}
+			wenv := &jobEnv{Job: j, Task: w, Env: env, Prefix: prefix}
+			err := genpg.WriteEl(b, wenv, w.Query.Whr.Els[0])
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return genQueryCommon(b, j.Query)
+}
+
+func genQueryCommon(b *gen.Ctx, q *qry.Query) error {
 	if len(q.Ord) > 0 {
 		b.WriteString(" ORDER BY ")
 		for i, ord := range q.Ord {
