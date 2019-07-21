@@ -62,9 +62,9 @@ func TestRender(t *testing.T) {
 			continue
 		}
 		var b strings.Builder
-		err = WriteEl(&gen.Ctx{Ctx: bfr.Ctx{B: &b}}, env, el)
+		err = WriteEl(&gen.Ctx{Ctx: bfr.Ctx{B: &b}}, ExpEnv{env}, el)
 		if err != nil {
-			t.Errorf("render %s err: %v", test.el, err)
+			t.Errorf("render %s err: %+v", test.el, err)
 			continue
 		}
 		got := b.String()

@@ -11,13 +11,25 @@ import (
 	"github.com/mb0/xelf/lit"
 )
 
+var External = cor.StrError("external symbol")
+
+type Env interface {
+	Translate(*exp.Sym) (string, lit.Lit, error)
+}
+
 // WriteEl writes the element e to b or returns an error.
 // This is used for explicit selectors for example.
-func WriteEl(b *gen.Ctx, env exp.Env, e exp.El) error {
+func WriteEl(b *gen.Ctx, env Env, e exp.El) error {
 	switch v := e.(type) {
 	case *exp.Sym:
-		// is this a column name?
-		return WriteRef(b, env, v)
+		n, l, err := env.Translate(v)
+		if err != nil {
+			return cor.Errorf("symbol %q: %w", v.Name, err)
+		}
+		if l != nil {
+			return WriteLit(b, v.Lit)
+		}
+		return writeIdent(b, n)
 	case *exp.Call:
 		return WriteExpr(b, env, v)
 	case *exp.Atom:
@@ -26,25 +38,11 @@ func WriteEl(b *gen.Ctx, env exp.Env, e exp.El) error {
 	return cor.Errorf("unexpected element %[1]T %[1]s", e)
 }
 
-// WriteRef writes the reference r to b using env or returns an error.
-// References can point schema objects like tables, enums and columns, or point inside composite
-// typed columns like arrays, jsonb or previous results. It uses env to determine how to render
-// the reference.
-func WriteRef(b *gen.Ctx, env exp.Env, r *exp.Sym) error {
-	// TODO we need check the name, but for now work with the key as is
-	name := r.Name
-	if name[0] == '.' {
-		name = name[1:]
-	}
-	b.WriteString(name)
-	return nil
-}
-
 // WriteExpr writes the expression e to b using env or returns an error.
 // Most xelf expressions with resolvers from the core or lib built-ins have a corresponding
 // expression in postgresql. Custom resolvers can be rendered to sql by detecting
 // and handling them before calling this function.
-func WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Call) error {
+func WriteExpr(b *gen.Ctx, env Env, e *exp.Call) error {
 	key := e.Spec.Key()
 	if key == "bool" {
 		key = ":bool"
@@ -59,7 +57,7 @@ func WriteExpr(b *gen.Ctx, env exp.Env, e *exp.Call) error {
 }
 
 type exprWriter interface {
-	WriteExpr(*gen.Ctx, exp.Env, *exp.Call) error
+	WriteExpr(*gen.Ctx, Env, *exp.Call) error
 }
 
 var exprWriterMap map[string]exprWriter
@@ -138,7 +136,7 @@ func writeArray(b *gen.Ctx, l lit.Appender) error {
 	}
 	bb.WriteByte('}')
 	WriteQuote(b, bb.String())
-	t, err := TypString(l.Element())
+	t, err := TypString(l.Typ().Elem())
 	if err != nil {
 		return err
 	}
