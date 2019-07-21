@@ -8,7 +8,14 @@ import (
 	"github.com/mb0/xelf/typ"
 )
 
-func execTask(c ctx, t *qry.Task, par lit.Proxy) error {
+type execer struct {
+	*Backend
+	*exp.Ctx
+	exp.Env
+	*qry.Result
+}
+
+func execTask(c execer, t *qry.Task, par lit.Proxy) error {
 	res, err := c.Prep(par, t)
 	if err != nil {
 		return err
@@ -19,7 +26,7 @@ func execTask(c ctx, t *qry.Task, par lit.Proxy) error {
 	return execQuery(c, t, res)
 }
 
-func execExpr(c ctx, t *qry.Task, res lit.Proxy) error {
+func execExpr(c execer, t *qry.Task, res lit.Proxy) error {
 	el, err := c.Resolve(c.Env, t.Expr, t.Type)
 	if err != nil {
 		return err
@@ -32,13 +39,13 @@ func execExpr(c ctx, t *qry.Task, res lit.Proxy) error {
 	return nil
 }
 
-func execQuery(c ctx, t *qry.Task, res lit.Proxy) error {
+func execQuery(c execer, t *qry.Task, res lit.Proxy) error {
 	model, rest := modelName(t.Query)
 	m := c.tables[model]
 	if m == nil {
 		return cor.Errorf("mem table %s not found in %v", model, c.tables)
 	}
-	whr, null, err := prepareWhr(c.Ctx, c.Env, t.Query)
+	whr, null, err := prepareWhr(t.Query)
 	if err != nil {
 		return err
 	}
@@ -48,6 +55,9 @@ func execQuery(c ctx, t *qry.Task, res lit.Proxy) error {
 		switch t.Query.Ref[0] {
 		case '?':
 			list, err = collectList(c, t, m, whr, rest)
+			if err != nil {
+				return cor.Errorf("qrymem: collect list %v", err)
+			}
 			if list.Len() != 0 {
 				l = list.Data[0]
 			} else {
@@ -70,7 +80,7 @@ func execQuery(c ctx, t *qry.Task, res lit.Proxy) error {
 	return nil
 }
 
-func collectSel(c ctx, tt *qry.Task, l lit.Lit, z lit.Proxy) error {
+func collectSel(c execer, tt *qry.Task, l lit.Lit, z lit.Proxy) error {
 	c.Env = &qry.TaskEnv{c.Env, c.Result, tt, l}
 	for _, t := range tt.Query.Sel {
 		if t.Query == nil && t.Expr == nil {
@@ -97,7 +107,7 @@ func collectSel(c ctx, tt *qry.Task, l lit.Lit, z lit.Proxy) error {
 	return nil
 }
 
-func collectList(c ctx, t *qry.Task, m *lit.List, whr exp.El, rest string) (*lit.List, error) {
+func collectList(c execer, t *qry.Task, m *lit.List, whr exp.El, rest string) (*lit.List, error) {
 	q := t.Query
 	rt := t.Type
 	if rt.Kind&typ.MaskElem == typ.KindList {
@@ -156,7 +166,7 @@ func collectList(c ctx, t *qry.Task, m *lit.List, whr exp.El, rest string) (*lit
 	return &lit.List{Elem: rt, Data: result}, nil
 }
 
-func collectCount(c ctx, t *qry.Task, m *lit.List, whr exp.El) (lit.Lit, error) {
+func collectCount(c execer, t *qry.Task, m *lit.List, whr exp.El) (lit.Lit, error) {
 	// we can ignore order and selection completely
 	var result int64
 	if whr == nil {

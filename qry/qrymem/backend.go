@@ -52,23 +52,16 @@ func (b *Backend) Add(m *dom.Model, list *lit.List) error {
 	return nil
 }
 
-func (b *Backend) ExecPlan(c *exp.Ctx, env exp.Env, p *qry.Plan) (*qry.Result, error) {
+func (b *Backend) Exec(c *exp.Ctx, env exp.Env, p *qry.Doc) (*qry.Result, error) {
 	res := qry.NewResult(p)
-	ctx := ctx{b, c, &qry.ExecEnv{env, p, res}, res}
+	e := execer{b, c, &qry.ExecEnv{env, p, res}, res}
 	for _, t := range p.Root {
-		err := execTask(ctx, t, res.Data)
+		err := execTask(e, t, res.Data)
 		if err != nil {
 			return nil, err
 		}
 	}
 	return res, nil
-}
-
-type ctx struct {
-	*Backend
-	*exp.Ctx
-	exp.Env
-	*qry.Result
 }
 
 type listIter struct {

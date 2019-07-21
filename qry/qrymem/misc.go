@@ -14,7 +14,7 @@ import (
 
 var boolSpeck = std.Core(":bool")
 
-func prepareWhr(c *exp.Ctx, env exp.Env, q *qry.Query) (x exp.El, null bool, _ error) {
+func prepareWhr(q *qry.Query) (x exp.El, null bool, _ error) {
 	if q.Whr == nil || len(q.Whr.Els) == 0 {
 		return nil, false, nil
 	}
@@ -24,14 +24,7 @@ func prepareWhr(c *exp.Ctx, env exp.Env, q *qry.Query) (x exp.El, null bool, _ e
 	if x == nil {
 		x = &exp.Call{Spec: boolSpeck, Args: q.Whr.Els}
 	}
-	res, err := c.With(true, false).Resolve(env, x, c.New())
-	if err != nil {
-		if err != exp.ErrUnres {
-			return nil, false, err
-		}
-		return res.(*exp.Call), false, nil
-	}
-	return nil, res.(*exp.Atom).Lit != lit.True, nil
+	return x, false, nil
 }
 
 func orderResult(list []lit.Lit, sel []qry.Ord) (res error) {
