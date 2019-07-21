@@ -27,7 +27,7 @@ type Ledger interface {
 	Events(whr exp.Dyn, param lit.Lit) ([]*Event, error)
 	// Query executes the query plan on the audits and events or the latest state if supported
 	// and returns the result or an error.
-	Query(q *qry.Plan, param lit.Lit) (lit.Lit, error)
+	Query(q *qry.Doc, param lit.Lit) (lit.Lit, error)
 }
 
 // Publisher is a ledger that can publish transactions.

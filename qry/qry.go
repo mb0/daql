@@ -8,7 +8,7 @@ import (
 )
 
 type Backend interface {
-	ExecPlan(*exp.Ctx, exp.Env, *Plan) (*Result, error)
+	Exec(*exp.Ctx, exp.Env, *Doc) (*Result, error)
 }
 
 // TaskInfo holds task details during query execution.
@@ -23,13 +23,13 @@ type Result struct {
 	Info map[*Task]TaskInfo
 }
 
-func NewResult(p *Plan) *Result {
-	t, opt := p.Type.Deopt()
+func NewResult(d *Doc) *Result {
+	t, opt := d.Type.Deopt()
 	data := lit.ZeroProxy(t)
 	if opt {
 		data = lit.SomeProxy{data}
 	}
-	return &Result{data, make(map[*Task]TaskInfo, len(p.Root)*3)}
+	return &Result{data, make(map[*Task]TaskInfo, len(d.Root)*3)}
 }
 
 func (r *Result) Prep(parent lit.Proxy, t *Task) (lit.Proxy, error) {
@@ -54,8 +54,11 @@ func (r *Result) SetDone(t *Task, val lit.Proxy) {
 	n.Done = true
 	r.Info[t] = n
 }
+func (r *Result) IsDone(t *Task) bool {
+	return r.Info[t].Done
+}
 
-func (p *Plan) Find(name string) *Task {
+func (p *Doc) Find(name string) *Task {
 	for _, t := range p.Root {
 		if t.Name == name {
 			return t
@@ -64,7 +67,7 @@ func (p *Plan) Find(name string) *Task {
 	return nil
 }
 
-func RootTask(p *Plan, path string) (*Task, lit.Path, error) {
+func RootTask(p *Doc, path string) (*Task, lit.Path, error) {
 	if path == "" || path == "/" {
 		return nil, nil, cor.Errorf("task not found %s", path)
 	}
@@ -82,7 +85,7 @@ func RootTask(p *Plan, path string) (*Task, lit.Path, error) {
 	return t, lp[1:], nil
 }
 
-func (p *Plan) Resolve(c *exp.Ctx, env exp.Env, x *exp.Call, hint typ.Type) (exp.El, error) {
+func (p *Doc) Resolve(c *exp.Ctx, env exp.Env, x *exp.Call, hint typ.Type) (exp.El, error) {
 	if !c.Exec {
 		return x, exp.ErrExec
 	}
@@ -90,7 +93,7 @@ func (p *Plan) Resolve(c *exp.Ctx, env exp.Env, x *exp.Call, hint typ.Type) (exp
 	if qenv == nil && qenv.Backend == nil {
 		return nil, cor.Errorf("no qry backend configured for query %s", x)
 	}
-	res, err := qenv.Backend.ExecPlan(c, env, p)
+	res, err := qenv.Backend.Exec(c, env, p)
 	if err != nil {
 		return nil, err
 	}

@@ -1,14 +1,15 @@
 (schema 'qry'
 
 (+Task :doc `
-Task is a unit of work as a part of a greater query plan. Root tasks are either expression or
-query tasks. Expression tasks consist of a xelf expressions, that cannot query the data source,
-but can reference results of previous tasks. Query tasks do access the data source, and may have
-a list of explicit selection tasks. The selection tasks can have only simple field names or an
+Task is a unit of work as a part of a query document. Root tasks are either expression or query
+tasks. Expression tasks consist of a xelf expressions, that cannot query the data source, but
+can reference results of previous tasks. Query tasks do access the data source, and may have a
+list of explicit selection tasks. The selection tasks can have only simple field names or an
 expression or sub query. In effect building a tree of queries.`
 	+Name    str
 	+Expr?   ~expr
 	+Query?  @Query?
+	+Parent? @Task?
 	+Type?   ~typ :doc `
 		Type is the task's result type or void if not yet resolved.`)
 
@@ -29,8 +30,8 @@ expression or sub query. In effect building a tree of queries.`
 	+Lim? int
 	+Sel? list|@Task?)
 
-(+Plan :doc `
-Plan represents a whole query request, consisting of one or more tasks.`
+(+Doc :doc `
+Doc represents a whole query document, consisting of one or more tasks.`
 	+Root  list|@Task?
 	+Type? ~typ)
 )

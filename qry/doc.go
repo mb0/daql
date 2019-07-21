@@ -45,12 +45,12 @@ This would allow conditional queries or post processing of query results.
 	+mats #prod.cat (eq .kind 'material')
 
 	(() a field mapping can be used to filter or rename fields)
-	(+infoLabel *label.label +id +label ('Label: ' .name))
-	(+leanLabel *label.label -tmpl (() when sub starts with a - decl '+' is implied))
+	+infoLabel (*label.label +id +label ('Label: ' .name))
+	+leanLabel (*label.label -tmpl (() when sub starts with a - decl '+' is implied))
 
 	(() Select nested queries. The '+' includes all fields. The '..id' refers to the parent id)
-	(+nest ?prod.cat (eq .name $name)
-		+ +prods *prod.prod (eq .cat ..id) :asc .name (:: +id +name)
+	+nest (?prod.cat (eq .name $name) +
+		+prods (*prod.prod (eq .cat ..id) :asc .name  +id +name)
 	)
 	(() Previous results can be used in the query)
 	+top10prods *prod.prod (in .cat /top10/id) :asc .name

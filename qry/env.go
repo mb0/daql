@@ -50,21 +50,21 @@ func (qe *QryEnv) Get(sym string) *exp.Def {
 	return nil
 }
 
-type PlanEnv struct {
+type DocEnv struct {
 	Par exp.Env
-	*Plan
+	*Doc
 }
 
-func (pe *PlanEnv) Parent() exp.Env      { return pe.Par }
-func (pe *PlanEnv) Supports(x byte) bool { return x == '/' }
-func (pe *PlanEnv) Get(sym string) *exp.Def {
+func (de *DocEnv) Parent() exp.Env      { return de.Par }
+func (de *DocEnv) Supports(x byte) bool { return x == '/' }
+func (de *DocEnv) Get(sym string) *exp.Def {
 	if sym[0] != '/' {
 		return nil
 	}
 	if len(sym) == 1 {
-		return &exp.Def{Type: pe.Type}
+		return &exp.Def{Type: de.Type}
 	}
-	t, path, err := RootTask(pe.Plan, sym)
+	t, path, err := RootTask(de.Doc, sym)
 	if err != nil {
 		return nil
 	}
@@ -77,7 +77,7 @@ func (pe *PlanEnv) Get(sym string) *exp.Def {
 
 type ExecEnv struct {
 	Par exp.Env
-	*Plan
+	*Doc
 	*Result
 }
 
@@ -90,7 +90,7 @@ func (ee *ExecEnv) Get(sym string) *exp.Def {
 	if len(sym) == 1 {
 		return exp.NewDef(ee.Data)
 	}
-	t, path, err := RootTask(ee.Plan, sym)
+	t, path, err := RootTask(ee.Doc, sym)
 	if err != nil {
 		return nil
 	}
@@ -112,43 +112,82 @@ type TaskEnv struct {
 	Param lit.Lit
 }
 
-func (s *TaskEnv) Parent() exp.Env      { return s.Par }
-func (s *TaskEnv) Supports(x byte) bool { return x == '.' }
-func (s *TaskEnv) Get(sym string) *exp.Def {
+func (te *TaskEnv) Parent() exp.Env      { return te.Par }
+func (te *TaskEnv) Supports(x byte) bool { return x == '.' }
+func (te *TaskEnv) Get(sym string) *exp.Def {
 	if sym[0] != '.' {
 		return nil
 	}
 	sym = sym[1:]
-	if s.Query != nil {
-		for _, t := range s.Query.Sel {
+	if te.Query != nil {
+		for _, t := range te.Query.Sel {
 			if t.Name != sym {
 				continue
 			}
-			if s.Result != nil {
-				nfo := s.Result.Info[t]
+			if te.Result != nil {
+				nfo := te.Result.Info[t]
 				if nfo.Done {
 					return exp.NewDef(nfo.Data)
 				}
 			}
 			return &exp.Def{Type: t.Type}
 		}
-		if s.Param != nil {
-			l, err := lit.Select(s.Param, sym)
+		if te.Param != nil {
+			l, err := lit.Select(te.Param, sym)
 			if err == nil {
 				return exp.NewDef(l)
 			}
 		} else {
 			// otherwise check query result type
-			p, _, err := s.Query.Type.ParamByKey(sym)
+			p, _, err := te.Query.Type.ParamByKey(sym)
+			if err == nil {
+				return &exp.Def{Type: p.Type}
+			}
+		}
+	}
+	if te.Task.Parent != nil {
+		p, _, err := te.Task.Parent.Type.ParamByKey(sym)
+		if err == nil {
+			return &exp.Def{Type: p.Type}
+		}
+		if te.Task.Parent.Query != nil {
+			p, _, err = te.Task.Parent.Query.Type.ParamByKey(sym)
 			if err == nil {
 				return &exp.Def{Type: p.Type}
 			}
 		}
 	}
 	// resolves to result from result type
-	p, _, err := s.Type.ParamByKey(sym)
+	p, _, err := te.Type.ParamByKey(sym)
 	if err == nil {
 		return &exp.Def{Type: p.Type}
+	}
+	return nil
+}
+
+type SelEnv struct {
+	Par exp.Env
+	*Task
+}
+
+func (se *SelEnv) Parent() exp.Env      { return se.Par }
+func (se *SelEnv) Supports(x byte) bool { return x == '.' }
+func (se *SelEnv) Get(sym string) *exp.Def {
+	if sym[0] != '.' {
+		return nil
+	}
+	sym = sym[1:]
+	// resolves to result from query type
+	p, _, err := se.Query.Type.ParamByKey(sym)
+	if err == nil || err == exp.ErrUnres {
+		return &exp.Def{Type: p.Type}
+	}
+	// otherwise check previous selection
+	for _, t := range se.Query.Sel {
+		if t.Name != sym {
+			continue
+		}
+		return &exp.Def{Type: t.Type}
 	}
 	return nil
 }
