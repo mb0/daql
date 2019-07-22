@@ -79,7 +79,7 @@ func resolveSchema(c *exp.Ctx, env exp.Env, s *Schema, lo *exp.Layout) (utl.Node
 	for _, d := range decls {
 		name := d.Name[1:]
 		m := &Model{
-			Common: Common{Name: name}, schema: qual,
+			Common: Common{Name: name}, Schema: qual,
 			Type: typ.Type{typ.KindObj, &typ.Info{
 				Ref: qual + "." + name,
 			}},
@@ -115,13 +115,13 @@ func resolveModel(c *exp.Ctx, env *SchemaEnv, m *Model, args []exp.El) error {
 		return err
 	}
 	for _, d := range decls {
-		switch m.Kind {
+		switch m.Type.Kind {
 		case typ.KindBits, typ.KindEnum:
 			_, err = resolveConst(c, menv, d)
 		case typ.KindObj, typ.KindFunc:
 			_, err = resolveField(c, menv, d)
 		default:
-			err = cor.Errorf("unexpected model kind %s", m.Kind)
+			err = cor.Errorf("unexpected model kind %s", m.Type.Kind)
 		}
 		if err != nil {
 			return err
@@ -141,19 +141,19 @@ var modelRules = utl.TagRules{
 	IdxKeyer: utl.OffsetKeyer(2),
 	KeyRule:  utl.KeyRule{KeySetter: utl.ExtraMapSetter("extra")},
 	Rules: map[string]utl.KeyRule{
-		"typ": {typPrepper, typSetter},
-		"idx": {idxPrepper, idxSetter},
+		"type": {typPrepper, typSetter},
+		"idx":  {idxPrepper, idxSetter},
 	},
 }
 var defaultRules utl.TagRules
 
 func resolveConst(c *exp.Ctx, env *ModelEnv, n *exp.Named) (lit.Lit, error) {
-	d, err := resolveConstVal(c, env, n.Args(), len(env.Model.Consts))
+	d, err := resolveConstVal(c, env, n.Args(), len(env.Model.Type.Consts))
 	if err != nil {
 		return nil, cor.Errorf("resolve const val: %w", err)
 	}
 	m := env.Model
-	m.Consts = append(m.Consts, typ.Const{n.Name[1:], int64(d)})
+	m.Type.Consts = append(m.Type.Consts, typ.Const{n.Name[1:], int64(d)})
 	m.Elems = append(m.Elems, &Elem{})
 	return m.Type, nil
 }
@@ -162,7 +162,7 @@ func resolveConstVal(c *exp.Ctx, env *ModelEnv, args []exp.El, idx int) (_ lit.I
 	var el exp.El
 	switch len(args) {
 	case 0:
-		if env.Model.Kind&typ.MaskRef == typ.KindBits {
+		if env.Model.Type.Kind&typ.MaskRef == typ.KindBits {
 			return lit.Int(1 << uint64(idx)), nil
 		}
 		return lit.Int(idx) + 1, nil
@@ -194,7 +194,7 @@ var fieldRules = utl.TagRules{
 		"ordr": bitRule,
 		"auto": bitRule,
 		"ro":   bitRule,
-		"typ":  {KeyPrepper: typPrepper, KeySetter: typSetter},
+		"type": {KeyPrepper: typPrepper, KeySetter: typSetter},
 	},
 	KeyRule: utl.KeyRule{KeySetter: utl.ExtraMapSetter("extra")},
 }
@@ -210,7 +210,7 @@ func resolveField(c *exp.Ctx, env *ModelEnv, n *exp.Named) (lit.Lit, error) {
 	}
 	m := env.Model
 	m.Elems = append(m.Elems, el)
-	m.Params = append(m.Params, p)
+	m.Type.Params = append(m.Type.Params, p)
 	return p.Type, nil
 }
 

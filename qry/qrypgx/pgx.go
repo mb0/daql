@@ -80,7 +80,7 @@ func DropProject(db *pgx.ConnPool, p *dom.Project) error {
 }
 
 func CreateModel(tx *pgx.Tx, s *dom.Schema, m *dom.Model) error {
-	switch m.Kind {
+	switch m.Type.Kind {
 	case typ.KindBits:
 		return nil
 	case typ.KindEnum:
@@ -93,7 +93,7 @@ func CreateModel(tx *pgx.Tx, s *dom.Schema, m *dom.Model) error {
 		// TODO indices
 		return nil
 	}
-	return cor.Errorf("unexpected model kind %s", m.Kind)
+	return cor.Errorf("unexpected model kind %s", m.Type.Kind)
 }
 
 func createModel(tx *pgx.Tx, m *dom.Model, f func(*gen.Ctx, *dom.Model) error) error {
@@ -185,8 +185,8 @@ func (c *litCopySrc) Err() error {
 }
 
 func modelColumns(m *dom.Model) []string {
-	res := make([]string, 0, len(m.Params))
-	for _, p := range m.Params {
+	res := make([]string, 0, len(m.Type.Params))
+	for _, p := range m.Type.Params {
 		res = append(res, p.Key())
 	}
 	return res

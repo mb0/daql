@@ -10,51 +10,9 @@ import (
 	"github.com/mb0/xelf/typ"
 )
 
-// Bit is a bit set used for a number of field options.
-type Bit uint64
-
-const (
-	BitOpt = 1 << iota
-	BitPK
-	BitIdx
-	BitUniq
-	BitOrdr
-	BitAuto
-	BitRO
-)
-
 func (Bit) Bits() map[string]int64 { return bitConsts }
 
-// Keys is a slice of field keys used for indices and order.
-type Keys = []string
-
-// Elem holds additional information for either constants or type paramters.
-type Elem struct {
-	Bits  Bit       `json:"bits,omitempty"`
-	Extra *lit.Dict `json:"extra,omitempty"`
-	Ref   string    `json:"ref,omitempty"`
-}
-
-// Index represents a record model index, mainly used for databases.
-type Index struct {
-	Name   string `json:"name,omitempty"`
-	Keys   Keys   `json:"keys"`
-	Unique bool   `json:"unique,omitempty"`
-}
-
-// Common represents the common name and version of model, schema or project nodes.
-type Common struct {
-	Name  string    `json:"name,omitempty"`
-	Extra *lit.Dict `json:"extra,omitempty"`
-	key   string
-}
-
-func (c *Common) Key() string {
-	if c.key == "" && c.Name != "" {
-		c.key = strings.ToLower(c.Name)
-	}
-	return c.key
-}
+func (c *Common) Key() string { return strings.ToLower(c.Name) }
 
 type Node interface {
 	Qualified() string
@@ -62,47 +20,10 @@ type Node interface {
 	WriteBfr(b *bfr.Ctx) error
 }
 
-// Model represents either a bits, enum or record type and has extra domain information.
-type Model struct {
-	Common
-	typ.Type `json:"typ"`
-	Elems    []*Elem `json:"elems,omitempty"`
-	Object   *Object `json:"rec,omitempty"`
-	schema   string
-}
-
-// Object holds data specific to object types for grouping.
-type Object struct {
-	Indices []*Index `json:"indices,omitempty"`
-	OrderBy Keys     `json:"orderby,omitempty"`
-	// TODO add triggers and references
-
-}
-
-func (m *Model) Qual() string      { return m.schema }
-func (m *Model) Qualified() string { return fmt.Sprintf("%s.%s", m.schema, m.Key()) }
-
-// Schema is a namespace for models.
-type Schema struct {
-	Common
-	Path   string   `json:"path,omitempty"`
-	Use    Keys     `json:"use,omitempty"`
-	Models []*Model `json:"models"`
-}
+func (m *Model) Qual() string      { return m.Schema }
+func (m *Model) Qualified() string { return fmt.Sprintf("%s.%s", m.Schema, m.Key()) }
 
 func (s *Schema) Qualified() string { return s.Key() }
-
-// Project is a collection of schemas and is the central place for any extra project configuration.
-//
-// The schema definition can either be declared as part of the project file, or included from an
-// external schema file. Includes should have syntax to filtering the included schema definition.
-//
-// Extra setting, usually include, but are not limited to, targets and output paths for code
-// generation, paths to look for the project's manifest and history.
-type Project struct {
-	Common
-	Schemas []*Schema `json:"schemas"`
-}
 
 func (p *Project) Qualified() string { return fmt.Sprintf("_%s", p.Key()) }
 
@@ -147,9 +68,9 @@ type ConstElem struct {
 // Const returns a constant element for key or nil.
 func (m *Model) Const(key string) ConstElem {
 	if m != nil {
-		for i, c := range m.Consts {
+		for i, c := range m.Type.Consts {
 			if c.Key() == key {
-				return ConstElem{&m.Consts[i], m.Elems[i]}
+				return ConstElem{&m.Type.Consts[i], m.Elems[i]}
 			}
 		}
 	}
@@ -164,22 +85,22 @@ type FieldElem struct {
 // Field returns a field element for key or nil.
 func (m *Model) Field(key string) FieldElem {
 	if m != nil {
-		_, i, err := m.ParamByKey(key)
+		_, i, err := m.Type.ParamByKey(key)
 		if err == nil {
-			return FieldElem{&m.Params[i], m.Elems[i]}
+			return FieldElem{&m.Type.Params[i], m.Elems[i]}
 		}
 	}
 	return FieldElem{}
 }
 
 var bitConsts = map[string]int64{
-	"Opt":  BitOpt,
-	"PK":   BitPK,
-	"Idx":  BitIdx,
-	"Uniq": BitUniq,
-	"Ordr": BitOrdr,
-	"Auto": BitAuto,
-	"RO":   BitRO,
+	"Opt":  int64(BitOpt),
+	"PK":   int64(BitPK),
+	"Idx":  int64(BitIdx),
+	"Uniq": int64(BitUniq),
+	"Ordr": int64(BitOrdr),
+	"Auto": int64(BitAuto),
+	"RO":   int64(BitRO),
 }
 
 func setNode(n *Common, x lit.Keyed) error {
@@ -209,7 +130,7 @@ func addElemFromDict(m *Model, d *lit.Dict) error {
 			c.Val = int64(x.Lit.(lit.Numeric).Num())
 		case "ref":
 			el.Ref = x.Lit.(lit.Character).Char()
-		case "typ":
+		case "type":
 			t, err := typ.ParseSym(x.Lit.(lit.Character).Char(), nil)
 			if err != nil {
 				return err
@@ -225,23 +146,23 @@ func addElemFromDict(m *Model, d *lit.Dict) error {
 			return err
 		}
 	}
-	if m.Kind&typ.KindPrim != 0 {
-		m.Consts = append(m.Consts, c)
+	if m.Type.Kind&typ.KindPrim != 0 {
+		m.Type.Consts = append(m.Type.Consts, c)
 	} else {
-		m.Params = append(m.Params, p)
+		m.Type.Params = append(m.Type.Params, p)
 	}
 	m.Elems = append(m.Elems, &el)
 	return nil
 }
 
 func (m *Model) FromDict(d *lit.Dict) (err error) {
-	if m.Info == nil {
+	if m.Type.Info == nil {
 		m.Type.Kind = typ.KindObj
-		m.Info = &typ.Info{}
+		m.Type.Info = &typ.Info{}
 	}
 	for _, x := range d.List {
 		switch x.Key {
-		case "typ":
+		case "type":
 			t, err := typ.ParseSym(x.Lit.(lit.Character).Char(), nil)
 			if err != nil {
 				return err
@@ -255,7 +176,7 @@ func (m *Model) FromDict(d *lit.Dict) (err error) {
 			if len(m.Elems) == 0 {
 				n := idx.Len()
 				m.Elems = make([]*Elem, 0, n)
-				m.Params = make([]typ.Param, 0, n)
+				m.Type.Params = make([]typ.Param, 0, n)
 			}
 			err = idx.IterIdx(func(i int, el lit.Lit) error {
 				return addElemFromDict(m, el.(*lit.Dict))
@@ -273,29 +194,29 @@ func (m *Model) String() string { return bfr.String(m) }
 func (m *Model) WriteBfr(b *bfr.Ctx) error {
 	b.WriteString("{name:")
 	b.Quote(m.Name)
-	b.WriteString(" typ:")
-	b.Quote(m.Kind.String())
+	b.WriteString(" type:")
+	b.Quote(m.Type.Kind.String())
 	b.WriteString(" elems:[")
 	for i, e := range m.Elems {
 		if i > 0 {
 			b.WriteByte(' ')
 		}
 		b.WriteByte('{')
-		if len(m.Params) > 0 {
-			p := m.Params[i]
+		if len(m.Type.Params) > 0 {
+			p := m.Type.Params[i]
 			if p.Name != "" {
 				b.WriteString("name:")
 				b.Quote(p.Name)
 				b.WriteByte(' ')
 			}
-			b.WriteString("typ:")
+			b.WriteString("type:")
 			if p.Kind&typ.KindCtx != 0 {
 				b.Quote("~" + p.Ref)
 			} else {
 				b.Quote(p.Type.String())
 			}
-		} else if len(m.Consts) > 0 {
-			c := m.Consts[i]
+		} else if len(m.Type.Consts) > 0 {
+			c := m.Type.Consts[i]
 			if c.Name != "" {
 				b.WriteString("name:")
 				b.Quote(string(c.Name))
@@ -334,9 +255,9 @@ func (s *Schema) FromDict(d *lit.Dict) (err error) {
 			}
 			err = idx.IterIdx(func(i int, el lit.Lit) error {
 				var m Model
-				m.schema = s.Key()
+				m.Schema = s.Key()
 				err := m.FromDict(el.(*lit.Dict))
-				m.Ref = m.schema + "." + m.Name
+				m.Type.Ref = m.Schema + "." + m.Name
 				s.Models = append(s.Models, &m)
 				return err
 			})

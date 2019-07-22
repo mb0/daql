@@ -21,7 +21,7 @@ func TestDom(t *testing.T) {
 		},
 
 		{`(schema 'test' (+Dir bits +North +East +South +West))`,
-			`{name:'test' models:[{name:'Dir' typ:'bits' elems:[` +
+			`{name:'test' models:[{name:'Dir' type:'bits' elems:[` +
 				`{name:'North' val:1} {name:'East' val:2} ` +
 				`{name:'South' val:4} {name:'West' val:8}]` +
 				`}]}`,
@@ -37,7 +37,7 @@ func TestDom(t *testing.T) {
 				Elems: []*Elem{{}, {}, {}, {}},
 			}}}},
 		{`(schema 'test' (+Dir enum +North +East +South +West))`,
-			`{name:'test' models:[{name:'Dir' typ:'enum' elems:[` +
+			`{name:'test' models:[{name:'Dir' type:'enum' elems:[` +
 				`{name:'North' val:1} {name:'East' val:2} ` +
 				`{name:'South' val:3} {name:'West' val:4}]` +
 				`}]}`,
@@ -53,8 +53,8 @@ func TestDom(t *testing.T) {
 				Elems: []*Elem{{}, {}, {}, {}},
 			}}}},
 		{`(schema 'test' (+Named :prop "something" +Name str))`,
-			`{name:'test' models:[{name:'Named' typ:'obj' ` +
-				`elems:[{name:'Name' typ:'str'}] ` +
+			`{name:'test' models:[{name:'Named' type:'obj' ` +
+				`elems:[{name:'Name' type:'str'}] ` +
 				`prop:'something'}]}`,
 			&Schema{Common: Common{Name: "test"}, Models: []*Model{{
 				Common: Common{Name: "Named",
@@ -69,8 +69,8 @@ func TestDom(t *testing.T) {
 				Elems: []*Elem{{}},
 			}}}},
 		{`(schema 'test' (+Named :prop :doc "something" +Name str))`,
-			`{name:'test' models:[{name:'Named' typ:'obj' ` +
-				`elems:[{name:'Name' typ:'str'}] ` +
+			`{name:'test' models:[{name:'Named' type:'obj' ` +
+				`elems:[{name:'Name' type:'str'}] ` +
 				`prop:true doc:'something'}]}`,
 			&Schema{Common: Common{Name: "test"}, Models: []*Model{{
 				Common: Common{Name: "Named",
@@ -86,8 +86,8 @@ func TestDom(t *testing.T) {
 				Elems: []*Elem{{}},
 			}}}},
 		{`(schema 'test' (+Point +X int +Y int))`,
-			`{name:'test' models:[{name:'Point' typ:'obj' ` +
-				`elems:[{name:'X' typ:'int'} {name:'Y' typ:'int'}]}]}`,
+			`{name:'test' models:[{name:'Point' type:'obj' ` +
+				`elems:[{name:'X' type:'int'} {name:'Y' type:'int'}]}]}`,
 			&Schema{Common: Common{Name: "test"}, Models: []*Model{{
 				Common: Common{Name: "Point"},
 				Type: typ.Type{typ.KindObj, &typ.Info{
@@ -100,8 +100,8 @@ func TestDom(t *testing.T) {
 				Elems: []*Elem{{}, {}},
 			}}}},
 		{`(schema 'test' (+Named +ID uuid :pk +Name str))`,
-			`{name:'test' models:[{name:'Named' typ:'obj' elems:[` +
-				`{name:'ID' typ:'uuid' bits:2} {name:'Name' typ:'str'}]}]}`,
+			`{name:'test' models:[{name:'Named' type:'obj' elems:[` +
+				`{name:'ID' type:'uuid' bits:2} {name:'Name' type:'str'}]}]}`,
 			&Schema{Common: Common{Name: "test"}, Models: []*Model{{
 				Common: Common{Name: "Named"},
 				Type: typ.Type{typ.KindObj, &typ.Info{
@@ -114,8 +114,8 @@ func TestDom(t *testing.T) {
 				Elems: []*Elem{{Bits: BitPK}, {}},
 			}}}},
 		{`(schema 'test' (+Foo +A str) (+Bar +B str))`, `{name:'test' models:[` +
-			`{name:'Foo' typ:'obj' elems:[{name:'A' typ:'str'}]} ` +
-			`{name:'Bar' typ:'obj' elems:[{name:'B' typ:'str'}]}]}`,
+			`{name:'Foo' type:'obj' elems:[{name:'A' type:'str'}]} ` +
+			`{name:'Bar' type:'obj' elems:[{name:'B' type:'str'}]}]}`,
 			&Schema{Common: Common{Name: "test"}, Models: []*Model{{
 				Common: Common{Name: "Foo"},
 				Type: typ.Type{typ.KindObj, &typ.Info{
@@ -134,9 +134,9 @@ func TestDom(t *testing.T) {
 				}},
 				Elems: []*Elem{{}},
 			}}}},
-		{`(schema 'test' (+Foo +A str) (+Bar +B ~test.Foo))`, `{name:'test' models:[` +
-			`{name:'Foo' typ:'obj' elems:[{name:'A' typ:'str'}]} ` +
-			`{name:'Bar' typ:'obj' elems:[{name:'B' typ:'~test.Foo'}]}]}`,
+		{`(schema 'test' (+Foo +A str) (+Bar +B @Foo))`, `{name:'test' models:[` +
+			`{name:'Foo' type:'obj' elems:[{name:'A' type:'str'}]} ` +
+			`{name:'Bar' type:'obj' elems:[{name:'B' type:'~test.Foo'}]}]}`,
 			&Schema{Common: Common{Name: "test"}, Models: []*Model{{
 				Common: Common{Name: "Foo"},
 				Type: typ.Type{typ.KindObj, &typ.Info{
@@ -158,10 +158,10 @@ func TestDom(t *testing.T) {
 			}}}},
 		{`(schema 'test' (+Group +ID str :pk) (+Entry +ID int :pk +Group str :ref '..group'))`,
 			`{name:'test' models:[` +
-				`{name:'Group' typ:'obj' elems:[{name:'ID' typ:'str' bits:2}]} ` +
-				`{name:'Entry' typ:'obj' elems:[` +
-				`{name:'ID' typ:'int' bits:2} ` +
-				`{name:'Group' typ:'str' ref:'..group'}]}]}`,
+				`{name:'Group' type:'obj' elems:[{name:'ID' type:'str' bits:2}]} ` +
+				`{name:'Entry' type:'obj' elems:[` +
+				`{name:'ID' type:'int' bits:2} ` +
+				`{name:'Group' type:'str' ref:'..group'}]}]}`,
 			&Schema{Common: Common{Name: "test"}, Models: []*Model{{
 				Common: Common{Name: "Group"},
 				Type: typ.Type{typ.KindObj, &typ.Info{
@@ -183,7 +183,7 @@ func TestDom(t *testing.T) {
 				Elems: []*Elem{{Bits: BitPK}, {Ref: "..group"}},
 			}}}},
 		{`(schema 'test' (+Spam func +Egg str + bool))`, `{name:'test' models:[` +
-			`{name:'Spam' typ:'func' elems:[{name:'Egg' typ:'str'} {typ:'bool'}]}]}`,
+			`{name:'Spam' type:'func' elems:[{name:'Egg' type:'str'} {type:'bool'}]}]}`,
 			&Schema{Common: Common{Name: "test"}, Models: []*Model{{
 				Common: Common{Name: "Spam"},
 				Type: typ.Type{typ.KindFunc, &typ.Info{

@@ -10,6 +10,7 @@ import (
 	"github.com/mb0/xelf/typ"
 )
 
+const barRaw = `(schema 'bar' (+Kind enum +X +Y +Z))`
 const fooRaw = `(schema 'foo'
 	(+Align bits
 		+A
@@ -22,14 +23,18 @@ const fooRaw = `(schema 'foo'
 	(+Node1 +Name? str)
 	(+Node2 +Start time)
 	(+Node3 +Kind  (bits 'bar.Kind'))
-	(+Node4 +Kind  (bits 'foo.Kind'))
+	(+Node4 +Kind  @Kind)
 )`
 
 func TestWriteFile(t *testing.T) {
 	env := dom.NewEnv(dom.Env, &dom.Project{})
+	_, err := dom.ExecuteString(env, barRaw)
+	if err != nil {
+		t.Fatalf("schema bar error %v", err)
+	}
 	s, err := dom.ExecuteString(env, fooRaw)
 	if err != nil {
-		t.Fatalf("schema error %v", err)
+		t.Fatalf("schema foo error %v", err)
 	}
 	tests := []struct {
 		model string

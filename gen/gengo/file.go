@@ -161,7 +161,7 @@ func DeclareType(c *gen.Ctx, m *dom.Model) (err error) {
 			c.Prepend(ch.Char(), "// ")
 		}
 	}
-	switch m.Kind {
+	switch m.Type.Kind {
 	case typ.KindBits:
 		c.WriteString("type ")
 		c.WriteString(m.Name)
@@ -180,18 +180,18 @@ func DeclareType(c *gen.Ctx, m *dom.Model) (err error) {
 		err = WriteType(c, t)
 		c.WriteByte('\n')
 	case typ.KindFunc:
-		last := len(m.Params) - 1
+		last := len(m.Type.Params) - 1
 		c.WriteString("type ")
 		c.WriteString(m.Name)
 		c.WriteString("Req ")
-		err = WriteType(c, typ.Rec(m.Params[:last]))
+		err = WriteType(c, typ.Rec(m.Type.Params[:last]))
 		if err != nil {
 			break
 		}
 		c.WriteString("\n\ntype ")
 		c.WriteString(m.Name)
 		c.WriteString("Res ")
-		res := m.Params[last].Type
+		res := m.Type.Params[last].Type
 		err = WriteType(c, typ.Rec([]typ.Param{
 			{Name: "Res?", Type: res},
 			{Name: "Err?", Type: typ.Str},
@@ -226,7 +226,7 @@ func (f %[1]sFunc) Serve(m *hub.Msg) interface{} {
 }
 `, m.Name, tmp.String())
 	default:
-		err = errors.Errorf("model kind %s cannot be declared", m.Kind)
+		err = errors.Errorf("model kind %s cannot be declared", m.Type.Kind)
 	}
 	return err
 }

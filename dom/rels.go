@@ -78,7 +78,7 @@ func Relate(pro *Project) (Relations, error) {
 	// TODO collect relaxed reference in the first iteration
 	for _, s := range pro.Schemas {
 		for _, m := range s.Models {
-			if !m.HasParams() { // is constant
+			if !m.Type.HasParams() { // is constant
 				continue
 			}
 			err := res.relate(pro, s, m)
@@ -109,7 +109,7 @@ func Relate(pro *Project) (Relations, error) {
 }
 
 func (res *Relations) relate(pro *Project, s *Schema, m *Model) error {
-	for i, p := range m.Params {
+	for i, p := range m.Type.Params {
 		rel := Relation{A: ModelRef{m, p.Key()}}
 		e := m.Elems[i]
 		if e.Ref != "" {

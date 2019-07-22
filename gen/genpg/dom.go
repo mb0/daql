@@ -33,7 +33,7 @@ func RenderFile(c *gen.Ctx, s *dom.Schema) (err error) {
 	c.WriteString(s.Name)
 	c.WriteString(";\n\n")
 	for _, m := range s.Models {
-		switch m.Kind {
+		switch m.Type.Kind {
 		case typ.KindBits:
 		case typ.KindEnum:
 			err = WriteEnum(c, m)
@@ -54,7 +54,7 @@ func WriteEnum(b *gen.Ctx, m *dom.Model) error {
 	b.WriteString(m.Type.Key())
 	b.WriteString(" AS ENUM (")
 	b.Indent()
-	for i, c := range m.Consts {
+	for i, c := range m.Type.Consts {
 		if i > 0 {
 			b.WriteByte(',')
 			if !b.Break() {
@@ -72,7 +72,7 @@ func WriteTable(b *gen.Ctx, m *dom.Model) error {
 	b.WriteString(m.Type.Key())
 	b.WriteString(" (")
 	b.Indent()
-	for i, p := range m.Params {
+	for i, p := range m.Type.Params {
 		if i > 0 {
 			b.WriteByte(',')
 			if !b.Break() {
@@ -125,7 +125,7 @@ func writeField(b *gen.Ctx, p typ.Param, el *dom.Elem) error {
 func embedField(b *gen.Ctx, t typ.Type) error {
 	split := strings.Split(t.Key(), ".")
 	m := b.Project.Schema(split[0]).Model(split[1])
-	for i, p := range m.Params {
+	for i, p := range m.Type.Params {
 		if i > 0 {
 			b.WriteByte(',')
 			if !b.Break() {

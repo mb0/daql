@@ -26,7 +26,7 @@ func New(db *pgx.ConnPool, proj *dom.Project) *Backend {
 	tables := make(map[string]*dom.Model, len(proj.Schemas)*8)
 	for _, s := range proj.Schemas {
 		for _, m := range s.Models {
-			if m.Kind == typ.KindObj {
+			if m.Type.Kind == typ.KindObj {
 				continue
 			}
 			// TODO check if model is actually part of the database
@@ -74,7 +74,7 @@ func (b *Backend) Iter(key string) (mig.Iter, error) {
 }
 
 func openRowsIter(db *pgx.ConnPool, m *dom.Model) (*rowsIter, error) {
-	res, err := lit.MakeRec(m.Typ())
+	res, err := lit.MakeRec(m.Type)
 	if err != nil {
 		return nil, err
 	}

@@ -108,11 +108,11 @@ func schemaElem(s *Schema, key string) *exp.Def {
 	if len(split) > 1 {
 		return modelElem(m, split[1])
 	}
-	return exp.NewDef(typ.Type{m.Kind, &typ.Info{Ref: m.Ref}})
+	return exp.NewDef(typ.Type{m.Type.Kind, &typ.Info{Ref: m.Type.Ref}})
 }
 
 func modelElem(m *Model, key string) *exp.Def {
-	if m.Kind&typ.KindPrim != 0 {
+	if m.Type.Kind&typ.KindPrim != 0 {
 		c := m.Const(key)
 		if c.Const != nil {
 			l := constLit(m, c.Const)
@@ -128,7 +128,7 @@ func modelElem(m *Model, key string) *exp.Def {
 }
 
 func constLit(m *Model, c *typ.Const) lit.Lit {
-	if m.Kind != typ.KindEnum {
+	if m.Type.Kind != typ.KindEnum {
 		return lit.BitsInt{m.Type, lit.Int(c.Val)}
 	}
 	return lit.EnumStr{m.Type, lit.Str(c.Key())}
