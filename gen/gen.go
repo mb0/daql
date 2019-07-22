@@ -44,9 +44,6 @@ func (c *Ctx) Prepend(text, prefix string) {
 		return
 	}
 	split := strings.Split(text, "\n")
-	if len(split) > 0 && split[0] == "" {
-		split = split[1:]
-	}
 	var ws int
 	for i, s := range split {
 		if i == 0 && s == "" && len(split) > 1 {
