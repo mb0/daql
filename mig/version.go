@@ -6,24 +6,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
-	"time"
 
 	"github.com/mb0/daql/dom"
 	"github.com/mb0/xelf/cor"
 )
-
-// Version contains essential details for a node to derive a new version number.
-//
-// The name is the node's qualified name, and date is an optional recording time. Vers is a positive
-// integer for known versions or zero if unknown. The hash is a lowercase hex string of an sha256
-// hash of the node's qualified name and its contents. For models the default string representation
-// is used as content, for schemas each model hash and for projects each schema hash.
-type Version struct {
-	Name string    `json:"name"`
-	Vers int64     `json:"vers"`
-	Date time.Time `json:"date,omitempty"`
-	Hash string    `json:"hash"`
-}
 
 // ReadVersion returns a version read from r or and error.
 func ReadVersion(r io.Reader) (v Version, err error) {
