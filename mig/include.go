@@ -31,40 +31,43 @@ func ResolveProject(path string) (*dom.Project, error) {
 		return nil, cor.Errorf("open project file %s: %v", path, err)
 	}
 	defer f.Close()
-	pr, err := dom.Read(f, nil)
+	var pr dom.Project
+	err = dom.Read(f, nil, &pr)
 	if err != nil {
 		return nil, err
 	}
 	pdir := filepath.Dir(path)
-	for _, s := range pr.Schemas {
+	for i, s := range pr.Schemas {
 		if inc := xstr(s.Extra, "inc", ""); inc != "" {
 			ipath := filepath.FromSlash(inc)
 			if !filepath.IsAbs(ipath) {
 				ipath = filepath.Join(pdir, ipath)
 			}
-			err = includeSchema(s, ipath, s.Name)
+			err = includeSchema(s, ipath, s.Name, pr.Schemas[:i])
 			if err != nil {
-				return nil, cor.Errorf("include %s not found: %w", inc, err)
+				return nil, err
 			}
 		}
 	}
-	return pr, nil
+	return &pr, nil
 }
 
-func includeSchema(s *dom.Schema, path, name string) error {
+func includeSchema(s *dom.Schema, path, name string, prev []*dom.Schema) error {
 	fi, err := os.Stat(path)
 	if err != nil {
-		return err
+		return cor.Errorf("include %s not found: %w", path, err)
 	}
 	if fi.IsDir() {
-		return includeSchema(s, filepath.Join(path, fmt.Sprintf("%s.daql", name)), name)
+		fpath := filepath.Join(path, fmt.Sprintf("%s.daql", name))
+		return includeSchema(s, fpath, name, prev)
 	}
 	f, err := os.Open(path)
 	if err != nil {
-		return err
+		return cor.Errorf("include %s not readable: %w", path, err)
 	}
 	defer f.Close()
-	pr, err := dom.Read(f, nil)
+	pr := &dom.Project{Schemas: prev}
+	err = dom.Read(f, nil, pr)
 	if err != nil {
 		return err
 	}

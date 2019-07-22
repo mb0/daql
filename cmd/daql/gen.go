@@ -60,12 +60,13 @@ func gogen(pr *Project, ss []*dom.Schema) error {
 	if err != nil {
 		return err
 	}
+	pkgs := gengo.DefaultPkgs()
 	for _, s := range pr.Schemas {
 		if nogen(s) {
 			continue
 		}
 		out := filepath.Join(schemaPath(pr, s), fmt.Sprintf("%s_gen.go", s.Name))
-		b := gengo.NewCtx(pr.Project, s.Name, path.Join(ppkg, s.Name))
+		b := gengo.NewCtxPkgs(pr.Project, s.Name, path.Join(ppkg, s.Name), pkgs)
 		err := gengo.WriteFile(b, out, s)
 		if err != nil {
 			return err

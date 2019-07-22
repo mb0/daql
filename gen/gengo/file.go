@@ -15,16 +15,23 @@ import (
 	"github.com/pkg/errors"
 )
 
+func DefaultPkgs() map[string]string {
+	return map[string]string{
+		"cor": "github.com/mb0/xelf/cor",
+		"lit": "github.com/mb0/xelf/lit",
+		"typ": "github.com/mb0/xelf/typ",
+		"exp": "github.com/mb0/xelf/exp",
+	}
+}
+
 func NewCtx(pr *dom.Project, pkg, path string) *gen.Ctx {
+	return NewCtxPkgs(pr, pkg, path, DefaultPkgs())
+}
+func NewCtxPkgs(pr *dom.Project, pkg, path string, pkgs map[string]string) *gen.Ctx {
+	pkgs[pkg] = path
 	return &gen.Ctx{
 		Project: pr, Pkg: path,
-		Pkgs: map[string]string{
-			"cor": "github.com/mb0/xelf/cor",
-			"lit": "github.com/mb0/xelf/lit",
-			"typ": "github.com/mb0/xelf/typ",
-			"exp": "github.com/mb0/xelf/exp",
-			pkg:   path,
-		},
+		Pkgs:   pkgs,
 		Header: "// generated code\n\n",
 	}
 }
