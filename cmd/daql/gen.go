@@ -61,6 +61,9 @@ func gogen(pr *Project, ss []*dom.Schema) error {
 		return err
 	}
 	for _, s := range pr.Schemas {
+		if nogen(s) {
+			continue
+		}
 		out := filepath.Join(schemaPath(pr, s), fmt.Sprintf("%s_gen.go", s.Name))
 		b := gengo.NewCtx(pr.Project, s.Name, path.Join(ppkg, s.Name))
 		err := gengo.WriteFile(b, out, s)
@@ -74,6 +77,9 @@ func gogen(pr *Project, ss []*dom.Schema) error {
 
 func pggen(pr *Project, ss []*dom.Schema) error {
 	for _, s := range pr.Schemas {
+		if nogen(s) {
+			continue
+		}
 		c := *s
 		c.Models = make([]*dom.Model, 0, len(s.Models))
 		for _, m := range s.Models {
@@ -95,6 +101,11 @@ func pggen(pr *Project, ss []*dom.Schema) error {
 		fmt.Println(out)
 	}
 	return nil
+}
+
+func nogen(s *dom.Schema) bool {
+	l, _ := s.Extra.Key("nogen")
+	return l != lit.Nil
 }
 
 func schemaPath(pr *Project, s *dom.Schema) string {
