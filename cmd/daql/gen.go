@@ -11,6 +11,7 @@ import (
 	"github.com/mb0/daql/gen/genpg"
 	"github.com/mb0/daql/mig"
 	"github.com/mb0/xelf/cor"
+	"github.com/mb0/xelf/lit"
 )
 
 func generate(args []string) error {
@@ -60,9 +61,9 @@ func gogen(pr *Project, ss []*dom.Schema) error {
 		return err
 	}
 	for _, s := range pr.Schemas {
-		out := fmt.Sprintf("%s/%s_gen.go", s.Name, s.Name)
+		out := filepath.Join(schemaPath(pr, s), fmt.Sprintf("%s_gen.go", s.Name))
 		b := gengo.NewCtx(pr.Project, s.Name, path.Join(ppkg, s.Name))
-		err := gengo.WriteFile(b, filepath.Join(pr.Dir, out), s)
+		err := gengo.WriteFile(b, out, s)
 		if err != nil {
 			return err
 		}
@@ -85,15 +86,23 @@ func pggen(pr *Project, ss []*dom.Schema) error {
 		if len(c.Models) == 0 {
 			continue
 		}
-		out := fmt.Sprintf("%s/%s_gen.sql", s.Name, s.Name)
+		out := filepath.Join(schemaPath(pr, s), fmt.Sprintf("%s_gen.sql", s.Name))
 		b := &gen.Ctx{Project: pr.Project, Pkg: "evt", Header: "-- generated code\n\n"}
-		err := genpg.WriteFile(b, filepath.Join(pr.Dir, out), &c)
+		err := genpg.WriteFile(b, out, &c)
 		if err != nil {
 			return err
 		}
 		fmt.Println(out)
 	}
 	return nil
+}
+
+func schemaPath(pr *Project, s *dom.Schema) string {
+	l, _ := s.Extra.Key("file")
+	if c, ok := l.(lit.Character); ok {
+		return filepath.Dir(c.Char())
+	}
+	return filepath.Join(pr.Dir, s.Name)
 }
 
 type Project struct {

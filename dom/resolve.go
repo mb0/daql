@@ -47,7 +47,7 @@ var projectSpec = exp.Implement("(form 'project' :args? :decls? : @)", false,
 
 var schemaSpec = exp.Implement("(form 'schema' :args? :decls? : @)", false,
 	func(c *exp.Ctx, env exp.Env, x *exp.Call, lo *exp.Layout, h typ.Type) (exp.El, error) {
-		s := &Schema{}
+		s := &Schema{Common: Common{Extra: &lit.Dict{}}}
 		n, err := resolveSchema(c, env, s, lo)
 		if err != nil {
 			return nil, err

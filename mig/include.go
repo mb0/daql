@@ -72,6 +72,7 @@ func includeSchema(s *dom.Schema, path, name string) error {
 	if ps == nil {
 		return cor.Errorf("no schema %s found in %s", name, path)
 	}
+	ps.Extra.SetKey("file", lit.Str(path))
 	*s = *ps
 	return nil
 }
