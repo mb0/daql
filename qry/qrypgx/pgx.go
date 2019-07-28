@@ -5,18 +5,22 @@ import (
 
 	"github.com/jackc/pgx"
 	"github.com/mb0/daql/dom"
-	"github.com/mb0/daql/gen"
 	"github.com/mb0/daql/gen/genpg"
-	"github.com/mb0/xelf/bfr"
 	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/lit"
 	"github.com/mb0/xelf/typ"
 )
 
+type DB interface {
+	Begin() (*pgx.Tx, error)
+}
+
 type C interface {
 	Query(string, ...interface{}) (*pgx.Rows, error)
 	QueryRow(string, ...interface{}) *pgx.Row
 	Exec(string, ...interface{}) (pgx.CommandTag, error)
+	Prepare(string, string) (*pgx.PreparedStatement, error)
+	CopyFrom(pgx.Identifier, []string, pgx.CopyFromSource) (int, error)
 }
 
 func Open(dsn string, logger pgx.Logger) (*pgx.ConnPool, error) {
@@ -41,52 +45,55 @@ func Open(dsn string, logger pgx.Logger) (*pgx.ConnPool, error) {
 	return db, nil
 }
 
-func CreateProject(db *pgx.ConnPool, p *dom.Project) error {
+func WithTx(db DB, f func(C) error) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	err = dropProject(tx, p)
+	err = f(tx)
 	if err != nil {
 		return err
 	}
-	for _, s := range p.Schemas {
-		_, err = tx.Exec("CREATE SCHEMA " + s.Name)
+	return tx.Commit()
+}
+
+func CreateProject(db *pgx.ConnPool, p *dom.Project) error {
+	return WithTx(db, func(tx C) error {
+		err := dropProject(tx, p)
 		if err != nil {
 			return err
 		}
-		for _, m := range s.Models {
-			err = CreateModel(tx, s, m)
+		for _, s := range p.Schemas {
+			_, err = tx.Exec("CREATE SCHEMA " + s.Name)
 			if err != nil {
 				return err
 			}
+			for _, m := range s.Models {
+				err = CreateModel(tx, s, m)
+				if err != nil {
+					return err
+				}
+			}
 		}
-	}
-	return tx.Commit()
+		return nil
+	})
 }
 
 func DropProject(db *pgx.ConnPool, p *dom.Project) error {
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	err = dropProject(tx, p)
-	if err != nil {
-		return err
-	}
-	return tx.Commit()
+	return WithTx(db, func(tx C) error {
+		return dropProject(tx, p)
+	})
 }
 
-func CreateModel(tx *pgx.Tx, s *dom.Schema, m *dom.Model) error {
+func CreateModel(tx C, s *dom.Schema, m *dom.Model) error {
 	switch m.Type.Kind {
 	case typ.KindBits:
 		return nil
 	case typ.KindEnum:
-		return createModel(tx, m, genpg.WriteEnum)
+		return createModel(tx, m, (*genpg.Writer).WriteEnum)
 	case typ.KindObj:
-		err := createModel(tx, m, genpg.WriteTable)
+		err := createModel(tx, m, (*genpg.Writer).WriteTable)
 		if err != nil {
 			return err
 		}
@@ -96,9 +103,10 @@ func CreateModel(tx *pgx.Tx, s *dom.Schema, m *dom.Model) error {
 	return cor.Errorf("unexpected model kind %s", m.Type.Kind)
 }
 
-func createModel(tx *pgx.Tx, m *dom.Model, f func(*gen.Ctx, *dom.Model) error) error {
+func createModel(tx C, m *dom.Model, f func(*genpg.Writer, *dom.Model) error) error {
 	var b strings.Builder
-	err := f(&gen.Ctx{Ctx: bfr.Ctx{B: &b}}, m)
+	w := genpg.NewWriter(&b, genpg.ExpEnv{})
+	err := f(w, m)
 	if err != nil {
 		return err
 	}
@@ -106,7 +114,7 @@ func createModel(tx *pgx.Tx, m *dom.Model, f func(*gen.Ctx, *dom.Model) error) e
 	return err
 }
 
-func dropProject(tx *pgx.Tx, p *dom.Project) error {
+func dropProject(tx C, p *dom.Project) error {
 	for i := len(p.Schemas) - 1; i >= 0; i-- {
 		s := p.Schemas[i]
 		_, err := tx.Exec("DROP SCHEMA IF EXISTS " + s.Name + " CASCADE")
@@ -118,21 +126,18 @@ func dropProject(tx *pgx.Tx, p *dom.Project) error {
 }
 
 func CopyFrom(db *pgx.ConnPool, s *dom.Schema, fix *lit.Dict) error {
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	for _, kl := range fix.List {
-		m := s.Model(kl.Key)
-		cols := modelColumns(m)
-		src := &litCopySrc{List: kl.Lit.(*lit.List), typ: m.Type, cols: cols}
-		_, err := tx.CopyFrom(pgx.Identifier{m.Qual(), m.Key()}, cols, src)
-		if err != nil {
-			return err
+	return WithTx(db, func(tx C) error {
+		for _, kl := range fix.List {
+			m := s.Model(kl.Key)
+			cols := modelColumns(m)
+			src := &litCopySrc{List: kl.Lit.(*lit.List), typ: m.Type, cols: cols}
+			_, err := tx.CopyFrom(pgx.Identifier{m.Qual(), m.Key()}, cols, src)
+			if err != nil {
+				return err
+			}
 		}
-	}
-	return tx.Commit()
+		return nil
+	})
 }
 
 type litCopySrc struct {
@@ -141,6 +146,7 @@ type litCopySrc struct {
 	cols []string
 	nxt  int
 	err  error
+	res  interface{}
 }
 
 func (c *litCopySrc) Next() bool {

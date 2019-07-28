@@ -7,13 +7,12 @@ import (
 	"github.com/mb0/daql/dom"
 	"github.com/mb0/daql/dom/domtest"
 	"github.com/mb0/daql/qry"
-	"github.com/mb0/xelf/exp"
-	"github.com/mb0/xelf/typ"
+	"github.com/mb0/xelf/lit"
 )
 
 const dsn = `host=/var/run/postgresql dbname=daql`
 
-func TestPgx(t *testing.T) {
+func TestBackend(t *testing.T) {
 	f, err := domtest.ProdFixture()
 	if err != nil {
 		t.Fatalf("parse prod fixture error: %v", err)
@@ -34,6 +33,7 @@ func TestPgx(t *testing.T) {
 		{`(qry +count #prod.cat)`, `{count:7}`},
 		{`(qry +cat ?prod.cat +count #prod.cat)`, `{cat:{id:25 name:'y'} count:7}`},
 		{`(qry ?prod.cat (eq .id 1))`, `{id:1 name:'a'}`},
+		{`(qry ?prod.cat (eq .id $a))`, `{id:1 name:'a'}`},
 		{`(qry ?prod.cat.name (eq .id 1))`, `'a'`},
 		{`(qry *prod.cat :off 1 :lim 2 :asc .name)`, `[{id:2 name:'b'} {id:3 name:'c'}]`},
 		{`(qry *prod.cat :lim 2 :desc .name)`, `[{id:26 name:'z'} {id:25 name:'y'}]`},
@@ -56,24 +56,13 @@ func TestPgx(t *testing.T) {
 		{`(qry (?prod.prod (eq .id 1) +name +cn (?prod.cat.name (eq .id ..cat))))`,
 			`{name:'A' cn:'c'}`},
 	}
-	pgxBed := New(db, &f.Project)
+	b := New(db, &f.Project)
+	arg := lit.RecFromKeyed([]lit.Keyed{{"a", lit.Int(1)}})
+	env := qry.NewEnv(nil, &f.Project, b)
 	for _, test := range tests {
-		env := qry.NewEnv(nil, &f.Project, pgxBed)
-		el, err := exp.ParseString(env, test.Raw)
+		l, err := env.Qry(test.Raw, arg)
 		if err != nil {
-			t.Errorf("parse %s error %+v", test.Raw, err)
-			continue
-		}
-		c := exp.NewCtx(false, true)
-		l, err := c.Resolve(env, el, typ.Void)
-		if err != nil {
-			t.Errorf("resolve %s error %+v\n%v", el, err, c.Unres)
-			continue
-		}
-		spec := l.(*exp.Atom).Lit.(*exp.Spec)
-		l, err = spec.Resolve(c, env, &exp.Call{Spec: spec, Args: nil}, typ.Void)
-		if err != nil {
-			t.Errorf("execute %s error %+v\n%v", el, err, c.Unres)
+			t.Errorf("query %s error %+v", test.Raw, err)
 			continue
 		}
 		if got := l.String(); got != test.Want {

@@ -2,6 +2,7 @@ package qry
 
 import (
 	"github.com/mb0/daql/dom"
+	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/lit"
 	"github.com/mb0/xelf/std"
@@ -48,6 +49,26 @@ func (qe *QryEnv) Get(sym string) *exp.Def {
 		return exp.NewDef(qrySpec)
 	}
 	return nil
+}
+
+func (qe *QryEnv) Qry(q string, arg lit.Lit) (lit.Lit, error) {
+	el, err := exp.ParseString(qe, q)
+	if err != nil {
+		return nil, cor.Errorf("parse qry %s error: %w", q, err)
+	}
+	env := qe
+	if arg == nil {
+		arg = lit.Nil
+	}
+	d := &exp.Dyn{Els: []exp.El{el, &exp.Atom{Lit: arg}}}
+	l, err := exp.NewCtx(false, true).Resolve(env, d, typ.Void)
+	if err != nil {
+		return nil, cor.Errorf("resolve qry %s error: %w", el, err)
+	}
+	if a, ok := l.(*exp.Atom); ok {
+		return a.Lit, nil
+	}
+	return nil, cor.Errorf("qry result %T is not an atom", l)
 }
 
 type DocEnv struct {

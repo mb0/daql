@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/mb0/daql/dom"
-	"github.com/mb0/daql/gen"
 	"github.com/mb0/daql/gen/gengo"
 	"github.com/mb0/daql/gen/genpg"
 	"github.com/mb0/daql/mig"
@@ -94,8 +93,7 @@ func pggen(pr *Project, ss []*dom.Schema) error {
 			continue
 		}
 		out := filepath.Join(schemaPath(pr, s), fmt.Sprintf("%s_gen.sql", s.Name))
-		b := &gen.Ctx{Project: pr.Project, Pkg: "evt", Header: "-- generated code\n\n"}
-		err := genpg.WriteFile(b, out, &c)
+		err := genpg.WriteFile(out, pr.Project, &c)
 		if err != nil {
 			return err
 		}

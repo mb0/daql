@@ -32,12 +32,22 @@ func (e *execer) execJob(j *Job, par lit.Proxy) error {
 		}
 		return res.Assign(el.(lit.Lit))
 	}
-	qs, err := genQueryStr(e.Ctx, e.Env, j)
+	qs, ps, err := genQueryStr(e.Ctx, e.Env, j)
 	if err != nil {
 		return err
 	}
-	// TODO collect and pass query parameters
-	rows, err := e.DB.Query(qs)
+	var args []interface{}
+	if len(ps) != 0 {
+		args = make([]interface{}, 0, len(ps))
+		for _, p := range ps {
+			if p.Value != nil {
+				args = append(args, p.Value)
+				continue
+			}
+			return cor.Errorf("unexpected external param %+v", p)
+		}
+	}
+	rows, err := e.DB.Query(qs, args...)
 	if err != nil {
 		return cor.Errorf("query %s: %w", qs, err)
 	}
@@ -155,31 +165,73 @@ func (e *execer) scanRow(j *Job, r lit.Lit, rows *pgx.Rows) (err error) {
 }
 
 type jobEnv struct {
-	*Job
+	Alias map[*qry.Task]string
 	*qry.Task
-	exp.Env
+	Env    exp.Env
 	Prefix bool
 }
 
-func (je *jobEnv) Translate(s *exp.Sym) (string, lit.Lit, error) {
-	n := s.Name
-	switch n[0] {
-	case '/', '$':
-		return n, nil, genpg.External
-	case '.':
-		// handled after switch
-	default:
-		d := je.Get(n)
-		if d == nil {
-			return n, nil, exp.ErrUnres
-		}
-		if d.Lit != nil {
-			return "", d.Lit, nil
-		}
-		return n, nil, genpg.External
+func (je *jobEnv) Parent() exp.Env      { return je.Env }
+func (je *jobEnv) Supports(x byte) bool { return x == '.' }
+func (je *jobEnv) Get(sym string) *exp.Def {
+	if sym[0] != '.' {
+		return nil
 	}
 	dots := 1
-	n = n[1:]
+	n := sym[1:]
+	if n[0] == '.' {
+		return nil
+	}
+	sp := strings.SplitN(n, ".", 2)
+	if dots == 1 {
+		// TODO only check if inline or joined query
+		for _, s := range je.Query.Sel {
+			if s.Name != sp[0] {
+				continue
+			}
+			return &exp.Def{Type: s.Type}
+		}
+	} else {
+		return nil
+	}
+	p, _, err := je.Query.Type.ParamByKey(sp[0])
+	if err != nil {
+		return nil
+	}
+	return &exp.Def{Type: p.Type}
+}
+
+func (je *jobEnv) prefix(n string, t *qry.Task) string {
+	if !je.Prefix {
+		return n
+	}
+	return fmt.Sprintf("%s.%s", je.Alias[t], n)
+}
+
+type jobTranslator struct{}
+
+func (jt jobTranslator) Translate(env exp.Env, s *exp.Sym) (string, lit.Lit, error) {
+	switch s.Name[0] {
+	case '/', '$':
+		d := exp.LookupSupports(env, s.Name, s.Name[0])
+		if d == nil {
+			return "", nil, exp.ErrUnres
+		}
+		return s.Name, d.Lit, genpg.External
+	case '.':
+	default:
+		return genpg.ExpEnv{}.Translate(env, s)
+	}
+	env = exp.Supports(env, '.')
+	if env == nil {
+		return s.Name, nil, cor.Errorf("no dot scope for %s", s.Name)
+	}
+	je, ok := env.(*jobEnv)
+	if !ok {
+		return genpg.ExpEnv{}.Translate(env, s)
+	}
+	dots := 1
+	n := s.Name[1:]
 	t := je.Task
 	for n != "" && n[0] == '.' {
 		if t.Parent == nil {
@@ -207,11 +259,4 @@ func (je *jobEnv) Translate(s *exp.Sym) (string, lit.Lit, error) {
 		return "", nil, cor.Errorf("no selection or field for %q in %s: %w", s.Name, t.Query.Type, err)
 	}
 	return je.prefix(n, t), nil, nil
-}
-
-func (je *jobEnv) prefix(n string, t *qry.Task) string {
-	if !je.Prefix || je.Job == nil {
-		return n
-	}
-	return fmt.Sprintf("%s.%s", je.Alias[t], n)
 }

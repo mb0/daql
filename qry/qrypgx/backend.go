@@ -36,20 +36,20 @@ func New(db *pgx.ConnPool, proj *dom.Project) *Backend {
 	return &Backend{DB: db, Record: mig.Record{Project: proj}, tables: tables}
 }
 
-func (b *Backend) Exec(c *exp.Ctx, env exp.Env, d *qry.Doc) (*qry.Result, error) {
-	p, err := Analyse(d)
+func (b *Backend) Eval(c *exp.Ctx, env exp.Env, doc *qry.Doc) (lit.Lit, error) {
+	p, err := Analyse(doc)
 	if err != nil {
 		return nil, err
 	}
-	res := qry.NewResult(d)
-	ctx := &execer{b, c, &qry.ExecEnv{env, d, res}, res, nil}
+	res := qry.NewResult(doc)
+	ctx := &execer{b, c, &qry.ExecEnv{env, doc, res}, res, nil}
 	for _, j := range p.Jobs {
 		err := ctx.execJob(j, res.Data)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return res, nil
+	return res.Data, nil
 }
 
 var _ mig.Dataset = (*Backend)(nil)

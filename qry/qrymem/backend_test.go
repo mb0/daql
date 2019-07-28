@@ -4,33 +4,23 @@ import (
 	"log"
 	"testing"
 
-	"github.com/mb0/daql/dom"
 	"github.com/mb0/daql/dom/domtest"
+	"github.com/mb0/daql/mig"
 	"github.com/mb0/daql/qry"
-	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/lit"
-	"github.com/mb0/xelf/typ"
 )
 
-var (
-	prodProj *dom.Project
-	memBed   *Backend
-)
-
-func init() {
-	f, err := domtest.ProdFixture()
-	if err != nil {
-		log.Fatalf("parse prod fixture error: %v", err)
-	}
-	prodProj = &f.Project
-	memBed = &Backend{}
+func getBackend() *Backend {
+	f := domtest.Must(domtest.ProdFixture())
+	b := &Backend{Record: mig.Record{Project: &f.Project}}
 	s := f.Schema("prod")
 	for _, kl := range f.Fix.List {
-		err = memBed.Add(s.Model(kl.Key), kl.Lit.(*lit.List))
+		err := b.Add(s.Model(kl.Key), kl.Lit.(*lit.List))
 		if err != nil {
 			log.Fatalf("add %s error: %v", kl.Key, err)
 		}
 	}
+	return b
 }
 
 var testQry = `(qry
@@ -51,14 +41,16 @@ var testQry = `(qry
 )`
 
 func TestBackend(t *testing.T) {
+	b := getBackend()
 	tests := []struct {
-		raw  string
-		want string
+		Raw  string
+		Want string
 	}{
 		{`(qry ?prod.cat)`, `{id:25 name:'y'}`},
 		{`(qry +count #prod.cat)`, `{count:7}`},
 		{`(qry +cat ?prod.cat +count #prod.cat)`, `{cat:{id:25 name:'y'} count:7}`},
 		{`(qry ?prod.cat (eq .id 1))`, `{id:1 name:'a'}`},
+		{`(qry ?prod.cat (eq .id $a))`, `{id:1 name:'a'}`},
 		{`(qry ?prod.cat.name (eq .id 1))`, `'a'`},
 		{`(qry *prod.cat :off 1 :lim 2 :asc .name)`, `[{id:2 name:'b'} {id:3 name:'c'}]`},
 		{`(qry *prod.cat :lim 2 :desc .name)`, `[{id:26 name:'z'} {id:25 name:'y'}]`},
@@ -82,32 +74,19 @@ func TestBackend(t *testing.T) {
 			`{name:'A' cn:'c'}`},
 		{testQry, ``},
 	}
+	arg := lit.RecFromKeyed([]lit.Keyed{{"a", lit.Int(1)}})
+	env := qry.NewEnv(qry.Builtin, b.Project, b)
 	for _, test := range tests {
-		el, err := exp.ParseString(qry.Builtin, test.raw)
+		l, err := env.Qry(test.Raw, arg)
 		if err != nil {
-			t.Errorf("parse %s error %+v", test.raw, err)
+			t.Errorf("query %s error %+v", test.Raw, err)
 			continue
 		}
-		c := exp.NewCtx(false, true)
-		env := qry.NewEnv(nil, prodProj, memBed)
-		l, err := c.Resolve(env, el, typ.Void)
-		if err != nil {
-			t.Errorf("resolve %s error %+v\nUnresolved: %v\nType Context: %v",
-				test.raw, err, c.Unres, c.Ctx)
+		if test.Want == "" {
 			continue
 		}
-		spec := l.(*exp.Atom).Lit.(*exp.Spec)
-		l, err = spec.Resolve(c, env, &exp.Call{Spec: spec, Args: nil}, typ.Void)
-		if err != nil {
-			t.Errorf("execute %s error %+v\nUnresolved: %v\nType Context: %v",
-				test.raw, err, c.Unres, c.Ctx)
-			continue
-		}
-		if test.want == "" {
-			continue
-		}
-		if got := l.String(); got != test.want {
-			t.Errorf("want %s got %s", test.want, got)
+		if got := l.String(); got != test.Want {
+			t.Errorf("want %s got %s", test.Want, got)
 		}
 	}
 }

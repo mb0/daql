@@ -116,7 +116,7 @@ func TestGenQuery(t *testing.T) {
 
 func genQueries(c *exp.Ctx, env exp.Env, p *Plan) (res []string, _ error) {
 	for _, j := range p.Jobs {
-		s, err := genQueryStr(c, env, j)
+		s, _, err := genQueryStr(c, env, j)
 		if err != nil {
 			return nil, err
 		}
