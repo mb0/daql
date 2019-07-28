@@ -15,6 +15,7 @@ func WriteFile(fname string, p *dom.Project, s *dom.Schema) error {
 	b := bfr.Get()
 	defer bfr.Put(b)
 	w := NewWriter(b, ExpEnv{})
+	w.Project = p
 	w.WriteString(w.Header)
 	w.WriteString("BEGIN;\n\n")
 	err := w.WriteSchema(s)
@@ -81,7 +82,10 @@ func (w *Writer) WriteTable(m *dom.Model) error {
 				w.WriteByte(' ')
 			}
 		}
-		w.writeField(p, m.Elems[i])
+		err := w.writeField(p, m.Elems[i])
+		if err != nil {
+			return err
+		}
 	}
 	w.Dedent()
 	return w.WriteByte(')')
@@ -127,6 +131,9 @@ func (w *Writer) writeField(p typ.Param, el *dom.Elem) error {
 func (w *Writer) writerEmbed(t typ.Type) error {
 	split := strings.Split(t.Key(), ".")
 	m := w.Project.Schema(split[0]).Model(split[1])
+	if m == nil {
+		return cor.Errorf("no model for %s in %s", t.Key(), m)
+	}
 	for i, p := range m.Type.Params {
 		if i > 0 {
 			w.WriteByte(',')
