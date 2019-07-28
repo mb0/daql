@@ -12,7 +12,7 @@ type execer struct {
 	*Backend
 	*exp.Ctx
 	exp.Env
-	*qry.Result
+	*qry.DocEnv
 }
 
 func execTask(c execer, t *qry.Task, par lit.Proxy) error {
@@ -35,7 +35,7 @@ func execExpr(c execer, t *qry.Task, res lit.Proxy) error {
 	if err != nil {
 		return err
 	}
-	c.SetDone(t, res)
+	c.Done(t, res)
 	return nil
 }
 
@@ -76,12 +76,12 @@ func execQuery(c execer, t *qry.Task, res lit.Proxy) error {
 			return cor.Errorf("qrymem assign: %v", err)
 		}
 	}
-	c.SetDone(t, res)
+	c.Done(t, res)
 	return nil
 }
 
 func collectSel(c execer, tt *qry.Task, l lit.Lit, z lit.Proxy) error {
-	c.Env = &qry.TaskEnv{c.Env, c.Result, tt, l}
+	c.Env = &qry.TaskEnv{c.Env, c.DocEnv, tt, l}
 	for _, t := range tt.Query.Sel {
 		if t.Query == nil && t.Expr == nil {
 			el, err := lit.Select(l, cor.Keyed(t.Name))
@@ -96,7 +96,7 @@ func collectSel(c execer, tt *qry.Task, l lit.Lit, z lit.Proxy) error {
 			if err != nil {
 				return err
 			}
-			c.SetDone(t, res)
+			c.Done(t, res)
 		} else {
 			err := execTask(c, t, z)
 			if err != nil {

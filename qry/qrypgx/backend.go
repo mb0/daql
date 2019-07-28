@@ -41,15 +41,15 @@ func (b *Backend) Eval(c *exp.Ctx, env exp.Env, doc *qry.Doc) (lit.Lit, error) {
 	if err != nil {
 		return nil, err
 	}
-	res := qry.NewResult(doc)
-	ctx := &execer{b, c, &qry.ExecEnv{env, doc, res}, res, nil}
+	denv := doc.ExecEnv(env)
+	ctx := &execer{b, c, denv, denv, nil}
 	for _, j := range p.Jobs {
-		err := ctx.execJob(j, res.Data)
+		err := ctx.execJob(j, denv.Data)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return res.Data, nil
+	return denv.Data, nil
 }
 
 var _ mig.Dataset = (*Backend)(nil)

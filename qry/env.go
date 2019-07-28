@@ -71,9 +71,18 @@ func (qe *QryEnv) Qry(q string, arg lit.Lit) (lit.Lit, error) {
 	return nil, cor.Errorf("qry result %T is not an atom", l)
 }
 
+// TaskInfo holds task details during query execution.
+// Done indicates whether the task and all its sub task are represented by data.
+type TaskInfo struct {
+	Data lit.Proxy
+	Done bool
+}
+
 type DocEnv struct {
-	Par exp.Env
-	*Doc
+	Par   exp.Env
+	Doc   *Doc
+	Data  lit.Proxy
+	Infos map[*Task]TaskInfo
 }
 
 func (de *DocEnv) Parent() exp.Env      { return de.Par }
@@ -83,52 +92,71 @@ func (de *DocEnv) Get(sym string) *exp.Def {
 		return nil
 	}
 	if len(sym) == 1 {
-		return &exp.Def{Type: de.Type}
+		return &exp.Def{Type: de.Doc.Type, Lit: de.Data}
 	}
 	t, path, err := RootTask(de.Doc, sym)
 	if err != nil {
 		return nil
 	}
-	l, err := lit.SelectPath(t.Type, path)
+	var data lit.Lit
+	if de.Data == nil {
+		data = t.Type
+	} else {
+		n := de.Infos[t]
+		if !n.Done {
+			return nil
+		}
+		data = n.Data
+	}
+	l, err := lit.SelectPath(data, path)
 	if err != nil {
 		return nil
 	}
-	return &exp.Def{Type: l.(typ.Type)}
-}
-
-type ExecEnv struct {
-	Par exp.Env
-	*Doc
-	*Result
-}
-
-func (ee *ExecEnv) Parent() exp.Env      { return ee.Par }
-func (ee *ExecEnv) Supports(x byte) bool { return x == '/' }
-func (ee *ExecEnv) Get(sym string) *exp.Def {
-	if sym[0] != '/' {
-		return nil
-	}
-	if len(sym) == 1 {
-		return exp.NewDef(ee.Data)
-	}
-	t, path, err := RootTask(ee.Doc, sym)
-	if err != nil {
-		return nil
-	}
-	n := ee.Info[t]
-	if !n.Done {
-		return nil
-	}
-	l, err := lit.SelectPath(n.Data, path)
-	if err != nil {
-		return nil
+	if de.Data == nil {
+		return &exp.Def{Type: l.(typ.Type)}
 	}
 	return exp.NewDef(l)
 }
 
+func (d *Doc) ReslEnv(par exp.Env) *DocEnv {
+	return &DocEnv{par, d, nil, nil}
+}
+
+func (d *Doc) ExecEnv(par exp.Env) *DocEnv {
+	t, opt := d.Type.Deopt()
+	data := lit.ZeroProxy(t)
+	if opt {
+		data = lit.SomeProxy{data}
+	}
+	return &DocEnv{par, d, data, make(map[*Task]TaskInfo, len(d.Root)*3)}
+}
+
+func (de *DocEnv) Prep(parent lit.Proxy, t *Task) (lit.Proxy, error) {
+	if t.Name == "" {
+		return parent, nil
+	}
+	k := lit.Deopt(parent).(lit.Keyer)
+	l, err := k.Key(cor.Keyed(t.Name))
+	if err != nil {
+		return nil, err
+	}
+	p, ok := l.(lit.Proxy)
+	if !ok {
+		return nil, cor.Errorf("prep task result for %s want proxy got %T", t.Name, l)
+	}
+	return p, nil
+}
+
+func (de *DocEnv) Done(t *Task, data lit.Proxy) {
+	n := de.Infos[t]
+	n.Data = data
+	n.Done = true
+	de.Infos[t] = n
+}
+
 type TaskEnv struct {
-	Par    exp.Env
-	Result *Result
+	Par exp.Env
+	Doc *DocEnv
 	*Task
 	Param lit.Lit
 }
@@ -145,8 +173,8 @@ func (te *TaskEnv) Get(sym string) *exp.Def {
 			if t.Name != sym {
 				continue
 			}
-			if te.Result != nil {
-				nfo := te.Result.Info[t]
+			if te.Doc != nil {
+				nfo := te.Doc.Infos[t]
 				if nfo.Done {
 					return exp.NewDef(nfo.Data)
 				}

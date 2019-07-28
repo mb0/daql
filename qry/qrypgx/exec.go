@@ -16,7 +16,7 @@ type execer struct {
 	*Backend
 	*exp.Ctx
 	exp.Env
-	*qry.Result
+	*qry.DocEnv
 	args []interface{}
 }
 
@@ -65,7 +65,7 @@ func (e *execer) execJob(j *Job, par lit.Proxy) error {
 	if err != nil {
 		return err
 	}
-	e.SetDone(j.Task, res)
+	e.Done(j.Task, res)
 	return nil
 }
 

@@ -16,21 +16,21 @@ var qrySpec = exp.ImplementReq("(form 'qry' :args? :decls? : @1)", false,
 		if qenv == nil {
 			return nil, cor.Errorf("no qry environment for query %s", x)
 		}
-		p := &Doc{}
+		doc := &Doc{}
 		args := x.Args(0)
-		penv := &DocEnv{x.Env, p}
+		denv := doc.ReslEnv(x.Env)
 		if len(args) > 0 {
 			// simple query
 			if len(x.Args(1)) > 0 {
 				return nil, cor.Errorf("either use simple or compound query got %v rest %v",
 					args, x.Args(1))
 			}
-			t, err := resolveTask(x.Ctx, penv, exp.NewNamed("", args...), nil)
+			t, err := resolveTask(x.Ctx, denv, exp.NewNamed("", args...), nil)
 			if err != nil {
 				return nil, err
 			}
-			p.Root = []*Task{t}
-			p.Type = t.Type
+			doc.Root = []*Task{t}
+			doc.Type = t.Type
 		} else {
 			decls, err := x.Decls(1)
 			if err != nil {
@@ -38,22 +38,22 @@ var qrySpec = exp.ImplementReq("(form 'qry' :args? :decls? : @1)", false,
 			}
 			ps := make([]typ.Param, 0, len(decls))
 			for _, d := range decls {
-				t, err := resolveTask(x.Ctx, penv, d, nil)
+				t, err := resolveTask(x.Ctx, denv, d, nil)
 				if err != nil {
 					return nil, err
 				}
-				p.Root = append(p.Root, t)
+				doc.Root = append(doc.Root, t)
 				ps = append(ps, typ.Param{Name: t.Name, Type: t.Type})
 			}
-			p.Type = typ.Rec(ps)
+			doc.Type = typ.Rec(ps)
 		}
-		if len(p.Root) == 0 {
+		if len(doc.Root) == 0 {
 			return nil, cor.Error("empty plan")
 		}
 		return &exp.Atom{Lit: &exp.Spec{typ.Func("", []typ.Param{
 			{"arg", typ.Any},
-			{"", p.Type},
-		}), p}}, nil
+			{"", doc.Type},
+		}), doc}}, nil
 	})
 
 var taskSig = exp.MustSig("(form '_' :ref? @1 :args? :decls? : void)")
