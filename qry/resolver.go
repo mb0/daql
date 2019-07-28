@@ -10,35 +10,35 @@ import (
 	"github.com/mb0/xelf/typ"
 )
 
-var qrySpec = exp.Implement("(form 'qry' :args? :decls? : @1)", false,
-	func(c *exp.Ctx, env exp.Env, x *exp.Call, lo *exp.Layout, hint typ.Type) (exp.El, error) {
-		qenv := FindEnv(env)
+var qrySpec = exp.ImplementReq("(form 'qry' :args? :decls? : @1)", false,
+	func(x exp.ReslReq) (exp.El, error) {
+		qenv := FindEnv(x.Env)
 		if qenv == nil {
 			return nil, cor.Errorf("no qry environment for query %s", x)
 		}
 		p := &Doc{}
-		args := lo.Args(0)
-		penv := &DocEnv{env, p}
+		args := x.Args(0)
+		penv := &DocEnv{x.Env, p}
 		if len(args) > 0 {
 			// simple query
-			if len(lo.Args(1)) > 0 {
+			if len(x.Args(1)) > 0 {
 				return nil, cor.Errorf("either use simple or compound query got %v rest %v",
-					args, lo.Args(1))
+					args, x.Args(1))
 			}
-			t, err := resolveTask(c, penv, exp.NewNamed("", args...), nil)
+			t, err := resolveTask(x.Ctx, penv, exp.NewNamed("", args...), nil)
 			if err != nil {
 				return nil, err
 			}
 			p.Root = []*Task{t}
 			p.Type = t.Type
 		} else {
-			decls, err := lo.Decls(1)
+			decls, err := x.Decls(1)
 			if err != nil {
 				return nil, err
 			}
 			ps := make([]typ.Param, 0, len(decls))
 			for _, d := range decls {
-				t, err := resolveTask(c, penv, d, nil)
+				t, err := resolveTask(x.Ctx, penv, d, nil)
 				if err != nil {
 					return nil, err
 				}
@@ -51,7 +51,7 @@ var qrySpec = exp.Implement("(form 'qry' :args? :decls? : @1)", false,
 			return nil, cor.Error("empty plan")
 		}
 		return &exp.Atom{Lit: &exp.Spec{typ.Func("", []typ.Param{
-			{"arg", typ.Dict(typ.Any)},
+			{"arg", typ.Any},
 			{"", p.Type},
 		}), p}}, nil
 	})

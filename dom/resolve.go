@@ -11,18 +11,18 @@ import (
 	"github.com/mb0/xelf/utl"
 )
 
-var projectSpec = exp.Implement("(form 'project' :args? :decls? : @)", false,
-	func(c *exp.Ctx, env exp.Env, x *exp.Call, lo *exp.Layout, h typ.Type) (exp.El, error) {
-		p := FindEnv(env)
+var projectSpec = exp.ImplementReq("(form 'project' :args? :decls? : @)", false,
+	func(x exp.ReslReq) (exp.El, error) {
+		p := FindEnv(x.Env)
 		n, err := utl.GetNode(p.Project)
 		if err != nil {
 			return nil, err
 		}
-		err = commonRules.Resolve(c, env, lo.Tags(0), n)
+		err = commonRules.Resolve(x.Ctx, x.Env, x.Tags(0), n)
 		if err != nil {
 			return nil, err
 		}
-		decls, err := lo.Decls(1)
+		decls, err := x.Decls(1)
 		if err != nil {
 			return nil, err
 		}
@@ -36,7 +36,7 @@ var projectSpec = exp.Implement("(form 'project' :args? :decls? : @)", false,
 			if err != nil {
 				return nil, err
 			}
-			_, err = resolveSchema(c, env, s, slo)
+			_, err = resolveSchema(x.Ctx, x.Env, s, slo)
 			if err != nil {
 				return nil, err
 			}
@@ -45,14 +45,14 @@ var projectSpec = exp.Implement("(form 'project' :args? :decls? : @)", false,
 		return &exp.Atom{Lit: n}, nil
 	})
 
-var schemaSpec = exp.Implement("(form 'schema' :args? :decls? : @)", false,
-	func(c *exp.Ctx, env exp.Env, x *exp.Call, lo *exp.Layout, h typ.Type) (exp.El, error) {
+var schemaSpec = exp.ImplementReq("(form 'schema' :args? :decls? : @)", false,
+	func(x exp.ReslReq) (exp.El, error) {
 		s := &Schema{Common: Common{Extra: &lit.Dict{}}}
-		n, err := resolveSchema(c, env, s, lo)
+		n, err := resolveSchema(x.Ctx, x.Env, s, x.Layout)
 		if err != nil {
 			return nil, err
 		}
-		pro := FindEnv(env)
+		pro := FindEnv(x.Env)
 		if pro != nil {
 			pro.Schemas = append(pro.Schemas, s)
 		}
