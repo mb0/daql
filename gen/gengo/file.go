@@ -24,12 +24,12 @@ func DefaultPkgs() map[string]string {
 	}
 }
 
-func NewCtx(pr *dom.Project, pkg, path string) *gen.Ctx {
+func NewCtx(pr *dom.Project, pkg, path string) *gen.Gen {
 	return NewCtxPkgs(pr, pkg, path, DefaultPkgs())
 }
-func NewCtxPkgs(pr *dom.Project, pkg, path string, pkgs map[string]string) *gen.Ctx {
+func NewCtxPkgs(pr *dom.Project, pkg, path string, pkgs map[string]string) *gen.Gen {
 	pkgs[pkg] = path
-	return &gen.Ctx{
+	return &gen.Gen{
 		Project: pr, Pkg: path,
 		Pkgs:   pkgs,
 		Header: "// generated code\n\n",
@@ -40,7 +40,7 @@ func NewCtxPkgs(pr *dom.Project, pkg, path string, pkgs map[string]string) *gen.
 // map if available, otherwise the name is used as path. If the package path is the same as the
 // context package it returns the 'Decl' part. Otherwise it adds the package path to the import
 // list and returns a substring starting with last package path segment: 'pkg.Decl'.
-func Import(c *gen.Ctx, name string) string {
+func Import(c *gen.Gen, name string) string {
 	ptr := name[0] == '*'
 	if ptr {
 		name = name[1:]
@@ -69,7 +69,7 @@ func Import(c *gen.Ctx, name string) string {
 	return name
 }
 
-func WriteFile(c *gen.Ctx, fname string, s *dom.Schema) error {
+func WriteFile(c *gen.Gen, fname string, s *dom.Schema) error {
 	b := bfr.Get()
 	defer bfr.Put(b)
 	c.Ctx = bfr.Ctx{B: b, Tab: "\t"}
@@ -87,7 +87,7 @@ func WriteFile(c *gen.Ctx, fname string, s *dom.Schema) error {
 // RenderFile writes the elements to a go file with package and import declarations.
 //
 // For now only bits, enum and rec type definitions are supported
-func RenderFile(c *gen.Ctx, s *dom.Schema) error {
+func RenderFile(c *gen.Gen, s *dom.Schema) error {
 	b := bfr.Get()
 	defer bfr.Put(b)
 	// swap new buffer with context buffer
@@ -159,7 +159,7 @@ Next:
 
 // DeclareType writes a type declaration for bits, enum and rec types.
 // For bits and enum types the declaration includes the constant declarations.
-func DeclareType(c *gen.Ctx, m *dom.Model) (err error) {
+func DeclareType(c *gen.Gen, m *dom.Model) (err error) {
 	t := m.Type
 	doc, err := m.Extra.Key("doc")
 	if err == nil {
@@ -189,13 +189,15 @@ func DeclareType(c *gen.Ctx, m *dom.Model) (err error) {
 	case typ.KindFunc:
 		last := len(m.Type.Params) - 1
 		c.WriteString("type ")
-		c.WriteString(m.Name)
-		c.WriteString("Req ")
-		err = WriteType(c, typ.Rec(m.Type.Params[:last]))
-		if err != nil {
-			break
+		if last > 0 {
+			c.WriteString(m.Name)
+			c.WriteString("Req ")
+			err = WriteType(c, typ.Rec(m.Type.Params[:last]))
+			if err != nil {
+				break
+			}
+			c.WriteString("\n\ntype ")
 		}
-		c.WriteString("\n\ntype ")
 		c.WriteString(m.Name)
 		c.WriteString("Res ")
 		res := m.Type.Params[last].Type
@@ -215,8 +217,9 @@ func DeclareType(c *gen.Ctx, m *dom.Model) (err error) {
 			break
 		}
 		c.Imports.Add("github.com/mb0/daql/hub")
-		c.Imports.Add("encoding/json")
-		c.Fmt(`
+		if last > 0 {
+			c.Imports.Add("encoding/json")
+			c.Fmt(`
 type %[1]sFunc func(*hub.Msg, %[1]sReq) (%[2]s, error)
 
 func (f %[1]sFunc) Serve(m *hub.Msg) interface{} {
@@ -232,6 +235,18 @@ func (f %[1]sFunc) Serve(m *hub.Msg) interface{} {
 	return %[1]sRes{Res: res}
 }
 `, m.Name, tmp.String())
+		} else {
+			c.Fmt(`
+type %[1]sFunc func(*hub.Msg) (%[2]s, error)
+
+func (f %[1]sFunc) Serve(m *hub.Msg) interface{} {
+	res, err := f(m)
+	if err != nil {
+		return %[1]sRes{Err: err.Error()}
+	}
+	return %[1]sRes{Res: res}
+}`, m.Name, tmp.String())
+		}
 	default:
 		err = errors.Errorf("model kind %s cannot be declared", m.Type.Kind)
 	}
@@ -281,7 +296,7 @@ func refName(t typ.Type) string {
 	return n
 }
 
-func writeBitsConsts(c *gen.Ctx, t typ.Type, ref string) {
+func writeBitsConsts(c *gen.Gen, t typ.Type, ref string) {
 	mono := true
 	c.WriteString("const (")
 	for i, cst := range t.Consts {
@@ -310,7 +325,7 @@ func writeBitsConsts(c *gen.Ctx, t typ.Type, ref string) {
 	c.WriteString("\n)\n")
 }
 
-func writeEnumConsts(c *gen.Ctx, t typ.Type, ref string) {
+func writeEnumConsts(c *gen.Gen, t typ.Type, ref string) {
 	c.WriteString("const (")
 	for _, cst := range t.Consts {
 		c.WriteString("\n\t")

@@ -10,7 +10,7 @@ import (
 )
 
 // WriteType writes the native go type for t to c or returns an error.
-func WriteType(c *gen.Ctx, t typ.Type) error {
+func WriteType(c *gen.Gen, t typ.Type) error {
 	k := t.Kind
 	switch k {
 	case typ.KindAny:

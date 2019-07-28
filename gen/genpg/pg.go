@@ -4,7 +4,6 @@ package genpg
 import (
 	"strings"
 
-	"github.com/mb0/daql/gen"
 	"github.com/mb0/xelf/bfr"
 	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/exp"
@@ -13,27 +12,23 @@ import (
 
 var External = cor.StrError("external symbol")
 
-type Env interface {
-	Translate(*exp.Sym) (string, lit.Lit, error)
-}
-
 // WriteEl writes the element e to b or returns an error.
 // This is used for explicit selectors for example.
-func WriteEl(b *gen.Ctx, env Env, e exp.El) error {
+func (w *Writer) WriteEl(env exp.Env, e exp.El) error {
 	switch v := e.(type) {
 	case *exp.Sym:
-		n, l, err := env.Translate(v)
+		n, l, err := w.Translate(env, v)
 		if err != nil {
 			return cor.Errorf("symbol %q: %w", v.Name, err)
 		}
 		if l != nil {
-			return WriteLit(b, v.Lit)
+			return WriteLit(w, v.Lit)
 		}
-		return writeIdent(b, n)
+		return writeIdent(w, n)
 	case *exp.Call:
-		return WriteExpr(b, env, v)
+		return w.WriteExpr(env, v)
 	case *exp.Atom:
-		return WriteLit(b, v.Lit)
+		return WriteLit(w, v.Lit)
 	}
 	return cor.Errorf("unexpected element %[1]T %[1]s", e)
 }
@@ -42,28 +37,28 @@ func WriteEl(b *gen.Ctx, env Env, e exp.El) error {
 // Most xelf expressions with resolvers from the core or lib built-ins have a corresponding
 // expression in postgresql. Custom resolvers can be rendered to sql by detecting
 // and handling them before calling this function.
-func WriteExpr(b *gen.Ctx, env Env, e *exp.Call) error {
+func (w *Writer) WriteExpr(env exp.Env, e *exp.Call) error {
 	key := e.Spec.Key()
 	if key == "bool" {
 		key = ":bool"
 	}
 	r := exprWriterMap[key]
 	if r != nil {
-		return r.WriteExpr(b, env, e)
+		return r.WriteCall(w, env, e)
 	}
 	// dyn and reduce are not supported
 	// TODO let and with might use common table expressions on a higher level
 	return cor.Errorf("no writer for expression %s", e)
 }
 
-type exprWriter interface {
-	WriteExpr(*gen.Ctx, Env, *exp.Call) error
+type callWriter interface {
+	WriteCall(*Writer, exp.Env, *exp.Call) error
 }
 
-var exprWriterMap map[string]exprWriter
+var exprWriterMap map[string]callWriter
 
 func init() {
-	exprWriterMap = map[string]exprWriter{
+	exprWriterMap = map[string]callWriter{
 		// I found no better way sql expression to fail when resolved but not otherwise.
 		// Sadly we cannot transport any failure message, but it suffices, because this is
 		// only meant to be a test helper.
@@ -104,25 +99,25 @@ const (
 	PrecMul // *, /, %
 )
 
-func writeSuffix(b *gen.Ctx, l lit.Lit, fix string) error {
-	err := l.WriteBfr(&b.Ctx)
+func writeSuffix(w *Writer, l lit.Lit, fix string) error {
+	err := l.WriteBfr(&w.Ctx)
 	if err != nil {
 		return err
 	}
-	return b.Fmt(fix)
+	return w.Fmt(fix)
 }
 
-func writeJSONB(b *gen.Ctx, l lit.Lit) error {
+func writeJSONB(w *Writer, l lit.Lit) error {
 	var bb strings.Builder
 	err := l.WriteBfr(&bfr.Ctx{B: &bb, JSON: true})
 	if err != nil {
 		return err
 	}
-	WriteQuote(b, bb.String())
-	return b.Fmt("::jsonb")
+	WriteQuote(w, bb.String())
+	return w.Fmt("::jsonb")
 }
 
-func writeArray(b *gen.Ctx, l lit.Appender) error {
+func writeArray(w *Writer, l lit.Appender) error {
 	var bb strings.Builder
 	bb.WriteByte('{')
 	err := l.IterIdx(func(i int, e lit.Lit) error {
@@ -135,32 +130,32 @@ func writeArray(b *gen.Ctx, l lit.Appender) error {
 		return err
 	}
 	bb.WriteByte('}')
-	WriteQuote(b, bb.String())
+	WriteQuote(w, bb.String())
 	t, err := TypString(l.Typ().Elem())
 	if err != nil {
 		return err
 	}
-	b.WriteString("::")
-	b.WriteString(t)
-	b.WriteString("[]")
+	w.WriteString("::")
+	w.WriteString(t)
+	w.WriteString("[]")
 	return nil
 }
 
 // WriteQuote quotes a string as a postgres string, all single quotes are use sql escaping.
-func WriteQuote(b bfr.B, text string) {
-	b.WriteByte('\'')
-	b.WriteString(strings.Replace(text, "'", "''", -1))
-	b.WriteByte('\'')
+func WriteQuote(w bfr.B, text string) {
+	w.WriteByte('\'')
+	w.WriteString(strings.Replace(text, "'", "''", -1))
+	w.WriteByte('\'')
 }
 
 var keywords map[string]struct{}
 
-func writeIdent(b *gen.Ctx, name string) error {
+func writeIdent(w *Writer, name string) error {
 	name = strings.ToLower(name)
 	if _, ok := keywords[name]; !ok {
-		return b.Fmt(name)
+		return w.Fmt(name)
 	}
-	b.WriteByte('"')
-	b.WriteString(name)
-	return b.WriteByte('"')
+	w.WriteByte('"')
+	w.WriteString(name)
+	return w.WriteByte('"')
 }

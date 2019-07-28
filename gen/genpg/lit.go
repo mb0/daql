@@ -1,7 +1,6 @@
 package genpg
 
 import (
-	"github.com/mb0/daql/gen"
 	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/lit"
 	"github.com/mb0/xelf/typ"
@@ -44,7 +43,7 @@ func TypString(t typ.Type) (string, error) {
 }
 
 // WriteLit renders the literal l to b or returns an error.
-func WriteLit(b *gen.Ctx, l lit.Lit) error {
+func WriteLit(b *Writer, l lit.Lit) error {
 	t := l.Typ()
 	if (t.Kind == typ.KindAny || t.Kind&typ.KindOpt != 0) && l.IsZero() {
 		return b.Fmt("NULL")

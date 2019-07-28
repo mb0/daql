@@ -33,7 +33,7 @@ func TestWriteType(t *testing.T) {
 	}
 	for _, test := range tests {
 		var b strings.Builder
-		c := &gen.Ctx{Ctx: bfr.Ctx{B: &b}, Pkgs: map[string]string{
+		c := &gen.Gen{Ctx: bfr.Ctx{B: &b}, Pkgs: map[string]string{
 			"lit": "xelf/lit",
 		}}
 		err := WriteType(c, test.t)

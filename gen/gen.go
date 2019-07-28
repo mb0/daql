@@ -10,8 +10,8 @@ import (
 	"github.com/mb0/xelf/bfr"
 )
 
-// Ctx is the code generation context holding the buffer and additional information.
-type Ctx struct {
+// Gen is the code generation context holding the buffer and additional information.
+type Gen struct {
 	bfr.Ctx
 	*dom.Project
 	Pkg    string
@@ -22,7 +22,7 @@ type Ctx struct {
 	Imports
 }
 
-func (c *Ctx) Prec(prec int) (restore func()) {
+func (c *Gen) Prec(prec int) (restore func()) {
 	org := c.OpPrec
 	if org > prec {
 		c.WriteByte('(')
@@ -39,7 +39,7 @@ func (c *Ctx) Prec(prec int) (restore func()) {
 // Prepend write each line in text prepended with prefix to the buffer.
 // It strips the ascii whitespace bytes after the first linebreak, and tries to remove the same
 // from each following line. If text starts with an empty line, that line is ignored.
-func (c *Ctx) Prepend(text, prefix string) {
+func (c *Gen) Prepend(text, prefix string) {
 	if text == "" {
 		return
 	}

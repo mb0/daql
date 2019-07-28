@@ -1,91 +1,93 @@
 package genpg
 
 import (
-	"io/ioutil"
+	"io"
+	"os"
 	"strings"
 
 	"github.com/mb0/daql/dom"
-	"github.com/mb0/daql/gen"
 	"github.com/mb0/xelf/bfr"
 	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/typ"
 )
 
-func WriteFile(c *gen.Ctx, fname string, s *dom.Schema) error {
+func WriteFile(fname string, p *dom.Project, s *dom.Schema) error {
 	b := bfr.Get()
 	defer bfr.Put(b)
-	c.Ctx = bfr.Ctx{B: b, Tab: "\t"}
-	err := RenderFile(c, s)
+	w := NewWriter(b, ExpEnv{})
+	w.WriteString(w.Header)
+	w.WriteString("BEGIN;\n\n")
+	err := w.WriteSchema(s)
 	if err != nil {
 		return cor.Errorf("render file %s error: %v", fname, err)
 	}
-	err = ioutil.WriteFile(fname, b.Bytes(), 0644)
+	w.WriteString("COMMIT;\n")
+	f, err := os.OpenFile(fname, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
-		return cor.Errorf("write file %s error: %v", fname, err)
+		return err
 	}
-	return nil
+	defer f.Close()
+	_, err = io.Copy(f, b)
+	return err
 }
 
-func RenderFile(c *gen.Ctx, s *dom.Schema) (err error) {
-	c.WriteString(c.Header)
-	c.WriteString("BEGIN;\n\n")
-	c.WriteString("CREATE SCHEMA ")
-	c.WriteString(s.Name)
-	c.WriteString(";\n\n")
+func (w *Writer) WriteSchema(s *dom.Schema) (err error) {
+	w.WriteString("CREATE SCHEMA ")
+	w.WriteString(s.Name)
+	w.WriteString(";\n\n")
 	for _, m := range s.Models {
 		switch m.Type.Kind {
 		case typ.KindBits:
 		case typ.KindEnum:
-			err = WriteEnum(c, m)
+			err = w.WriteEnum(m)
 		default:
-			err = WriteTable(c, m)
+			err = w.WriteTable(m)
 		}
 		if err != nil {
 			return err
 		}
-		c.WriteString(";\n\n")
+		w.WriteString(";\n\n")
 	}
-	c.WriteString("COMMIT;\n")
 	return nil
 }
 
-func WriteEnum(b *gen.Ctx, m *dom.Model) error {
-	b.WriteString("CREATE TYPE ")
-	b.WriteString(m.Type.Key())
-	b.WriteString(" AS ENUM (")
-	b.Indent()
+func (w *Writer) WriteEnum(m *dom.Model) error {
+	w.WriteString("CREATE TYPE ")
+	w.WriteString(m.Type.Key())
+	w.WriteString(" AS ENUM (")
+	w.Indent()
 	for i, c := range m.Type.Consts {
 		if i > 0 {
-			b.WriteByte(',')
-			if !b.Break() {
-				b.WriteByte(' ')
+			w.WriteByte(',')
+			if !w.Break() {
+				w.WriteByte(' ')
 			}
 		}
-		WriteQuote(b, c.Key())
+		WriteQuote(w, c.Key())
 	}
-	b.Dedent()
-	return b.WriteByte(')')
+	w.Dedent()
+	return w.WriteByte(')')
 }
 
-func WriteTable(b *gen.Ctx, m *dom.Model) error {
-	b.WriteString("CREATE TABLE ")
-	b.WriteString(m.Type.Key())
-	b.WriteString(" (")
-	b.Indent()
+func (w *Writer) WriteTable(m *dom.Model) error {
+	w.WriteString("CREATE TABLE ")
+	w.WriteString(m.Type.Key())
+	w.WriteString(" (")
+	w.Indent()
 	for i, p := range m.Type.Params {
 		if i > 0 {
-			b.WriteByte(',')
-			if !b.Break() {
-				b.WriteByte(' ')
+			w.WriteByte(',')
+			if !w.Break() {
+				w.WriteByte(' ')
 			}
 		}
-		writeField(b, p, m.Elems[i])
+		w.writeField(p, m.Elems[i])
 	}
-	b.Dedent()
-	return b.WriteByte(')')
+	w.Dedent()
+	return w.WriteByte(')')
 }
 
-func writeField(b *gen.Ctx, p typ.Param, el *dom.Elem) error {
+func (w *Writer) writeField(p typ.Param, el *dom.Elem) error {
 	key := p.Key()
 	if key == "" {
 		switch p.Type.Kind & typ.MaskRef {
@@ -93,61 +95,61 @@ func writeField(b *gen.Ctx, p typ.Param, el *dom.Elem) error {
 			split := strings.Split(p.Type.Key(), ".")
 			key = split[len(split)-1]
 		case typ.KindObj:
-			return embedField(b, p.Type)
+			return w.writerEmbed(p.Type)
 		default:
 			return cor.Errorf("unexpected embedded field type %s", p.Type)
 		}
 	}
-	b.WriteString(key)
-	b.WriteByte(' ')
+	w.WriteString(key)
+	w.WriteByte(' ')
 	ts, err := TypString(p.Type)
 	if err != nil {
 		return err
 	}
 	if ts == "int8" && el.Bits&dom.BitPK != 0 && el.Bits&dom.BitAuto != 0 {
-		b.WriteString("serial8")
+		w.WriteString("serial8")
 	} else {
-		b.WriteString(ts)
+		w.WriteString(ts)
 	}
 	if el.Bits&dom.BitPK != 0 {
-		b.WriteString(" PRIMARY KEY")
+		w.WriteString(" PRIMARY KEY")
 		// TODO auto
 	} else if el.Bits&dom.BitOpt != 0 || p.Type.IsOpt() {
-		b.WriteString(" NULL")
+		w.WriteString(" NULL")
 	} else {
-		b.WriteString(" NOT NULL")
+		w.WriteString(" NOT NULL")
 	}
 	// TODO default
 	// TODO references
 	return nil
 }
 
-func embedField(b *gen.Ctx, t typ.Type) error {
+func (w *Writer) writerEmbed(t typ.Type) error {
 	split := strings.Split(t.Key(), ".")
-	m := b.Project.Schema(split[0]).Model(split[1])
+	m := w.Project.Schema(split[0]).Model(split[1])
 	for i, p := range m.Type.Params {
 		if i > 0 {
-			b.WriteByte(',')
-			if !b.Break() {
-				b.WriteByte(' ')
+			w.WriteByte(',')
+			if !w.Break() {
+				w.WriteByte(' ')
 			}
 		}
 		key := p.Key()
 		if key == "" {
-			embedField(b, p.Type)
+			w.writerEmbed(p.Type)
 			continue
 		}
-		b.WriteString(p.Key())
-		b.WriteByte(' ')
+		w.WriteString(p.Key())
+		w.WriteByte(' ')
 		ts, err := TypString(p.Type)
 		if err != nil {
 			return err
 		}
-		b.WriteString(ts)
+		w.WriteString(ts)
 		if p.Opt() || p.Type.IsOpt() {
-			b.WriteString(" NULL")
+			w.WriteString(" NULL")
 		} else {
-			b.WriteString(" NOT NULL")
+			w.WriteString(" NOT NULL")
 			if p.Opt() {
 				// TODO implicit default
 			}

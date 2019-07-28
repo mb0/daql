@@ -3,7 +3,6 @@ package genpg
 import (
 	"strings"
 
-	"github.com/mb0/daql/gen"
 	"github.com/mb0/xelf/bfr"
 	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/exp"
@@ -16,7 +15,7 @@ type (
 		raw  string
 		prec int
 	}
-	writeFunc  func(*gen.Ctx, Env, *exp.Call) error
+	writeFunc  func(*Writer, exp.Env, *exp.Call) error
 	writeArith struct {
 		op   string
 		prec int
@@ -33,20 +32,20 @@ type (
 	}
 )
 
-func (r writeRaw) WriteExpr(b *gen.Ctx, env Env, e *exp.Call) error {
-	restore := b.Prec(r.prec)
-	b.WriteString(r.raw)
+func (r writeRaw) WriteCall(w *Writer, env exp.Env, e *exp.Call) error {
+	restore := w.Prec(r.prec)
+	w.WriteString(r.raw)
 	restore()
 	return nil
 }
-func (r writeFunc) WriteExpr(b *gen.Ctx, env Env, e *exp.Call) error { return r(b, env, e) }
-func (r writeLogic) WriteExpr(b *gen.Ctx, env Env, e *exp.Call) error {
-	restore := b.Prec(r.prec)
+func (r writeFunc) WriteCall(w *Writer, env exp.Env, e *exp.Call) error { return r(w, env, e) }
+func (r writeLogic) WriteCall(w *Writer, env exp.Env, e *exp.Call) error {
+	restore := w.Prec(r.prec)
 	for i, arg := range e.Args {
 		if i > 0 {
-			b.WriteString(r.op)
+			w.WriteString(r.op)
 		}
-		err := writeBool(b, env, r.not, arg)
+		err := writeBool(w, env, r.not, arg)
 		if err != nil {
 			return err
 		}
@@ -55,13 +54,13 @@ func (r writeLogic) WriteExpr(b *gen.Ctx, env Env, e *exp.Call) error {
 	return nil
 }
 
-func (r writeArith) WriteExpr(b *gen.Ctx, env Env, e *exp.Call) error {
-	restore := b.Prec(r.prec)
+func (r writeArith) WriteCall(w *Writer, env exp.Env, e *exp.Call) error {
+	restore := w.Prec(r.prec)
 	for i, arg := range e.Args {
 		if i > 0 {
-			b.WriteString(r.op)
+			w.WriteString(r.op)
 		}
-		err := WriteEl(b, env, arg)
+		err := w.WriteEl(env, arg)
 		if err != nil {
 			return err
 		}
@@ -70,106 +69,106 @@ func (r writeArith) WriteExpr(b *gen.Ctx, env Env, e *exp.Call) error {
 	return nil
 }
 
-func renderIf(b *gen.Ctx, env Env, e *exp.Call) error {
-	restore := b.Prec(PrecDef)
-	b.WriteString("CASE ")
+func renderIf(w *Writer, env exp.Env, e *exp.Call) error {
+	restore := w.Prec(PrecDef)
+	w.WriteString("CASE ")
 	var i int
 	for i = 0; i+1 < len(e.Args); i += 2 {
-		b.WriteString("WHEN ")
-		err := writeBool(b, env, false, e.Args[i])
+		w.WriteString("WHEN ")
+		err := writeBool(w, env, false, e.Args[i])
 		if err != nil {
 			return err
 		}
-		b.WriteString(" THEN ")
-		err = WriteEl(b, env, e.Args[i+1])
+		w.WriteString(" THEN ")
+		err = w.WriteEl(env, e.Args[i+1])
 		if err != nil {
 			return err
 		}
 	}
 	if i < len(e.Args) {
-		b.WriteString(" ELSE ")
-		err := WriteEl(b, env, e.Args[i])
+		w.WriteString(" ELSE ")
+		err := w.WriteEl(env, e.Args[i])
 		if err != nil {
 			return err
 		}
 	}
-	b.WriteString(" END")
+	w.WriteString(" END")
 	restore()
 	return nil
 }
 
-func (r writeEq) WriteExpr(b *gen.Ctx, env Env, e *exp.Call) error {
+func (r writeEq) WriteCall(w *Writer, env exp.Env, e *exp.Call) error {
 	if len(e.Args) > 2 {
-		defer b.Prec(PrecAnd)()
+		defer w.Prec(PrecAnd)()
 	}
 	// TODO mind nulls
-	fst, err := writeString(b, env, e.Args[0])
+	fst, err := writeString(w, env, e.Args[0])
 	if err != nil {
 		return err
 	}
 	for i, arg := range e.Args[1:] {
 		if i > 0 {
-			b.WriteString(" AND ")
+			w.WriteString(" AND ")
 		}
 		if !r.strict {
-			restore := b.Prec(PrecCmp)
-			b.WriteString(fst)
-			b.WriteString(r.op)
-			err = WriteEl(b, env, arg)
+			restore := w.Prec(PrecCmp)
+			w.WriteString(fst)
+			w.WriteString(r.op)
+			err = w.WriteEl(env, arg)
 			if err != nil {
 				return err
 			}
 			restore()
 			continue
 		}
-		b.WriteByte('(')
-		b.WriteString(fst)
-		b.WriteString(r.op)
-		oth, err := writeString(b, env, arg)
+		w.WriteByte('(')
+		w.WriteString(fst)
+		w.WriteString(r.op)
+		oth, err := writeString(w, env, arg)
 		if err != nil {
 			return err
 		}
-		b.WriteString(oth)
-		b.WriteString(" AND pg_typeof(")
-		b.WriteString(fst)
-		b.WriteByte(')')
-		b.WriteString(r.op)
-		b.WriteString("pg_typeof(")
-		b.WriteString(oth)
-		b.WriteByte(')')
-		b.WriteByte(')')
+		w.WriteString(oth)
+		w.WriteString(" AND pg_typeof(")
+		w.WriteString(fst)
+		w.WriteByte(')')
+		w.WriteString(r.op)
+		w.WriteString("pg_typeof(")
+		w.WriteString(oth)
+		w.WriteByte(')')
+		w.WriteByte(')')
 	}
 	return nil
 }
 
-func (r writeCmp) WriteExpr(b *gen.Ctx, env Env, e *exp.Call) error {
+func (r writeCmp) WriteCall(w *Writer, env exp.Env, e *exp.Call) error {
 	if len(e.Args) > 2 {
-		defer b.Prec(PrecAnd)()
+		defer w.Prec(PrecAnd)()
 	}
 	// TODO mind nulls
-	last, err := writeString(b, env, e.Args[0])
+	last, err := writeString(w, env, e.Args[0])
 	if err != nil {
 		return err
 	}
 	for i, arg := range e.Args[1:] {
 		if i > 0 {
-			b.WriteString(" AND ")
+			w.WriteString(" AND ")
 		}
-		restore := b.Prec(PrecCmp)
-		b.WriteString(last)
-		b.WriteString(string(r))
-		oth, err := writeString(b, env, arg)
+		restore := w.Prec(PrecCmp)
+		w.WriteString(last)
+		w.WriteString(string(r))
+		oth, err := writeString(w, env, arg)
 		if err != nil {
 			return err
 		}
-		b.WriteString(oth)
+		w.WriteString(oth)
 		restore()
 		last = oth
 	}
 	return nil
 }
 
-func writeAs(b *gen.Ctx, env Env, e *exp.Call) error {
+func writeAs(w *Writer, env exp.Env, e *exp.Call) error {
 	if len(e.Args) == 0 {
 		return cor.Errorf("empty as expression")
 	}
@@ -187,28 +186,28 @@ func writeAs(b *gen.Ctx, env Env, e *exp.Call) error {
 		if err != nil {
 			return err
 		}
-		b.WriteString(zero)
+		w.WriteString(zero)
 	case 2:
-		err = WriteEl(b, env, e.Args[1])
+		err = w.WriteEl(env, e.Args[1])
 		if err != nil {
 			return err
 		}
 	default:
 		return cor.Errorf("not implemented %q", e)
 	}
-	b.WriteString("::")
-	b.WriteString(ts)
+	w.WriteString("::")
+	w.WriteString(ts)
 	return nil
 }
 
-func writeCat(b *gen.Ctx, env Env, e *exp.Call) error {
-	restore := b.Prec(PrecDef)
+func writeCat(w *Writer, env exp.Env, e *exp.Call) error {
+	restore := w.Prec(PrecDef)
 	for i, arg := range e.Args {
 		if i > 0 {
-			b.WriteString(" || ")
+			w.WriteString(" || ")
 		}
 		// TODO cast to element type
-		err := WriteEl(b, env, arg)
+		err := w.WriteEl(env, arg)
 		if err != nil {
 			return err
 		}
@@ -216,7 +215,7 @@ func writeCat(b *gen.Ctx, env Env, e *exp.Call) error {
 	restore()
 	return nil
 }
-func writeApd(b *gen.Ctx, env Env, e *exp.Call) error {
+func writeApd(w *Writer, env exp.Env, e *exp.Call) error {
 	if len(e.Args) == 0 {
 		return cor.Errorf("empty apd expression")
 	}
@@ -224,16 +223,16 @@ func writeApd(b *gen.Ctx, env Env, e *exp.Call) error {
 	if t == typ.Void {
 		return cor.Errorf("untyped first argument in apd expression")
 	}
-	restore := b.Prec(PrecDef)
+	restore := w.Prec(PrecDef)
 	// either jsonb or postgres array
 	ispg := t.Elem().Kind&typ.KindPrim != 0
 	for i, arg := range e.Args {
 		if i > 0 {
-			b.WriteString(" || ")
+			w.WriteString(" || ")
 		}
 		// TODO cast to element type when ispg, otherwise jsonb
 		_ = ispg
-		err := WriteEl(b, env, arg)
+		err := w.WriteEl(env, arg)
 		if err != nil {
 			return err
 		}
@@ -244,7 +243,7 @@ func writeApd(b *gen.Ctx, env Env, e *exp.Call) error {
 
 var setSig = exp.MustSig("(form 'set' @1:keyr :plain? :tags?  @1)")
 
-func writeSet(b *gen.Ctx, env Env, e *exp.Call) error {
+func writeSet(w *Writer, env exp.Env, e *exp.Call) error {
 	// First arg can only be a jsonb obj
 	// TODO but check that
 	lo, err := exp.LayoutArgs(setSig, e.Args)
@@ -270,34 +269,34 @@ func writeSet(b *gen.Ctx, env Env, e *exp.Call) error {
 		}
 	}
 	for range rest {
-		b.WriteString("jsonb_set(")
+		w.WriteString("jsonb_set(")
 	}
-	err = WriteEl(b, env, e.Args[0])
+	err = w.WriteEl(env, e.Args[0])
 	if err != nil {
 		return err
 	}
 	if dict.Len() > 0 {
-		b.WriteString(" || ")
-		err = WriteLit(b, dict)
+		w.WriteString(" || ")
+		err = WriteLit(w, dict)
 		if err != nil {
 			return err
 		}
 	}
 	for i := range rest {
 		d := rest[len(rest)-i-1]
-		b.WriteString(", {")
-		b.WriteString(strings.ToLower(d.Name))
-		b.WriteString("}, ")
-		err = WriteEl(b, env, d.El)
+		w.WriteString(", {")
+		w.WriteString(strings.ToLower(d.Name))
+		w.WriteString("}, ")
+		err = w.WriteEl(env, d.El)
 		if err != nil {
 			return err
 		}
-		b.WriteString(", true)")
+		w.WriteString(", true)")
 	}
 	return nil
 }
 
-func writeBool(b *gen.Ctx, env Env, not bool, e exp.El) error {
+func writeBool(w *Writer, env exp.Env, not bool, e exp.El) error {
 	var t typ.Type
 	switch v := e.(type) {
 	case *exp.Sym:
@@ -311,22 +310,22 @@ func writeBool(b *gen.Ctx, env Env, not bool, e exp.El) error {
 	}
 	if t.Kind == typ.KindBool {
 		if not {
-			defer b.Prec(PrecNot)()
-			b.WriteString("NOT ")
+			defer w.Prec(PrecNot)()
+			w.WriteString("NOT ")
 		}
-		return WriteEl(b, env, e)
+		return w.WriteEl(env, e)
 	}
 	// add boolean conversion if necessary
 	if t.Kind&typ.KindOpt != 0 {
-		defer b.Prec(PrecIs)()
-		err := WriteEl(b, env, e)
+		defer w.Prec(PrecIs)()
+		err := w.WriteEl(env, e)
 		if err != nil {
 			return err
 		}
 		if not {
-			b.WriteString(" IS NULL")
+			w.WriteString(" IS NULL")
 		} else {
-			b.WriteString(" IS NOT NULL")
+			w.WriteString(" IS NOT NULL")
 		}
 		return nil
 	}
@@ -336,14 +335,14 @@ func writeBool(b *gen.Ctx, env Env, not bool, e exp.El) error {
 	}
 	if oth != "" {
 		if not {
-			defer b.Prec(PrecOr)()
+			defer w.Prec(PrecOr)()
 		} else {
-			defer b.Prec(PrecAnd)()
+			defer w.Prec(PrecAnd)()
 		}
 	} else if cmp != "" {
-		defer b.Prec(PrecCmp)()
+		defer w.Prec(PrecCmp)()
 	}
-	err = WriteEl(b, env, e)
+	err = w.WriteEl(env, e)
 	if err != nil {
 		return err
 	}
@@ -352,32 +351,32 @@ func writeBool(b *gen.Ctx, env Env, not bool, e exp.El) error {
 		if not {
 			op = " = "
 		}
-		restore := b.Prec(PrecCmp)
-		b.WriteString(op)
-		b.WriteString(cmp)
+		restore := w.Prec(PrecCmp)
+		w.WriteString(op)
+		w.WriteString(cmp)
 		if oth != "" {
 			if not {
-				b.WriteString(" OR ")
+				w.WriteString(" OR ")
 			} else {
-				b.WriteString(" AND ")
+				w.WriteString(" AND ")
 			}
-			err := WriteEl(b, env, e)
+			err := w.WriteEl(env, e)
 			if err != nil {
 				return err
 			}
-			b.WriteString(op)
-			b.WriteString(oth)
+			w.WriteString(op)
+			w.WriteString(oth)
 		}
 		restore()
 	}
 	return nil
 }
 
-func writeString(c *gen.Ctx, env Env, e exp.El) (string, error) {
-	cc := *c
+func writeString(w *Writer, env exp.Env, e exp.El) (string, error) {
+	cc := *w
 	var b strings.Builder
 	cc.Ctx = bfr.Ctx{B: &b}
-	err := WriteEl(&cc, env, e)
+	err := cc.WriteEl(env, e)
 	if err != nil {
 		return "", err
 	}

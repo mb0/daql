@@ -77,7 +77,7 @@ func TestWriteFile(t *testing.T) {
 	}
 	for _, test := range tests {
 		var b strings.Builder
-		c := &gen.Ctx{Ctx: bfr.Ctx{B: &b}, Pkg: "path/to/foo", Pkgs: pkgs}
+		c := &gen.Gen{Ctx: bfr.Ctx{B: &b}, Pkg: "path/to/foo", Pkgs: pkgs}
 		ss := &dom.Schema{Common: dom.Common{Name: s.Name}}
 		if m := s.Model(test.model); m != nil {
 			ss.Models = []*dom.Model{m}

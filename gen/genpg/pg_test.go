@@ -4,8 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mb0/daql/gen"
-	"github.com/mb0/xelf/bfr"
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/std"
 	"github.com/mb0/xelf/typ"
@@ -62,7 +60,8 @@ func TestRender(t *testing.T) {
 			continue
 		}
 		var b strings.Builder
-		err = WriteEl(&gen.Ctx{Ctx: bfr.Ctx{B: &b}}, ExpEnv{env}, el)
+		w := NewWriter(&b, ExpEnv{})
+		err = w.WriteEl(env, el)
 		if err != nil {
 			t.Errorf("render %s err: %+v", test.el, err)
 			continue

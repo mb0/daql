@@ -9,7 +9,7 @@ import (
 )
 
 // WriteLit writes the native go literal for l to c or returns an error.
-func WriteLit(c *gen.Ctx, l lit.Lit) error {
+func WriteLit(c *gen.Gen, l lit.Lit) error {
 	t := l.Typ()
 	opt := t.IsOpt()
 	if opt && l.IsZero() {
@@ -155,7 +155,7 @@ func WriteLit(c *gen.Ctx, l lit.Lit) error {
 	return nil
 }
 
-func writeCall(c *gen.Ctx, name string, l lit.Lit) error {
+func writeCall(c *gen.Gen, name string, l lit.Lit) error {
 	c.WriteString(Import(c, name))
 	c.WriteByte('(')
 	err := l.WriteBfr(&bfr.Ctx{B: c.B, JSON: true})
@@ -163,7 +163,7 @@ func writeCall(c *gen.Ctx, name string, l lit.Lit) error {
 	return err
 }
 
-func writeIdxer(c *gen.Ctx, l lit.Lit) error {
+func writeIdxer(c *gen.Gen, l lit.Lit) error {
 	v, ok := l.(lit.Indexer)
 	if !ok {
 		return cor.Errorf("expect idxer got %T", l)
@@ -186,7 +186,7 @@ func writeIdxer(c *gen.Ctx, l lit.Lit) error {
 	return c.WriteByte('}')
 }
 
-func writeKeyer(c *gen.Ctx, l lit.Lit, el func(int, string, lit.Lit) error) error {
+func writeKeyer(c *gen.Gen, l lit.Lit, el func(int, string, lit.Lit) error) error {
 	v, ok := l.(lit.Keyer)
 	if !ok {
 		return cor.Errorf("expect keyer got %T", l)
