@@ -15,6 +15,7 @@ import (
 	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/lit"
+	"github.com/mb0/xelf/typ"
 	"github.com/peterh/liner"
 )
 
@@ -40,7 +41,7 @@ func repl(args []string) error {
 	lin.SetMultiLineMode(true)
 	var buf bytes.Buffer
 	var multi bool
-	env := &exp.DataScope{Par: qry.Builtin, Dot: &lit.Dict{}}
+	env := &exp.DataScope{Par: qry.Builtin, Def: exp.Def{Lit: &lit.Dict{}}}
 	for {
 		prompt := "> "
 		if multi = buf.Len() > 0; multi {
@@ -65,7 +66,7 @@ func repl(args []string) error {
 			buf.WriteByte(' ')
 		}
 		buf.WriteString(got)
-		el, err := exp.ParseString(env, buf.String())
+		el, err := exp.Read(&buf)
 		if err != nil {
 			if cor.IsErr(err, io.EOF) {
 				continue
@@ -76,7 +77,8 @@ func repl(args []string) error {
 		}
 		lin.AppendHistory(buf.String())
 		buf.Reset()
-		l, err := exp.Execute(qry.NewEnv(env, &fix.Project, membed), el)
+		qenv := qry.NewEnv(env, &fix.Project, membed)
+		l, err := exp.NewCtx().Eval(qenv, el, typ.Void)
 		if err != nil {
 			log.Printf("error resolving %s: %v", got, err)
 			continue

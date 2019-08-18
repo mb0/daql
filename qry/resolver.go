@@ -10,51 +10,51 @@ import (
 	"github.com/mb0/xelf/typ"
 )
 
-var qrySpec = exp.ImplementReq("(form 'qry' :args? :decls? : @1)", false,
-	func(x exp.ReslReq) (exp.El, error) {
-		qenv := FindEnv(x.Env)
-		if qenv == nil {
-			return nil, cor.Errorf("no qry environment for query %s", x)
+var qrySpec = std.SpecXX("(form 'qry' :args? :decls? : @1)", func(x std.CallCtx) (exp.El, error) {
+	qenv := FindEnv(x.Env)
+	if qenv == nil {
+		return nil, cor.Errorf("no qry environment for query %s", x)
+	}
+	doc := &Doc{}
+	args := x.Args(0)
+	penv := exp.NewParamReslEnv(x.Env, x.Ctx.Ctx)
+	denv := doc.ReslEnv(penv)
+	if len(args) > 0 {
+		// simple query
+		if len(x.Args(1)) > 0 {
+			return nil, cor.Errorf("either use simple or compound query got %v rest %v",
+				args, x.Args(1))
 		}
-		doc := &Doc{}
-		args := x.Args(0)
-		denv := doc.ReslEnv(x.Env)
-		if len(args) > 0 {
-			// simple query
-			if len(x.Args(1)) > 0 {
-				return nil, cor.Errorf("either use simple or compound query got %v rest %v",
-					args, x.Args(1))
-			}
-			t, err := resolveTask(x.Ctx, denv, exp.NewNamed("", args...), nil)
+		t, err := resolveTask(x.Ctx, denv, exp.NewNamed("", args...), nil)
+		if err != nil {
+			return nil, err
+		}
+		doc.Root = []*Task{t}
+		doc.Type = t.Type
+	} else {
+		decls, err := x.Decls(1)
+		if err != nil {
+			return nil, err
+		}
+		ps := make([]typ.Param, 0, len(decls))
+		for _, d := range decls {
+			t, err := resolveTask(x.Ctx, denv, d, nil)
 			if err != nil {
 				return nil, err
 			}
-			doc.Root = []*Task{t}
-			doc.Type = t.Type
-		} else {
-			decls, err := x.Decls(1)
-			if err != nil {
-				return nil, err
-			}
-			ps := make([]typ.Param, 0, len(decls))
-			for _, d := range decls {
-				t, err := resolveTask(x.Ctx, denv, d, nil)
-				if err != nil {
-					return nil, err
-				}
-				doc.Root = append(doc.Root, t)
-				ps = append(ps, typ.Param{Name: t.Name, Type: t.Type})
-			}
-			doc.Type = typ.Rec(ps)
+			doc.Root = append(doc.Root, t)
+			ps = append(ps, typ.Param{Name: t.Name, Type: t.Type})
 		}
-		if len(doc.Root) == 0 {
-			return nil, cor.Error("empty plan")
-		}
-		return &exp.Atom{Lit: &exp.Spec{typ.Func("", []typ.Param{
-			{"arg", typ.Any},
-			{"", doc.Type},
-		}), doc}}, nil
-	})
+		doc.Type = typ.Rec(ps)
+	}
+	if len(doc.Root) == 0 {
+		return nil, cor.Error("empty plan")
+	}
+	return &exp.Atom{Lit: &exp.Spec{typ.Func("", []typ.Param{
+		{"arg", typ.Any},
+		{"", doc.Type},
+	}), doc}}, nil
+})
 
 var taskSig = exp.MustSig("(form '_' :ref? @1 :args? :decls? : void)")
 
@@ -69,7 +69,7 @@ func resolveTask(c *exp.Ctx, env exp.Env, d *exp.Named, p *Task) (t *Task, err e
 		// this transforms +id to (+id .id) an + to (+ .)
 		fst = &exp.Sym{Name: "." + t.Name}
 	} else {
-		lo, err := exp.LayoutArgs(taskSig, d.Args())
+		lo, err := exp.FormLayout(taskSig, d.Args())
 		if err != nil {
 			return nil, err
 		}
@@ -84,7 +84,6 @@ func resolveTask(c *exp.Ctx, env exp.Env, d *exp.Named, p *Task) (t *Task, err e
 				return nil, err
 			}
 			return t, nil
-		case '.':
 		default:
 			fst = &exp.Dyn{Els: d.Args()}
 		}
@@ -93,13 +92,13 @@ func resolveTask(c *exp.Ctx, env exp.Env, d *exp.Named, p *Task) (t *Task, err e
 		return nil, cor.Errorf("unnamed expr task %s", d)
 	}
 	// partially resolve expression
-	fst, err = exp.Resolve(env, fst)
+	fst, err = exp.NewCtx().WithPart(true).Resl(env, fst, typ.Void)
 	if fst == nil {
 		return nil, cor.Errorf("resolve task %s: %v", d, err)
 	}
 	t.Expr = fst
 	if err == nil {
-		t.Type = fst.Typ()
+		t.Type = exp.ResType(fst)
 		return t, nil
 	} else if err == exp.ErrUnres {
 		// check for sym, form or func expression to find a result type
@@ -109,7 +108,7 @@ func resolveTask(c *exp.Ctx, env exp.Env, d *exp.Named, p *Task) (t *Task, err e
 			rt = v.Type
 		case *exp.Call:
 			if v.Spec != nil {
-				rt = v.Type.Params[len(v.Type.Params)-1].Type
+				rt = v.Sig.Params[len(v.Sig.Params)-1].Type
 			}
 		}
 		switch rt.Kind {
@@ -197,18 +196,16 @@ func resolveQuery(c *exp.Ctx, env exp.Env, t *Task, ref string, lo *exp.Layout) 
 }
 
 func resolveTag(c *exp.Ctx, env exp.Env, q *Query, args []exp.El) (err error) {
-	if q.Whr == nil {
-		q.Whr = &exp.Dyn{}
-	}
+	var whr []exp.El
 	for _, arg := range args {
 		tag, ok := arg.(*exp.Named)
 		if !ok {
-			q.Whr.Els = append(q.Whr.Els, arg)
+			whr = append(whr, arg)
 			continue
 		}
 		switch tag.Name {
 		case ":whr":
-			q.Whr.Els = append(q.Whr.Els, tag.Args()...)
+			whr = append(whr, tag.Args()...)
 		case ":lim":
 			// takes one number
 			q.Lim, err = resolveInt(c, env, tag.Args())
@@ -226,11 +223,14 @@ func resolveTag(c *exp.Ctx, env exp.Env, q *Query, args []exp.El) (err error) {
 			return err
 		}
 	}
+	if len(whr) > 0 {
+		q.Whr = &exp.Dyn{Els: whr}
+	}
 	return nil
 }
 
 func resolveInt(c *exp.Ctx, env exp.Env, args []exp.El) (int64, error) {
-	el, err := c.Resolve(env, &exp.Dyn{Els: args}, typ.Int)
+	el, err := c.Eval(env, &exp.Dyn{Els: args}, typ.Int)
 	if err != nil {
 		return 0, err
 	}

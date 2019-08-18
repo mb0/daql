@@ -1,6 +1,7 @@
 package dom
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/mb0/xelf/lit"
@@ -211,7 +212,7 @@ func TestDom(t *testing.T) {
 		if got != test.str {
 			t.Errorf("string equal want %s got %s", test.str, got)
 		}
-		res, err := lit.ParseString(test.str)
+		res, err := lit.Read(strings.NewReader(test.str))
 		if err != nil {
 			t.Errorf("parse %s err: %v", test.str, err)
 		}

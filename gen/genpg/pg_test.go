@@ -49,12 +49,13 @@ func TestRender(t *testing.T) {
 	unresed(env, typ.Str, "v", "w")
 	unresed(env, typ.Int, "x", "y")
 	for _, test := range tests {
-		ex, err := exp.ParseString(env, test.el)
+		ex, err := exp.Read(strings.NewReader(test.el))
 		if err != nil {
 			t.Errorf("parse %s err: %v", test.el, err)
 			continue
 		}
-		el, err := exp.Resolve(env, ex)
+		c := exp.NewCtx()
+		el, err := c.Resl(env, ex, typ.Void)
 		if err != nil && err != exp.ErrUnres {
 			t.Errorf("resolve %s err: %v", test.el, err)
 			continue

@@ -79,7 +79,7 @@ func init() {
 		"gt":    writeCmp(" > "),
 		"le":    writeCmp(" <= "),
 		"ge":    writeCmp(" >= "),
-		"as":    writeFunc(writeAs),
+		"con":   writeFunc(writeCon),
 		"cat":   writeFunc(writeCat),
 		"apd":   writeFunc(writeApd),
 		"set":   writeFunc(writeSet),

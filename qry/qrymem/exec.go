@@ -27,7 +27,7 @@ func execTask(c execer, t *qry.Task, par lit.Proxy) error {
 }
 
 func execExpr(c execer, t *qry.Task, res lit.Proxy) error {
-	el, err := c.Resolve(c.Env, t.Expr, t.Type)
+	el, err := c.Ctx.Eval(c.Env, t.Expr, t.Type)
 	if err != nil {
 		return err
 	}
@@ -116,8 +116,8 @@ func collectList(c execer, t *qry.Task, m *lit.List, whr exp.El, rest string) (*
 	result := make([]lit.Lit, 0, len(m.Data))
 	for _, l := range m.Data {
 		if whr != nil {
-			lenv := &exp.DataScope{c.Env, l}
-			res, err := c.Resolve(lenv, whr, typ.Bool)
+			lenv := &exp.DataScope{c.Env, exp.Def{l.Typ(), l}}
+			res, err := c.Ctx.Eval(lenv, whr, typ.Bool)
 			if err != nil {
 				return nil, err
 			}
@@ -174,8 +174,8 @@ func collectCount(c execer, t *qry.Task, m *lit.List, whr exp.El) (lit.Lit, erro
 	} else {
 		for _, l := range m.Data {
 			// skip if it does not resolve to true
-			lenv := &exp.DataScope{c.Env, l}
-			res, err := c.Resolve(lenv, whr, typ.Void)
+			lenv := &exp.DataScope{c.Env, exp.Def{l.Typ(), l}}
+			res, err := c.Ctx.Eval(lenv, whr, typ.Void)
 			if err != nil {
 				return nil, err
 			}

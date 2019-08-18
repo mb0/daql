@@ -73,7 +73,7 @@ func (it *fileIter) Close() error {
 }
 
 func (it *fileIter) Scan() (lit.Lit, error) {
-	tr, err := it.lex.Scan()
+	tr, err := it.lex.Tree()
 	if err != nil {
 		return nil, err
 	}

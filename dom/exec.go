@@ -6,7 +6,6 @@ import (
 
 	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/exp"
-	"github.com/mb0/xelf/lex"
 	"github.com/mb0/xelf/lit"
 	"github.com/mb0/xelf/typ"
 )
@@ -16,16 +15,16 @@ func ExecuteString(env exp.Env, s string) (*Schema, error) {
 }
 
 func Execute(env exp.Env, r io.Reader) (*Schema, error) {
-	t, err := lex.New(r).Scan()
+	x, err := exp.Read(r)
 	if err != nil {
 		return nil, err
 	}
-	x, err := exp.Parse(env, t)
+	c := exp.NewCtx()
+	x, err = c.Resl(env, x, typ.Void)
 	if err != nil {
 		return nil, err
 	}
-	c := exp.NewCtx(true, true)
-	a, err := c.Resolve(env, x, typ.Void)
+	a, err := c.Eval(env, x, typ.Void)
 	if err != nil {
 		return nil, cor.Errorf("%s: %v", c.Unres, err)
 	}
@@ -46,17 +45,13 @@ func getPtr(e exp.El) interface{} {
 }
 
 func Read(r io.Reader, env exp.Env, pr *Project) error {
-	t, err := lex.New(r).Scan()
-	if err != nil {
-		return err
-	}
-	x, err := exp.Parse(env, t)
+	x, err := exp.Read(r)
 	if err != nil {
 		return err
 	}
 	if env == nil {
 		env = Env
 	}
-	_, err = exp.NewCtx(true, true).Resolve(NewEnv(env, pr), x, typ.Void)
+	_, err = exp.NewCtx().WithPart(true).Eval(NewEnv(env, pr), x, typ.Void)
 	return err
 }

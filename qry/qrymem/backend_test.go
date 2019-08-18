@@ -37,7 +37,9 @@ var testQry = `(qry
 	+nest (?prod.cat (eq .name 'a')
 		+prods (*prod.prod (eq .cat ..id) :asc .name +id +name)
 	)
+	(() TODO
 	+top10prods *prod.prod (in .cat /top10/id) :asc .name
+	)
 )`
 
 func TestBackend(t *testing.T) {
@@ -86,7 +88,7 @@ func TestBackend(t *testing.T) {
 			continue
 		}
 		if got := l.String(); got != test.Want {
-			t.Errorf("want %s got %s", test.Want, got)
+			t.Errorf("want for %s\n\t%s got %s", test.Raw, test.Want, got)
 		}
 	}
 }

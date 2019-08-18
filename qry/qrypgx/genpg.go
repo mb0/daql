@@ -6,6 +6,7 @@ import (
 	"github.com/mb0/daql/gen/genpg"
 	"github.com/mb0/daql/qry"
 	"github.com/mb0/xelf/exp"
+	"github.com/mb0/xelf/typ"
 )
 
 /*
@@ -114,7 +115,7 @@ func genSelect(w *genpg.Writer, c *exp.Ctx, env exp.Env, j *Job) error {
 			w.WriteByte(' ')
 			w.WriteString(j.Alias[tab])
 		}
-		if len(tab.Query.Whr.Els) > 0 {
+		if tab.Query.Whr != nil {
 			whr = append(whr, tab)
 		}
 	}
@@ -125,7 +126,11 @@ func genSelect(w *genpg.Writer, c *exp.Ctx, env exp.Env, j *Job) error {
 				w.WriteString(" AND ")
 			}
 			wenv := &jobEnv{Alias: j.Alias, Task: e, Env: env, Prefix: prefix}
-			err := w.WriteEl(wenv, e.Query.Whr.Els[0])
+			el, err := c.Resl(wenv, e.Query.Whr, typ.Void)
+			if err != nil && err != exp.ErrUnres {
+				return err
+			}
+			err = w.WriteEl(wenv, el)
 			if err != nil {
 				return err
 			}

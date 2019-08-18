@@ -2,6 +2,8 @@
 package domtest
 
 import (
+	"strings"
+
 	"github.com/mb0/daql/dom"
 	"github.com/mb0/daql/mig"
 	"github.com/mb0/xelf/cor"
@@ -25,7 +27,7 @@ func New(raw, fix string) (*Fixture, error) {
 	if err != nil {
 		return nil, cor.Errorf("manifest: %w", err)
 	}
-	l, err := lit.ParseString(fix)
+	l, err := lit.Read(strings.NewReader(fix))
 	if err != nil {
 		return nil, cor.Errorf("fixture: %w", err)
 	}

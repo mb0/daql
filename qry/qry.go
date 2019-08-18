@@ -21,20 +21,18 @@ func (p *Doc) Find(name string) *Task {
 }
 
 func (p *Doc) Resolve(c *exp.Ctx, env exp.Env, x *exp.Call, hint typ.Type) (exp.El, error) {
-	if !c.Exec {
-		return x, exp.ErrExec
-	}
+	return x, nil
+}
+func (p *Doc) Execute(c *exp.Ctx, env exp.Env, x *exp.Call, hint typ.Type) (exp.El, error) {
 	qenv := FindEnv(env)
 	if qenv == nil && qenv.Backend == nil {
 		return nil, cor.Errorf("no qry backend configured for query %s", x)
 	}
 	var arg lit.Lit = lit.Nil
-	if len(x.Args) > 0 {
-		if a, ok := x.Args[0].(*exp.Atom); ok {
-			arg = a.Lit
-		}
+	if a, ok := x.Arg(0).(*exp.Atom); ok {
+		arg = a.Lit
 	}
-	res, err := qenv.Backend.Eval(c, &exp.ParamScope{env, arg}, p)
+	res, err := qenv.Backend.Eval(c, &exp.ParamEnv{env, arg}, p)
 	if err != nil {
 		return nil, err
 	}

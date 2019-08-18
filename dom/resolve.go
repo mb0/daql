@@ -7,12 +7,13 @@ import (
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/lit"
 	"github.com/mb0/xelf/prx"
+	"github.com/mb0/xelf/std"
 	"github.com/mb0/xelf/typ"
 	"github.com/mb0/xelf/utl"
 )
 
-var projectSpec = exp.ImplementReq("(form 'project' :args? :decls? : @)", false,
-	func(x exp.ReslReq) (exp.El, error) {
+var projectSpec = std.SpecXX("(form 'project' :args? :decls? : @)",
+	func(x std.CallCtx) (exp.El, error) {
 		p := FindEnv(x.Env)
 		n, err := utl.GetNode(p.Project)
 		if err != nil {
@@ -32,7 +33,7 @@ var projectSpec = exp.ImplementReq("(form 'project' :args? :decls? : @)", false,
 		for _, d := range decls {
 			name := d.Name[1:]
 			s := &Schema{Common: Common{Name: name}}
-			slo, err := exp.LayoutArgs(schemaSpec.Type, d.Args())
+			slo, err := exp.FormLayout(schemaSpec.Type, d.Args())
 			if err != nil {
 				return nil, err
 			}
@@ -45,10 +46,10 @@ var projectSpec = exp.ImplementReq("(form 'project' :args? :decls? : @)", false,
 		return &exp.Atom{Lit: n}, nil
 	})
 
-var schemaSpec = exp.ImplementReq("(form 'schema' :args? :decls? : @)", false,
-	func(x exp.ReslReq) (exp.El, error) {
+var schemaSpec = std.SpecXX("(form 'schema' :args? :decls? : @)",
+	func(x std.CallCtx) (exp.El, error) {
 		s := &Schema{Common: Common{Extra: &lit.Dict{}}}
-		n, err := resolveSchema(x.Ctx, x.Env, s, x.Layout)
+		n, err := resolveSchema(x.Ctx, x.Env, s, &x.Layout)
 		if err != nil {
 			return nil, err
 		}
@@ -102,7 +103,7 @@ func resolveModel(c *exp.Ctx, env *SchemaEnv, m *Model, args []exp.El) error {
 	if err != nil {
 		return err
 	}
-	lo, err := exp.LayoutArgs(modelSig, args)
+	lo, err := exp.FormLayout(modelSig, args)
 	if err != nil {
 		return err
 	}
@@ -167,9 +168,9 @@ func resolveConstVal(c *exp.Ctx, env *ModelEnv, args []exp.El, idx int) (_ lit.I
 		}
 		return lit.Int(idx) + 1, nil
 	case 1:
-		el, err = c.Resolve(env, args[0], typ.Int)
+		el, err = c.Eval(env, args[0], typ.Int)
 	default:
-		el, err = c.Resolve(env, &exp.Dyn{Els: args}, typ.Int)
+		el, err = c.Eval(env, &exp.Dyn{Els: args}, typ.Int)
 	}
 	if err != nil {
 		return 0, err
@@ -220,7 +221,7 @@ func typPrepper(c *exp.Ctx, env exp.Env, n *exp.Named) (_ lit.Lit, err error) {
 		return nil, cor.Errorf("expect type for model kind")
 	}
 	fst := args[0]
-	fst, err = c.Resolve(env, fst, typ.Void)
+	fst, err = c.Eval(env, fst, typ.Void)
 	if err != nil && err != exp.ErrUnres {
 		return nil, err
 	}

@@ -41,7 +41,7 @@ func (b *Backend) Eval(c *exp.Ctx, env exp.Env, doc *qry.Doc) (lit.Lit, error) {
 	if err != nil {
 		return nil, err
 	}
-	denv := doc.ExecEnv(env)
+	denv := doc.EvalEnv(env)
 	ctx := &execer{b, c, denv, denv, nil}
 	for _, j := range p.Jobs {
 		err := ctx.execJob(j, denv.Data)

@@ -26,7 +26,7 @@ func (e *execer) execJob(j *Job, par lit.Proxy) error {
 		return err
 	}
 	if j.Query == nil {
-		el, err := e.Resolve(e.Env, j.Expr, j.Type)
+		el, err := e.Ctx.Eval(e.Env, j.Expr, j.Type)
 		if err != nil {
 			return err
 		}

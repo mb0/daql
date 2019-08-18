@@ -12,7 +12,7 @@ import (
 	"github.com/mb0/xelf/typ"
 )
 
-var boolSpeck = std.Core(":bool")
+var andSpeck = std.Core("and")
 
 func prepareWhr(q *qry.Query) (x exp.El, null bool, _ error) {
 	if q.Whr == nil || len(q.Whr.Els) == 0 {
@@ -20,9 +20,11 @@ func prepareWhr(q *qry.Query) (x exp.El, null bool, _ error) {
 	}
 	if len(q.Whr.Els) == 1 && isBool(q.Whr.Els[0]) {
 		x = q.Whr.Els[0]
-	}
-	if x == nil {
-		x = &exp.Call{Spec: boolSpeck, Args: q.Whr.Els}
+	} else {
+		x = &exp.Dyn{
+			Els: append([]exp.El{&exp.Atom{Lit: andSpeck}}, q.Whr.Els...),
+			Src: q.Whr.Src,
+		}
 	}
 	return x, false, nil
 }

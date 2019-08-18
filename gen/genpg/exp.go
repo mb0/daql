@@ -41,7 +41,7 @@ func (r writeRaw) WriteCall(w *Writer, env exp.Env, e *exp.Call) error {
 func (r writeFunc) WriteCall(w *Writer, env exp.Env, e *exp.Call) error { return r(w, env, e) }
 func (r writeLogic) WriteCall(w *Writer, env exp.Env, e *exp.Call) error {
 	restore := w.Prec(r.prec)
-	for i, arg := range e.Args {
+	for i, arg := range e.All() {
 		if i > 0 {
 			w.WriteString(r.op)
 		}
@@ -56,7 +56,7 @@ func (r writeLogic) WriteCall(w *Writer, env exp.Env, e *exp.Call) error {
 
 func (r writeArith) WriteCall(w *Writer, env exp.Env, e *exp.Call) error {
 	restore := w.Prec(r.prec)
-	for i, arg := range e.Args {
+	for i, arg := range e.All() {
 		if i > 0 {
 			w.WriteString(r.op)
 		}
@@ -73,21 +73,22 @@ func renderIf(w *Writer, env exp.Env, e *exp.Call) error {
 	restore := w.Prec(PrecDef)
 	w.WriteString("CASE ")
 	var i int
-	for i = 0; i+1 < len(e.Args); i += 2 {
+	all := e.All()
+	for i = 0; i+1 < len(all); i += 2 {
 		w.WriteString("WHEN ")
-		err := writeBool(w, env, false, e.Args[i])
+		err := writeBool(w, env, false, all[i])
 		if err != nil {
 			return err
 		}
 		w.WriteString(" THEN ")
-		err = w.WriteEl(env, e.Args[i+1])
+		err = w.WriteEl(env, all[i+1])
 		if err != nil {
 			return err
 		}
 	}
-	if i < len(e.Args) {
+	if i < len(all) {
 		w.WriteString(" ELSE ")
-		err := w.WriteEl(env, e.Args[i])
+		err := w.WriteEl(env, all[i])
 		if err != nil {
 			return err
 		}
@@ -98,15 +99,16 @@ func renderIf(w *Writer, env exp.Env, e *exp.Call) error {
 }
 
 func (r writeEq) WriteCall(w *Writer, env exp.Env, e *exp.Call) error {
-	if len(e.Args) > 2 {
+	all := e.All()
+	if len(all) > 2 {
 		defer w.Prec(PrecAnd)()
 	}
 	// TODO mind nulls
-	fst, err := writeString(w, env, e.Args[0])
+	fst, err := writeString(w, env, all[0])
 	if err != nil {
 		return err
 	}
-	for i, arg := range e.Args[1:] {
+	for i, arg := range all[1:] {
 		if i > 0 {
 			w.WriteString(" AND ")
 		}
@@ -142,15 +144,16 @@ func (r writeEq) WriteCall(w *Writer, env exp.Env, e *exp.Call) error {
 }
 
 func (r writeCmp) WriteCall(w *Writer, env exp.Env, e *exp.Call) error {
-	if len(e.Args) > 2 {
+	all := e.All()
+	if len(all) > 2 {
 		defer w.Prec(PrecAnd)()
 	}
 	// TODO mind nulls
-	last, err := writeString(w, env, e.Args[0])
+	last, err := writeString(w, env, all[0])
 	if err != nil {
 		return err
 	}
-	for i, arg := range e.Args[1:] {
+	for i, arg := range all[1:] {
 		if i > 0 {
 			w.WriteString(" AND ")
 		}
@@ -168,11 +171,12 @@ func (r writeCmp) WriteCall(w *Writer, env exp.Env, e *exp.Call) error {
 	return nil
 }
 
-func writeAs(w *Writer, env exp.Env, e *exp.Call) error {
-	if len(e.Args) == 0 {
+func writeCon(w *Writer, env exp.Env, e *exp.Call) error {
+	all := e.All()
+	if len(all) == 0 {
 		return cor.Errorf("empty as expression")
 	}
-	t, ok := e.Args[0].(*exp.Atom).Lit.(typ.Type)
+	t, ok := all[0].(*exp.Atom).Lit.(typ.Type)
 	if !ok {
 		return cor.Errorf("as expression must start with a type")
 	}
@@ -180,7 +184,7 @@ func writeAs(w *Writer, env exp.Env, e *exp.Call) error {
 	if err != nil {
 		return err
 	}
-	switch len(e.Args) {
+	switch len(all) {
 	case 1:
 		zero, _, err := zeroStrings(t)
 		if err != nil {
@@ -188,7 +192,16 @@ func writeAs(w *Writer, env exp.Env, e *exp.Call) error {
 		}
 		w.WriteString(zero)
 	case 2:
-		err = w.WriteEl(env, e.Args[1])
+		el := all[1]
+		if a, ok := el.(*exp.Atom); ok {
+			l, err := lit.Convert(a.Lit, t, 0)
+			if err != nil {
+				return err
+			}
+			el = &exp.Atom{Lit: l, Src: a.Src}
+			return w.WriteEl(env, el)
+		}
+		err = w.WriteEl(env, el)
 		if err != nil {
 			return err
 		}
@@ -202,7 +215,7 @@ func writeAs(w *Writer, env exp.Env, e *exp.Call) error {
 
 func writeCat(w *Writer, env exp.Env, e *exp.Call) error {
 	restore := w.Prec(PrecDef)
-	for i, arg := range e.Args {
+	for i, arg := range e.All() {
 		if i > 0 {
 			w.WriteString(" || ")
 		}
@@ -216,17 +229,18 @@ func writeCat(w *Writer, env exp.Env, e *exp.Call) error {
 	return nil
 }
 func writeApd(w *Writer, env exp.Env, e *exp.Call) error {
-	if len(e.Args) == 0 {
+	all := e.All()
+	if len(all) == 0 {
 		return cor.Errorf("empty apd expression")
 	}
-	t := elType(e.Args[0])
+	t := elType(all[0])
 	if t == typ.Void {
 		return cor.Errorf("untyped first argument in apd expression")
 	}
 	restore := w.Prec(PrecDef)
 	// either jsonb or postgres array
 	ispg := t.Elem().Kind&typ.KindPrim != 0
-	for i, arg := range e.Args {
+	for i, arg := range all {
 		if i > 0 {
 			w.WriteString(" || ")
 		}
@@ -246,11 +260,7 @@ var setSig = exp.MustSig("(form 'set' @1:keyr :plain? :tags?  @1)")
 func writeSet(w *Writer, env exp.Env, e *exp.Call) error {
 	// First arg can only be a jsonb obj
 	// TODO but check that
-	lo, err := exp.LayoutArgs(setSig, e.Args)
-	if err != nil {
-		return err
-	}
-	decls, err := lo.Unis(1)
+	decls, err := e.Unis(1)
 	if err != nil {
 		return err
 	}
@@ -271,7 +281,7 @@ func writeSet(w *Writer, env exp.Env, e *exp.Call) error {
 	for range rest {
 		w.WriteString("jsonb_set(")
 	}
-	err = w.WriteEl(env, e.Args[0])
+	err = w.WriteEl(env, e.Arg(0))
 	if err != nil {
 		return err
 	}

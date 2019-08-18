@@ -1,6 +1,8 @@
 package qry
 
 import (
+	"strings"
+
 	"github.com/mb0/daql/dom"
 	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/exp"
@@ -52,7 +54,7 @@ func (qe *QryEnv) Get(sym string) *exp.Def {
 }
 
 func (qe *QryEnv) Qry(q string, arg lit.Lit) (lit.Lit, error) {
-	el, err := exp.ParseString(qe, q)
+	el, err := exp.Read(strings.NewReader(q))
 	if err != nil {
 		return nil, cor.Errorf("parse qry %s error: %w", q, err)
 	}
@@ -61,9 +63,14 @@ func (qe *QryEnv) Qry(q string, arg lit.Lit) (lit.Lit, error) {
 		arg = lit.Nil
 	}
 	d := &exp.Dyn{Els: []exp.El{el, &exp.Atom{Lit: arg}}}
-	l, err := exp.NewCtx(false, true).Resolve(env, d, typ.Void)
+	c := exp.NewCtx()
+	l, err := c.Resl(env, d, typ.Void)
 	if err != nil {
-		return nil, cor.Errorf("resolve qry %s error: %w", el, err)
+		return nil, cor.Errorf("resl qry %s error: %w", el, err)
+	}
+	l, err = c.Eval(env, l, typ.Void)
+	if err != nil {
+		return nil, cor.Errorf("eval qry %s error: %w", el, err)
 	}
 	if a, ok := l.(*exp.Atom); ok {
 		return a.Lit, nil
@@ -122,7 +129,7 @@ func (d *Doc) ReslEnv(par exp.Env) *DocEnv {
 	return &DocEnv{par, d, nil, nil}
 }
 
-func (d *Doc) ExecEnv(par exp.Env) *DocEnv {
+func (d *Doc) EvalEnv(par exp.Env) *DocEnv {
 	t, opt := d.Type.Deopt()
 	data := lit.ZeroProxy(t)
 	if opt {

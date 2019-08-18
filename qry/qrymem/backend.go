@@ -53,7 +53,7 @@ func (b *Backend) Add(m *dom.Model, list *lit.List) error {
 }
 
 func (b *Backend) Eval(c *exp.Ctx, env exp.Env, doc *qry.Doc) (lit.Lit, error) {
-	denv := doc.ExecEnv(env)
+	denv := doc.EvalEnv(env)
 	x := execer{b, c, denv, denv}
 	for _, t := range doc.Root {
 		err := execTask(x, t, denv.Data)

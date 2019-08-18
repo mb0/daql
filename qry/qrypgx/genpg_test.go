@@ -1,6 +1,7 @@
 package qrypgx
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/mb0/daql/dom/domtest"
@@ -80,13 +81,13 @@ func TestGenQuery(t *testing.T) {
 	}
 	for _, test := range tests {
 		env := qry.NewEnv(nil, &f.Project, nil)
-		ex, err := exp.ParseString(env, test.raw)
+		ex, err := exp.Read(strings.NewReader(test.raw))
 		if err != nil {
 			t.Errorf("parse %s error %+v", test.raw, err)
 			continue
 		}
-		c := exp.NewCtx(true, false)
-		l, err := c.Resolve(env, ex, typ.Void)
+		c := exp.NewCtx()
+		l, err := c.Resl(env, ex, typ.Void)
 		if err != nil && err != exp.ErrExec {
 			t.Errorf("resolve %s error %+v", test.raw, err)
 			continue
