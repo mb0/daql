@@ -70,5 +70,37 @@ type MyQuery struct {
 		} `qry:"*prod.prod (eq .cat ..id)" :asc .name`
 	} `qry:"?prod.cat (eq .name $name)"`
 }
+
+TODO think about simplifying the query processing by relying more on the exp primitives, instead of
+the current declarative approach. We already thought about nested queries; what if queries are just
+any xelf scripts with nested queries. A query symbol, currently a ref, would resolve to a query
+spec. We would resolve the root element and collect all queries, plan and then execute. The plan may
+organize query calls in multiple batches. The execution however uses the default process, and calls
+the backend for each query. The backend will execute a batch when the first of its queries is
+requested and caches the results for the other batched queries.
+
+This would resolve to a query spec that stores the query ref:
+	*prod.cat
+
+Starting an expression expends to a call:
+	(*prod.cat)
+
+And can be used in any expression:
+	(div (add (#prod.cat) 9) 10)
+
+A query doc could in the end be just be a record constructor:
+	(rec
+	:all   (*prod.cat)
+	:top10 (*prod.cat :lim 10)
+	:page3 (*prod.cat :off 20 :lim 10)
+	:t10p  (*prod.prod (in .cat ..top10/id) :asc .name)
+	)
+
+This would require a partially resolved dot scope for the rec resolver or calls in general.
+Absolute paths may generally refer to the whole program result in any xelf script.
+
+This would make querying data more powerful for complex queries and flexible for use in other
+context like the repl or templates.
+
 */
 package qry
