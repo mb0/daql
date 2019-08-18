@@ -86,13 +86,13 @@ func TestGenQuery(t *testing.T) {
 			t.Errorf("parse %s error %+v", test.raw, err)
 			continue
 		}
-		c := exp.NewCtx()
+		c := exp.NewProg()
 		l, err := c.Resl(env, ex, typ.Void)
-		if err != nil && err != exp.ErrExec {
+		if err != nil {
 			t.Errorf("resolve %s error %+v", test.raw, err)
 			continue
 		}
-		d := l.(*exp.Atom).Lit.(*exp.Spec).Resl.(*qry.Doc)
+		d := l.(*exp.Atom).Lit.(*exp.Spec).Impl.(*qry.Doc)
 		p, err := Analyse(d)
 		if err != nil {
 			t.Errorf("analyse project: %v", err)
@@ -115,7 +115,7 @@ func TestGenQuery(t *testing.T) {
 	}
 }
 
-func genQueries(c *exp.Ctx, env exp.Env, p *Plan) (res []string, _ error) {
+func genQueries(c *exp.Prog, env exp.Env, p *Plan) (res []string, _ error) {
 	for _, j := range p.Jobs {
 		s, _, err := genQueryStr(c, env, j)
 		if err != nil {

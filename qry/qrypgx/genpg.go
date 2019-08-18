@@ -32,7 +32,7 @@ TODO
  * more tests for complex joins and inline queries
 */
 
-func genQueryStr(c *exp.Ctx, env exp.Env, j *Job) (string, []genpg.Param, error) {
+func genQueryStr(c *exp.Prog, env exp.Env, j *Job) (string, []genpg.Param, error) {
 	var sb strings.Builder
 	w := genpg.NewWriter(&sb, jobTranslator{})
 	err := genSelect(w, c, env, j)
@@ -42,7 +42,7 @@ func genQueryStr(c *exp.Ctx, env exp.Env, j *Job) (string, []genpg.Param, error)
 	return sb.String(), w.Params, nil
 }
 
-func genSelect(w *genpg.Writer, c *exp.Ctx, env exp.Env, j *Job) error {
+func genSelect(w *genpg.Writer, c *exp.Prog, env exp.Env, j *Job) error {
 	prefix := j.Kind&(KindJoin|KindInline) != 0 || j.Parent != nil
 	w.WriteString("SELECT ")
 	if j.IsScalar() {

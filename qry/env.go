@@ -63,12 +63,7 @@ func (qe *QryEnv) Qry(q string, arg lit.Lit) (lit.Lit, error) {
 		arg = lit.Nil
 	}
 	d := &exp.Dyn{Els: []exp.El{el, &exp.Atom{Lit: arg}}}
-	c := exp.NewCtx()
-	l, err := c.Resl(env, d, typ.Void)
-	if err != nil {
-		return nil, cor.Errorf("resl qry %s error: %w", el, err)
-	}
-	l, err = c.Eval(env, l, typ.Void)
+	l, err := exp.Eval(env, d)
 	if err != nil {
 		return nil, cor.Errorf("eval qry %s error: %w", el, err)
 	}

@@ -15,7 +15,6 @@ import (
 	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/lit"
-	"github.com/mb0/xelf/typ"
 	"github.com/peterh/liner"
 )
 
@@ -78,7 +77,7 @@ func repl(args []string) error {
 		lin.AppendHistory(buf.String())
 		buf.Reset()
 		qenv := qry.NewEnv(env, &fix.Project, membed)
-		l, err := exp.NewCtx().Eval(qenv, el, typ.Void)
+		l, err := exp.Eval(qenv, el)
 		if err != nil {
 			log.Printf("error resolving %s: %v", got, err)
 			continue

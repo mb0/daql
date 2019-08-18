@@ -8,7 +8,7 @@ import (
 )
 
 type Backend interface {
-	Eval(*exp.Ctx, exp.Env, *Doc) (lit.Lit, error)
+	Eval(*exp.Prog, exp.Env, *Doc) (lit.Lit, error)
 }
 
 func (p *Doc) Find(name string) *Task {
@@ -20,10 +20,10 @@ func (p *Doc) Find(name string) *Task {
 	return nil
 }
 
-func (p *Doc) Resolve(c *exp.Ctx, env exp.Env, x *exp.Call, hint typ.Type) (exp.El, error) {
+func (p *Doc) Resl(c *exp.Prog, env exp.Env, x *exp.Call, hint typ.Type) (exp.El, error) {
 	return x, nil
 }
-func (p *Doc) Execute(c *exp.Ctx, env exp.Env, x *exp.Call, hint typ.Type) (exp.El, error) {
+func (p *Doc) Eval(c *exp.Prog, env exp.Env, x *exp.Call, hint typ.Type) (exp.El, error) {
 	qenv := FindEnv(env)
 	if qenv == nil && qenv.Backend == nil {
 		return nil, cor.Errorf("no qry backend configured for query %s", x)

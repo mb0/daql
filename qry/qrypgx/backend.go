@@ -36,7 +36,7 @@ func New(db *pgx.ConnPool, proj *dom.Project) *Backend {
 	return &Backend{DB: db, Record: mig.Record{Project: proj}, tables: tables}
 }
 
-func (b *Backend) Eval(c *exp.Ctx, env exp.Env, doc *qry.Doc) (lit.Lit, error) {
+func (b *Backend) Eval(c *exp.Prog, env exp.Env, doc *qry.Doc) (lit.Lit, error) {
 	p, err := Analyse(doc)
 	if err != nil {
 		return nil, err

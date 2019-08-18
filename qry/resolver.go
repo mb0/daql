@@ -17,7 +17,7 @@ var qrySpec = std.SpecXX("(form 'qry' :args? :decls? : @1)", func(x std.CallCtx)
 	}
 	doc := &Doc{}
 	args := x.Args(0)
-	penv := exp.NewParamReslEnv(x.Env, x.Ctx.Ctx)
+	penv := exp.NewParamReslEnv(x.Env, x.Ctx)
 	denv := doc.ReslEnv(penv)
 	if len(args) > 0 {
 		// simple query
@@ -25,7 +25,7 @@ var qrySpec = std.SpecXX("(form 'qry' :args? :decls? : @1)", func(x std.CallCtx)
 			return nil, cor.Errorf("either use simple or compound query got %v rest %v",
 				args, x.Args(1))
 		}
-		t, err := resolveTask(x.Ctx, denv, exp.NewNamed("", args...), nil)
+		t, err := resolveTask(x.Prog, denv, exp.NewNamed("", args...), nil)
 		if err != nil {
 			return nil, err
 		}
@@ -38,7 +38,7 @@ var qrySpec = std.SpecXX("(form 'qry' :args? :decls? : @1)", func(x std.CallCtx)
 		}
 		ps := make([]typ.Param, 0, len(decls))
 		for _, d := range decls {
-			t, err := resolveTask(x.Ctx, denv, d, nil)
+			t, err := resolveTask(x.Prog, denv, d, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -58,8 +58,8 @@ var qrySpec = std.SpecXX("(form 'qry' :args? :decls? : @1)", func(x std.CallCtx)
 
 var taskSig = exp.MustSig("(form '_' :ref? @1 :args? :decls? : void)")
 
-func resolveTask(c *exp.Ctx, env exp.Env, d *exp.Named, p *Task) (t *Task, err error) {
-	t = &Task{Parent: p}
+func resolveTask(p *exp.Prog, env exp.Env, d *exp.Named, par *Task) (t *Task, err error) {
+	t = &Task{Parent: par}
 	if d.Name != "" {
 		t.Name = d.Name[1:]
 	}
@@ -79,7 +79,7 @@ func resolveTask(c *exp.Ctx, env exp.Env, d *exp.Named, p *Task) (t *Task, err e
 			if d.Name == "+" {
 				t.Name = cor.LastKey(sym)
 			}
-			err = resolveQuery(c, env, t, sym, lo)
+			err = resolveQuery(p, env, t, sym, lo)
 			if err != nil {
 				return nil, err
 			}
@@ -92,7 +92,7 @@ func resolveTask(c *exp.Ctx, env exp.Env, d *exp.Named, p *Task) (t *Task, err e
 		return nil, cor.Errorf("unnamed expr task %s", d)
 	}
 	// partially resolve expression
-	fst, err = exp.NewCtx().WithPart(true).Resl(env, fst, typ.Void)
+	fst, err = exp.Resl(env, fst)
 	if fst == nil {
 		return nil, cor.Errorf("resolve task %s: %v", d, err)
 	}
@@ -126,7 +126,7 @@ func resolveTask(c *exp.Ctx, env exp.Env, d *exp.Named, p *Task) (t *Task, err e
 
 var andSpec = std.Core("and")
 
-func resolveQuery(c *exp.Ctx, env exp.Env, t *Task, ref string, lo *exp.Layout) error {
+func resolveQuery(p *exp.Prog, env exp.Env, t *Task, ref string, lo *exp.Layout) error {
 	q := &Query{Ref: ref}
 	name := ref[1:]
 	if name == "" {
@@ -166,7 +166,7 @@ func resolveQuery(c *exp.Ctx, env exp.Env, t *Task, ref string, lo *exp.Layout) 
 	t.Query = q
 	args := lo.Args(1)
 	tenv := &SelEnv{env, t}
-	err := resolveTag(c, tenv, q, args)
+	err := resolveTag(p, tenv, q, args)
 	if err != nil {
 		return err
 	}
@@ -174,7 +174,7 @@ func resolveQuery(c *exp.Ctx, env exp.Env, t *Task, ref string, lo *exp.Layout) 
 	rt := scalar
 	if rt == typ.Void {
 		sel := lo.Args(2)
-		rt, err = resolveSel(c, tenv, q, sel)
+		rt, err = resolveSel(p, tenv, q, sel)
 		if err != nil {
 			return err
 		}
@@ -195,7 +195,7 @@ func resolveQuery(c *exp.Ctx, env exp.Env, t *Task, ref string, lo *exp.Layout) 
 	return nil
 }
 
-func resolveTag(c *exp.Ctx, env exp.Env, q *Query, args []exp.El) (err error) {
+func resolveTag(p *exp.Prog, env exp.Env, q *Query, args []exp.El) (err error) {
 	var whr []exp.El
 	for _, arg := range args {
 		tag, ok := arg.(*exp.Named)
@@ -208,14 +208,14 @@ func resolveTag(c *exp.Ctx, env exp.Env, q *Query, args []exp.El) (err error) {
 			whr = append(whr, tag.Args()...)
 		case ":lim":
 			// takes one number
-			q.Lim, err = resolveInt(c, env, tag.Args())
+			q.Lim, err = resolveInt(p, env, tag.Args())
 		case ":off":
 			// takes one or two number or a list of two numbers
-			q.Off, err = resolveInt(c, env, tag.Args())
+			q.Off, err = resolveInt(p, env, tag.Args())
 		case ":ord", ":asc", ":desc":
 			// takes one or more field references
 			// can be used multiple times to append to order
-			err = resolveOrd(c, env, q, tag.Name == ":desc", tag.Args())
+			err = resolveOrd(p, env, q, tag.Name == ":desc", tag.Args())
 		default:
 			return cor.Errorf("unexpected query tag %q", tag.Name)
 		}
@@ -229,8 +229,8 @@ func resolveTag(c *exp.Ctx, env exp.Env, q *Query, args []exp.El) (err error) {
 	return nil
 }
 
-func resolveInt(c *exp.Ctx, env exp.Env, args []exp.El) (int64, error) {
-	el, err := c.Eval(env, &exp.Dyn{Els: args}, typ.Int)
+func resolveInt(p *exp.Prog, env exp.Env, args []exp.El) (int64, error) {
+	el, err := p.Eval(env, &exp.Dyn{Els: args}, typ.Int)
 	if err != nil {
 		return 0, err
 	}
@@ -241,7 +241,7 @@ func resolveInt(c *exp.Ctx, env exp.Env, args []exp.El) (int64, error) {
 	return int64(n.Num()), nil
 }
 
-func resolveOrd(c *exp.Ctx, env exp.Env, q *Query, desc bool, args []exp.El) error {
+func resolveOrd(p *exp.Prog, env exp.Env, q *Query, desc bool, args []exp.El) error {
 	// either takes a list of strings, one string or one local symbol
 	for _, arg := range args {
 		sym, ok := arg.(*exp.Sym)
@@ -253,7 +253,7 @@ func resolveOrd(c *exp.Ctx, env exp.Env, q *Query, desc bool, args []exp.El) err
 	return nil
 }
 
-func resolveSel(c *exp.Ctx, env *SelEnv, q *Query, args []exp.El) (typ.Type, error) {
+func resolveSel(p *exp.Prog, env *SelEnv, q *Query, args []exp.El) (typ.Type, error) {
 	var ps []typ.Param
 	if q.Type.Kind&typ.MaskElem == typ.KindRec && q.Type.HasParams() {
 		ps = q.Type.Params
@@ -327,7 +327,7 @@ func resolveSel(c *exp.Ctx, env *SelEnv, q *Query, args []exp.El) (typ.Type, err
 			} else {
 				if len(args) > 0 {
 					// add arguments as task to sel
-					t, err := resolveTask(c, env, d, env.Task)
+					t, err := resolveTask(p, env, d, env.Task)
 					if err != nil {
 						return typ.Void, err
 					}

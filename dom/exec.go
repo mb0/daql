@@ -19,14 +19,14 @@ func Execute(env exp.Env, r io.Reader) (*Schema, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := exp.NewCtx()
-	x, err = c.Resl(env, x, typ.Void)
+	p := exp.NewProg()
+	x, err = p.Resl(env, x, typ.Void)
 	if err != nil {
 		return nil, err
 	}
-	a, err := c.Eval(env, x, typ.Void)
+	a, err := p.Eval(env, x, typ.Void)
 	if err != nil {
-		return nil, cor.Errorf("%s: %v", c.Unres, err)
+		return nil, cor.Errorf("%s: %v", p.Unres, err)
 	}
 	s, ok := getPtr(a).(*Schema)
 	if !ok {
@@ -52,6 +52,6 @@ func Read(r io.Reader, env exp.Env, pr *Project) error {
 	if env == nil {
 		env = Env
 	}
-	_, err = exp.NewCtx().WithPart(true).Eval(NewEnv(env, pr), x, typ.Void)
+	_, err = exp.Eval(NewEnv(env, pr), x)
 	return err
 }

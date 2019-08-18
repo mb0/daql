@@ -19,7 +19,7 @@ var projectSpec = std.SpecXX("(form 'project' :args? :decls? : @)",
 		if err != nil {
 			return nil, err
 		}
-		err = commonRules.Resolve(x.Ctx, x.Env, x.Tags(0), n)
+		err = commonRules.Resolve(x.Prog, x.Env, x.Tags(0), n)
 		if err != nil {
 			return nil, err
 		}
@@ -37,7 +37,7 @@ var projectSpec = std.SpecXX("(form 'project' :args? :decls? : @)",
 			if err != nil {
 				return nil, err
 			}
-			_, err = resolveSchema(x.Ctx, x.Env, s, slo)
+			_, err = resolveSchema(x.Prog, x.Env, s, slo)
 			if err != nil {
 				return nil, err
 			}
@@ -49,7 +49,7 @@ var projectSpec = std.SpecXX("(form 'project' :args? :decls? : @)",
 var schemaSpec = std.SpecXX("(form 'schema' :args? :decls? : @)",
 	func(x std.CallCtx) (exp.El, error) {
 		s := &Schema{Common: Common{Extra: &lit.Dict{}}}
-		n, err := resolveSchema(x.Ctx, x.Env, s, &x.Layout)
+		n, err := resolveSchema(x.Prog, x.Env, s, &x.Layout)
 		if err != nil {
 			return nil, err
 		}
@@ -60,13 +60,13 @@ var schemaSpec = std.SpecXX("(form 'schema' :args? :decls? : @)",
 		return &exp.Atom{Lit: n}, nil
 	})
 
-func resolveSchema(c *exp.Ctx, env exp.Env, s *Schema, lo *exp.Layout) (utl.Node, error) {
+func resolveSchema(p *exp.Prog, env exp.Env, s *Schema, lo *exp.Layout) (utl.Node, error) {
 	n, err := utl.GetNode(s)
 	if err != nil {
 		return nil, err
 	}
 	senv := &SchemaEnv{parent: env, Schema: s}
-	err = commonRules.Resolve(c, senv, lo.Tags(0), n)
+	err = commonRules.Resolve(p, senv, lo.Tags(0), n)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func resolveSchema(c *exp.Ctx, env exp.Env, s *Schema, lo *exp.Layout) (utl.Node
 	}
 	// ...then resolve the models with all other schema model names in scope
 	for i, m := range s.Models {
-		err = resolveModel(c, senv, m, decls[i].Args())
+		err = resolveModel(p, senv, m, decls[i].Args())
 		if err != nil {
 			return nil, err
 		}
@@ -97,7 +97,7 @@ func resolveSchema(c *exp.Ctx, env exp.Env, s *Schema, lo *exp.Layout) (utl.Node
 	return n, nil
 }
 
-func resolveModel(c *exp.Ctx, env *SchemaEnv, m *Model, args []exp.El) error {
+func resolveModel(p *exp.Prog, env *SchemaEnv, m *Model, args []exp.El) error {
 	menv := &ModelEnv{SchemaEnv: env, Model: m}
 	n, err := utl.GetNode(m)
 	if err != nil {
@@ -107,7 +107,7 @@ func resolveModel(c *exp.Ctx, env *SchemaEnv, m *Model, args []exp.El) error {
 	if err != nil {
 		return err
 	}
-	err = modelRules.Resolve(c, menv, lo.Tags(0), n)
+	err = modelRules.Resolve(p, menv, lo.Tags(0), n)
 	if err != nil {
 		return err
 	}
@@ -118,9 +118,9 @@ func resolveModel(c *exp.Ctx, env *SchemaEnv, m *Model, args []exp.El) error {
 	for _, d := range decls {
 		switch m.Type.Kind {
 		case typ.KindBits, typ.KindEnum:
-			_, err = resolveConst(c, menv, d)
+			_, err = resolveConst(p, menv, d)
 		case typ.KindObj, typ.KindFunc:
-			_, err = resolveField(c, menv, d)
+			_, err = resolveField(p, menv, d)
 		default:
 			err = cor.Errorf("unexpected model kind %s", m.Type.Kind)
 		}
@@ -128,7 +128,7 @@ func resolveModel(c *exp.Ctx, env *SchemaEnv, m *Model, args []exp.El) error {
 			return err
 		}
 	}
-	return defaultRules.Resolve(c, menv, lo.Tags(2), n)
+	return defaultRules.Resolve(p, menv, lo.Tags(2), n)
 }
 
 var modelSig = exp.MustSig("(form 'model' :args? :decls? :tail? : @)")
@@ -148,8 +148,8 @@ var modelRules = utl.TagRules{
 }
 var defaultRules utl.TagRules
 
-func resolveConst(c *exp.Ctx, env *ModelEnv, n *exp.Named) (lit.Lit, error) {
-	d, err := resolveConstVal(c, env, n.Args(), len(env.Model.Type.Consts))
+func resolveConst(p *exp.Prog, env *ModelEnv, n *exp.Named) (lit.Lit, error) {
+	d, err := resolveConstVal(p, env, n.Args(), len(env.Model.Type.Consts))
 	if err != nil {
 		return nil, cor.Errorf("resolve const val: %w", err)
 	}
@@ -159,7 +159,7 @@ func resolveConst(c *exp.Ctx, env *ModelEnv, n *exp.Named) (lit.Lit, error) {
 	return m.Type, nil
 }
 
-func resolveConstVal(c *exp.Ctx, env *ModelEnv, args []exp.El, idx int) (_ lit.Int, err error) {
+func resolveConstVal(p *exp.Prog, env *ModelEnv, args []exp.El, idx int) (_ lit.Int, err error) {
 	var el exp.El
 	switch len(args) {
 	case 0:
@@ -168,9 +168,9 @@ func resolveConstVal(c *exp.Ctx, env *ModelEnv, args []exp.El, idx int) (_ lit.I
 		}
 		return lit.Int(idx) + 1, nil
 	case 1:
-		el, err = c.Eval(env, args[0], typ.Int)
+		el, err = p.Eval(env, args[0], typ.Int)
 	default:
-		el, err = c.Eval(env, &exp.Dyn{Els: args}, typ.Int)
+		el, err = p.Eval(env, &exp.Dyn{Els: args}, typ.Int)
 	}
 	if err != nil {
 		return 0, err
@@ -200,28 +200,28 @@ var fieldRules = utl.TagRules{
 	KeyRule: utl.KeyRule{KeySetter: utl.ExtraMapSetter("extra")},
 }
 
-func resolveField(c *exp.Ctx, env *ModelEnv, n *exp.Named) (lit.Lit, error) {
-	p, el := typ.Param{Name: n.Name[1:]}, &Elem{}
+func resolveField(p *exp.Prog, env *ModelEnv, n *exp.Named) (lit.Lit, error) {
+	param, el := typ.Param{Name: n.Name[1:]}, &Elem{}
 	if strings.HasSuffix(n.Name, "?") {
 		el.Bits = BitOpt
 	}
-	err := utl.ParseTags(c, env, n.Args(), &FieldElem{&p, el}, fieldRules)
+	err := utl.ParseTags(p, env, n.Args(), &FieldElem{&param, el}, fieldRules)
 	if err != nil {
 		return nil, cor.Errorf("parsing tags: %w", err)
 	}
 	m := env.Model
 	m.Elems = append(m.Elems, el)
-	m.Type.Params = append(m.Type.Params, p)
-	return p.Type, nil
+	m.Type.Params = append(m.Type.Params, param)
+	return param.Type, nil
 }
 
-func typPrepper(c *exp.Ctx, env exp.Env, n *exp.Named) (_ lit.Lit, err error) {
+func typPrepper(p *exp.Prog, env exp.Env, n *exp.Named) (_ lit.Lit, err error) {
 	args := n.Args()
 	if len(args) == 0 {
 		return nil, cor.Errorf("expect type for model kind")
 	}
 	fst := args[0]
-	fst, err = c.Eval(env, fst, typ.Void)
+	fst, err = p.Eval(env, fst, typ.Void)
 	if err != nil && err != exp.ErrUnres {
 		return nil, err
 	}
@@ -247,8 +247,8 @@ func typSetter(o utl.Node, key string, l lit.Lit) error {
 	return nil
 }
 
-func idxPrepper(c *exp.Ctx, env exp.Env, n *exp.Named) (lit.Lit, error) {
-	l, err := utl.DynPrepper(c, env, n)
+func idxPrepper(p *exp.Prog, env exp.Env, n *exp.Named) (lit.Lit, error) {
+	l, err := utl.DynPrepper(p, env, n)
 	if err != nil {
 		return l, cor.Errorf("dyn prepper: %w", err)
 	}

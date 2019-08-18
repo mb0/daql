@@ -14,7 +14,7 @@ import (
 
 type execer struct {
 	*Backend
-	*exp.Ctx
+	*exp.Prog
 	exp.Env
 	*qry.DocEnv
 	args []interface{}
@@ -26,13 +26,13 @@ func (e *execer) execJob(j *Job, par lit.Proxy) error {
 		return err
 	}
 	if j.Query == nil {
-		el, err := e.Ctx.Eval(e.Env, j.Expr, j.Type)
+		el, err := e.Prog.Eval(e.Env, j.Expr, j.Type)
 		if err != nil {
 			return err
 		}
 		return res.Assign(el.(lit.Lit))
 	}
-	qs, ps, err := genQueryStr(e.Ctx, e.Env, j)
+	qs, ps, err := genQueryStr(e.Prog, e.Env, j)
 	if err != nil {
 		return err
 	}
