@@ -305,8 +305,7 @@ func resolveSel(p *exp.Prog, env *SelEnv, q *Query, args []exp.El) (typ.Type, er
 			}
 		case '+':
 			if len(d.Name) == 1 {
-				if len(args) > 0 {
-				} else {
+				if len(args) == 0 {
 					if i == 0 { // reset with explicit decls
 						res = res[:0]
 					}

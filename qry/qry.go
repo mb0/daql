@@ -8,11 +8,11 @@ import (
 )
 
 type Backend interface {
-	Eval(*exp.Prog, exp.Env, *Doc) (lit.Lit, error)
+	Exec(*exp.Prog, exp.Env, *Doc) (lit.Lit, error)
 }
 
-func (p *Doc) Find(name string) *Task {
-	for _, t := range p.Root {
+func (d *Doc) Find(name string) *Task {
+	for _, t := range d.Root {
 		if t.Name == name {
 			return t
 		}
@@ -20,26 +20,26 @@ func (p *Doc) Find(name string) *Task {
 	return nil
 }
 
-func (p *Doc) Resl(c *exp.Prog, env exp.Env, x *exp.Call, hint typ.Type) (exp.El, error) {
-	return x, nil
+func (d *Doc) Resl(p *exp.Prog, env exp.Env, c *exp.Call, h typ.Type) (exp.El, error) {
+	return c, nil
 }
-func (p *Doc) Eval(c *exp.Prog, env exp.Env, x *exp.Call, hint typ.Type) (exp.El, error) {
+func (d *Doc) Eval(p *exp.Prog, env exp.Env, c *exp.Call, h typ.Type) (exp.El, error) {
 	qenv := FindEnv(env)
 	if qenv == nil && qenv.Backend == nil {
-		return nil, cor.Errorf("no qry backend configured for query %s", x)
+		return nil, cor.Errorf("no qry backend configured for query %s", c)
 	}
 	var arg lit.Lit = lit.Nil
-	if a, ok := x.Arg(0).(*exp.Atom); ok {
+	if a, ok := c.Arg(0).(*exp.Atom); ok {
 		arg = a.Lit
 	}
-	res, err := qenv.Backend.Eval(c, &exp.ParamEnv{env, arg}, p)
+	res, err := qenv.Backend.Exec(p, &exp.ParamEnv{env, arg}, d)
 	if err != nil {
 		return nil, err
 	}
 	return &exp.Atom{Lit: res}, nil
 }
 
-func RootTask(p *Doc, path string) (*Task, lit.Path, error) {
+func RootTask(d *Doc, path string) (*Task, lit.Path, error) {
 	if path == "" || path == "/" {
 		return nil, nil, cor.Errorf("task not found %s", path)
 	}
@@ -50,7 +50,7 @@ func RootTask(p *Doc, path string) (*Task, lit.Path, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	t := p.Find(lp[0].Key)
+	t := d.Find(lp[0].Key)
 	if t == nil {
 		return nil, lp, cor.Errorf("task not found %s", path)
 	}

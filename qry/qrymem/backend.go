@@ -52,7 +52,7 @@ func (b *Backend) Add(m *dom.Model, list *lit.List) error {
 	return nil
 }
 
-func (b *Backend) Eval(c *exp.Prog, env exp.Env, doc *qry.Doc) (lit.Lit, error) {
+func (b *Backend) Exec(c *exp.Prog, env exp.Env, doc *qry.Doc) (lit.Lit, error) {
 	denv := doc.EvalEnv(env)
 	x := execer{b, c, denv, denv}
 	for _, t := range doc.Root {

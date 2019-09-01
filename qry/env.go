@@ -58,12 +58,11 @@ func (qe *QryEnv) Qry(q string, arg lit.Lit) (lit.Lit, error) {
 	if err != nil {
 		return nil, cor.Errorf("parse qry %s error: %w", q, err)
 	}
-	env := qe
 	if arg == nil {
 		arg = lit.Nil
 	}
 	d := &exp.Dyn{Els: []exp.El{el, &exp.Atom{Lit: arg}}}
-	l, err := exp.Eval(env, d)
+	l, err := exp.Eval(qe, d)
 	if err != nil {
 		return nil, cor.Errorf("eval qry %s error: %w", el, err)
 	}
