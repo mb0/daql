@@ -13,6 +13,16 @@ type Field struct {
 	Name string
 	Type typ.Type
 	El   exp.El
+	Nest []*Query
+}
+
+func (f *Field) AddNested(q *Query) {
+	for _, n := range f.Nest {
+		if n == q {
+			return
+		}
+	}
+	f.Nest = append(f.Nest, q)
 }
 
 type Fields []*Field
@@ -65,14 +75,13 @@ func subjFields(t typ.Type) Fields {
 	return fs
 }
 
-func reslSel(p *exp.Prog, env exp.Env, subj typ.Type, ds []*exp.Named) (*Sel, error) {
-	fs := subjFields(subj)
+func reslSel(p *exp.Prog, env exp.Env, q *Query, ds []*exp.Named) (*Sel, error) {
+	fs := subjFields(q.Subj)
 	if len(ds) == 0 {
-		return &Sel{Type: subj, Fields: fs}, nil
+		return &Sel{Type: q.Subj, Fields: fs}, nil
 	}
 	for _, d := range ds {
 		key := strings.ToLower(d.Name[1:])
-		// TODO resolve and replace
 		switch d.Name[0] {
 		case '-': // exclude
 			if d.El != nil {
@@ -88,15 +97,23 @@ func reslSel(p *exp.Prog, env exp.Env, subj typ.Type, ds []*exp.Named) (*Sel, er
 				return nil, cor.Errorf("unnamed selection %s", d)
 			}
 			if d.El == nil { // naked selects choose a subj field by key
-				p, _, err := subj.ParamByKey(key)
+				p, _, err := q.Subj.ParamByKey(key)
 				if err != nil {
 					return nil, err
 				}
 				fs, _ = fs.with(paramField(*p))
 			} else {
-				// TODO resolve sel type
 				name := cor.Cased(d.Name[1:])
-				fs, _ = fs.with(&Field{key, name, exp.ResType(d.El), d.El})
+				f := &Field{Key: key, Name: name}
+				renv := &ReslEnv{env, q, f, fs}
+				el, err := p.Resl(renv, d.El, typ.Void)
+				if err != nil && err != exp.ErrUnres {
+					return nil, err
+				}
+				d.El = el
+				f.El = el
+				f.Type = exp.ResType(d.El)
+				fs, _ = fs.with(f)
 				continue
 			}
 		}

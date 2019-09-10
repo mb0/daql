@@ -9,8 +9,6 @@
 package qry
 
 import (
-	"log"
-
 	"github.com/mb0/daql/dom"
 	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/exp"
@@ -26,15 +24,6 @@ const (
 	KindCount Kind = '#'
 )
 
-type Subj struct {
-	Kind  Kind
-	Ref   string
-	Path  string
-	Model *dom.Model
-	Bend  Backend
-	Type  typ.Type
-}
-
 type Ord struct {
 	Key  string
 	Desc bool
@@ -43,8 +32,11 @@ type Ord struct {
 
 // Query describes a query definition.
 type Query struct {
-	Planner Planner
-	Subj
+	Kind Kind
+	Ref  string
+	Path string
+	Subj typ.Type
+
 	Sel *Sel
 	Res typ.Type
 	Whr []exp.El
@@ -52,26 +44,32 @@ type Query struct {
 	Off int64
 	Ord []Ord
 
-	Err error
+	Planner Planner
+	Model   *dom.Model
+	Bend    Backend
+	Err     error
 }
 
 var qrySig = exp.MustSig("(form 'qry' :args? :decls? : @)")
 
 func (q *Query) Resl(p *exp.Prog, env exp.Env, c *exp.Call, h typ.Type) (exp.El, error) {
-	log.Printf("resl %s", c)
+	renv, ok := exp.Supports(env, '?').(*ReslEnv)
+	if ok {
+		renv.AddNested(q)
+	}
 	if q.Err != nil {
 		return c, q.Err
 	}
-	if q.Subj.Type == typ.Void {
+	if q.Subj == typ.Void {
 		if q.Model != nil {
-			q.Subj.Type = q.Model.Type
+			q.Subj = q.Model.Type
 		} else {
 			ref := &exp.Sym{Name: q.Ref}
 			_, err := p.Resl(env, ref, typ.Void)
 			if err != nil {
 				return c, err
 			}
-			q.Subj.Type = ref.Type
+			q.Subj = ref.Type
 		}
 	}
 	if q.Sel == nil {
@@ -86,7 +84,7 @@ func (q *Query) Resl(p *exp.Prog, env exp.Env, c *exp.Call, h typ.Type) (exp.El,
 			}
 			decls = append(decls, &exp.Named{Name: "+" + q.Path})
 		}
-		sel, err := reslSel(p, env, q.Subj.Type, decls)
+		sel, err := reslSel(p, env, q, decls)
 		if err != nil {
 			return c, cor.Errorf("resl sel %v: %v", decls, err)
 		}
@@ -181,7 +179,7 @@ func evalOrd(p *exp.Prog, env exp.Env, q *Query, desc bool, args []exp.El) error
 		_, _, err := q.Sel.Type.ParamByKey(key)
 		if err != nil {
 			subj = true
-			_, _, err = q.Subj.Type.ParamByKey(key)
+			_, _, err = q.Subj.ParamByKey(key)
 			if err != nil {
 				return cor.Errorf("order sym %q not found", sym.Name)
 			}

@@ -39,7 +39,7 @@ func (qe *QryEnv) Qry(q string, arg lit.Lit) (lit.Lit, error) {
 		arg = lit.Nil
 	}
 	// TODO use param scope with arg
-	for i := 0; i < 255; i++ {
+	for i := 0; i < 16; i++ {
 		l, err := exp.Eval(qe, el)
 		if err != nil {
 			if err == exp.ErrUnres {
@@ -49,9 +49,32 @@ func (qe *QryEnv) Qry(q string, arg lit.Lit) (lit.Lit, error) {
 			return nil, cor.Errorf("eval qry %s error: %w", el, err)
 		}
 		el = l
+		break
 	}
 	if a, ok := el.(*exp.Atom); ok {
 		return a.Lit, nil
 	}
-	return nil, cor.Errorf("qry result %T is not an atom", el)
+	return nil, cor.Errorf("qry result %T %s is not an atom", el, el)
+}
+
+type ReslEnv struct {
+	Par exp.Env
+	*Query
+	*Field
+	Fields
+}
+
+func (re *ReslEnv) Parent() exp.Env      { return re.Par }
+func (re *ReslEnv) Supports(x byte) bool { return x == '.' || x == '?' }
+func (re *ReslEnv) Get(sym string) *exp.Def {
+	if sym[0] != '.' {
+		return nil
+	}
+	sym = sym[1:]
+	for _, f := range re.Fields {
+		if f.Key == sym {
+			return &exp.Def{Type: f.Type}
+		}
+	}
+	return nil
 }

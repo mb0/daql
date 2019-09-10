@@ -7,6 +7,7 @@ import (
 	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/lit"
+	"github.com/mb0/xelf/std"
 	"github.com/mb0/xelf/typ"
 )
 
@@ -21,17 +22,25 @@ func (b *LitBackend) Proj() *dom.Project {
 
 func (b *LitBackend) Exec(p *exp.Prog, pl *Plan) error {
 	for _, j := range pl.Jobs {
-		key := j.Model.Qualified()
-		list := b.Data[key]
-		if list == nil {
-			return cor.Errorf("lit backend query data %q not found", key)
-		}
-		res, err := execListQry(p, j, list)
+		err := b.execJob(p, j)
 		if err != nil {
 			return err
 		}
-		j.Res = res
 	}
+	return nil
+}
+
+func (b *LitBackend) execJob(p *exp.Prog, j *Job) error {
+	key := j.Model.Qualified()
+	list := b.Data[key]
+	if list == nil {
+		return cor.Errorf("lit backend query data %q not found", key)
+	}
+	res, err := execListQry(p, j, list)
+	if err != nil {
+		return err
+	}
+	j.Res = res
 	return nil
 }
 
@@ -78,23 +87,27 @@ func getList(l lit.Lit) *lit.List {
 	return nil
 }
 
+var andSpec = std.Core("and")
+
 func execListQry(p *exp.Prog, j *Job, list *lit.List) (lit.Lit, error) {
-	if j.Kind == KindCount {
-		return collectCount(p, j, list, nil)
+	var whr exp.El
+	if len(j.Whr) > 0 {
+		whr = &exp.Dyn{Els: append([]exp.El{&exp.Atom{Lit: andSpec}}, j.Whr...)}
 	}
-	res, err := collectList(p, j, list, nil)
+	if j.Kind == KindCount {
+		return collectCount(p, j, list, whr)
+	}
+	res, err := collectList(p, j, list, whr)
 	if err != nil {
 		return nil, err
 	}
 	switch j.Kind {
 	case KindOne:
-		// TODO filter and limit
 		if len(res.Data) == 0 {
 			return lit.Nil, nil
 		}
 		return res.Data[0], nil
 	case KindMany:
-		// TODO filter and limit
 		return res, nil
 	}
 	return nil, cor.Errorf("exec unknown query kind %s", j.Kind)
@@ -102,16 +115,21 @@ func execListQry(p *exp.Prog, j *Job, list *lit.List) (lit.Lit, error) {
 
 func collectList(p *exp.Prog, j *Job, list *lit.List, whr exp.El) (*lit.List, error) {
 	res := make([]lit.Lit, 0, len(list.Data))
-	org := make([]lit.Lit, 0, len(list.Data))
+	org := list.Data
+	if whr != nil {
+		org = make([]lit.Lit, 0, len(list.Data))
+	}
 	for _, l := range list.Data {
-		ok, err := filter(p, j.Env, l, whr)
-		if err != nil {
-			return nil, err
+		if whr != nil {
+			ok, err := filter(p, j.Env, l, whr)
+			if err != nil {
+				return nil, err
+			}
+			if !ok {
+				continue
+			}
+			org = append(org, l)
 		}
-		if !ok {
-			continue
-		}
-		org = append(org, l)
 		if len(j.Sel.Fields) == 0 {
 			res = append(res, l)
 			continue
@@ -120,7 +138,18 @@ func collectList(p *exp.Prog, j *Job, list *lit.List, whr exp.El) (*lit.List, er
 		z := lit.ZeroProxy(j.Sel.Type).(lit.Keyer)
 		for _, f := range j.Sel.Fields {
 			if f.El != nil {
-				// TODO eval element on l
+				env := &exp.DataScope{j.Env, exp.Def{l.Typ(), l}}
+				el, err := p.Eval(env, f.El, f.Type)
+				if len(f.Nest) > 0 && err == exp.ErrUnres {
+					el, err = p.Eval(env, el, f.Type)
+				}
+				if err != nil {
+					return nil, err
+				}
+				_, err = z.SetKey(f.Key, el.(*exp.Atom).Lit)
+				if err != nil {
+					return nil, err
+				}
 			} else {
 				el, err := rec.Key(f.Key)
 				if err != nil {
@@ -150,8 +179,8 @@ func collectList(p *exp.Prog, j *Job, list *lit.List, whr exp.El) (*lit.List, er
 	if j.Lim > 0 && len(res) > int(j.Lim) {
 		res = res[:j.Lim]
 	}
-	if j.Subj.Path != "" {
-		p, err := lit.ReadPath(j.Subj.Path)
+	if j.Path != "" {
+		p, err := lit.ReadPath(j.Path)
 		if err != nil {
 			return nil, err
 		}
@@ -197,9 +226,6 @@ func collectCount(p *exp.Prog, j *Job, list *lit.List, whr exp.El) (lit.Lit, err
 }
 
 func filter(p *exp.Prog, env exp.Env, l lit.Lit, whr exp.El) (bool, error) {
-	if whr == nil {
-		return true, nil
-	}
 	env = &exp.DataScope{env, exp.Def{l.Typ(), l}}
 	res, err := p.Eval(env, whr, typ.Void)
 	if err != nil {

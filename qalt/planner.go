@@ -26,7 +26,7 @@ type planner struct {
 }
 
 func (pl *planner) Prep(key string) *Query {
-	q := &Query{Planner: pl, Subj: Subj{Kind: Kind(key[0])}}
+	q := &Query{Kind: Kind(key[0]), Planner: pl}
 	sp := strings.SplitN(key[1:], "/", 2)
 	q.Ref = sp[0]
 	if len(sp) > 1 {
