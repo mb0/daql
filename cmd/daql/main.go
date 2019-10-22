@@ -64,6 +64,8 @@ func main() {
 		err = genXX("go", args)
 	case "genpg":
 		err = genXX("pg", args)
+	case "graph":
+		err = graph(args)
 	case "dump":
 		err = dump(args)
 	case "backup":

@@ -27,8 +27,7 @@ It usually is a data operation on a record identified by a topic and primary key
 	+ID  int :pk :auto
 	+Rev time :idx
 	+    @Action
-	-
-	:idx ['top' 'key']
+	(()- :idx ['top' 'key'])
 )
 
 (+Trans :doc `Trans is an request to publish a list of actions for a base revision.`

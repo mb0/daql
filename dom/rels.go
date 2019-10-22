@@ -127,7 +127,7 @@ func (res *Relations) relate(pro *Project, s *Schema, m *Model) error {
 			}
 		} else if embed, many := isEmbed(p.Type); embed {
 			// embedded schema type
-			rel.B.Model = pro.Model(p.Type.Key())
+			rel.B.Model = pro.Model(p.Last().Key())
 			if many {
 				rel.Rel = Rel1N | RelEmbed
 			} else {
@@ -137,7 +137,7 @@ func (res *Relations) relate(pro *Project, s *Schema, m *Model) error {
 			continue
 		}
 		if rel.B.Model == nil {
-			return cor.Errorf("model ref not found %s", e.Ref)
+			return cor.Errorf("model ref not found ref %q typ %q", e.Ref, p.Last().Key())
 		}
 		res.add(rel)
 	}
