@@ -10,35 +10,88 @@ import (
 	"github.com/mb0/xelf/typ"
 )
 
-var qrySpec = std.SpecXX("(form 'qry' :args? :decls? : @1)", func(x std.CallCtx) (exp.El, error) {
+func splitPlain(args []exp.El) (plain, rest []exp.El) {
+	for i, arg := range args {
+		switch t := arg.(type) {
+		case *exp.Tag:
+			return args[:i], args[i:]
+		case *exp.Sym:
+			switch t.Name {
+			case "_", "+", "-":
+				return args[:i], args[i:]
+			}
+		}
+	}
+	return args, nil
+}
+
+func splitDecls(args []exp.El) (tags, decl []*exp.Tag) {
+	tags = make([]*exp.Tag, 0, len(args))
+	decl = make([]*exp.Tag, 0, len(args))
+	for _, arg := range args {
+		switch t := arg.(type) {
+		case *exp.Tag:
+			if len(decl) == 0 && cor.IsKey(t.Name) && t.Name[0] != '_' {
+				tags = append(tags, t)
+			} else {
+				decl = append(decl, t)
+			}
+		case *exp.Sym:
+			decl = append(decl, &exp.Tag{Name: t.Name, Src: t.Src})
+		default:
+			decl = append(decl, &exp.Tag{El: arg, Src: arg.Source()})
+		}
+	}
+	return tags, decl
+}
+
+func simpleExpr(el exp.El) (string, exp.El) {
+	s, ok := el.(*exp.Sym)
+	if ok && cor.IsKey(s.Name) {
+		n := *s
+		n.Name = "." + s.Name
+		return s.Name, &n
+	}
+	return "", el
+}
+
+func isQueryRef(a exp.El) bool {
+	s, ok := a.(*exp.Sym)
+	if !ok || s.Name == "" {
+		return false
+	}
+	switch s.Name[0] {
+	case '?', '*', '#':
+		return true
+	}
+	return false
+}
+
+var qrySpec = std.SpecXX("<form qry tail?; @>", func(x std.CallCtx) (exp.El, error) {
 	qenv := FindEnv(x.Env)
 	if qenv == nil {
 		return nil, cor.Errorf("no qry environment for query %s", x)
 	}
-	doc := &Doc{}
 	args := x.Args(0)
+	if len(args) == 0 {
+		return nil, cor.Errorf("empty query")
+	}
+	doc := &Doc{}
 	penv := exp.NewParamReslEnv(x.Env, x.Ctx)
 	denv := doc.ReslEnv(penv)
-	if len(args) > 0 {
-		// simple query
-		if len(x.Args(1)) > 0 {
-			return nil, cor.Errorf("either use simple or compound query got %v rest %v",
-				args, x.Args(1))
-		}
-		t, err := resolveTask(x.Prog, denv, exp.NewNamed("", args...), nil)
+	if isQueryRef(args[0]) {
+		t, err := resolveTask(x.Prog, denv, "", args, nil)
 		if err != nil {
 			return nil, err
 		}
 		doc.Root = []*Task{t}
 		doc.Type = t.Type
 	} else {
-		decls, err := x.Decls(1)
-		if err != nil {
-			return nil, err
-		}
-		ps := make([]typ.Param, 0, len(decls))
-		for _, d := range decls {
-			t, err := resolveTask(x.Prog, denv, d, nil)
+		decl := x.Tags(0)
+		ps := make([]typ.Param, 0, len(decl))
+		for _, d := range decl {
+			args := d.Args()
+			t, err := resolveTask(x.Prog, denv, d.Name, args, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -47,54 +100,47 @@ var qrySpec = std.SpecXX("(form 'qry' :args? :decls? : @1)", func(x std.CallCtx)
 		}
 		doc.Type = typ.Rec(ps)
 	}
-	if len(doc.Root) == 0 {
-		return nil, cor.Error("empty plan")
-	}
 	return &exp.Atom{Lit: &exp.Spec{typ.Func("", []typ.Param{
 		{"arg", typ.Any},
 		{"", doc.Type},
 	}), doc}}, nil
 })
 
-var taskSig = exp.MustSig("(form '_' :ref? @1 :args? :decls? : void)")
+var taskSig = exp.MustSig("<form task tail?; @>")
 
-func resolveTask(p *exp.Prog, env exp.Env, d *exp.Named, par *Task) (t *Task, err error) {
-	t = &Task{Parent: par}
-	if d.Name != "" {
-		t.Name = d.Name[1:]
+func declName(args []exp.El) (string, bool) {
+	if len(args) == 0 {
+		return "", false
 	}
+	fst, ok := args[0].(*exp.Sym)
+	if !ok {
+		return "", false
+	}
+	return fst.Name, true
+}
+
+func resolveTask(p *exp.Prog, env exp.Env, name string, args []exp.El, par *Task) (t *Task, err error) {
+	t = &Task{Parent: par, Name: name}
 	var fst exp.El
-	if d.El == nil {
-		// must be field selection in a parent query
-		// this transforms +id to (+id .id) an + to (+ .)
+	if len(args) == 0 {
 		fst = &exp.Sym{Name: "." + t.Name}
 	} else {
-		lo, err := exp.FormLayout(taskSig, d.Args())
-		if err != nil {
-			return nil, err
-		}
-		fst = lo.Arg(0)
+		fst = args[0]
 		switch sym := fst.String(); sym[0] {
 		case '?', '*', '#':
-			if d.Name == "+" {
-				t.Name = cor.LastKey(sym)
-			}
-			err = resolveQuery(p, env, t, sym, lo)
+			err = resolveQuery(p, env, t, sym, args[1:])
 			if err != nil {
 				return nil, err
 			}
 			return t, nil
 		default:
-			fst = &exp.Dyn{Els: d.Args()}
+			fst = &exp.Dyn{Els: args}
 		}
-	}
-	if t.Name == "" {
-		return nil, cor.Errorf("unnamed expr task %s", d)
 	}
 	// partially resolve expression
 	fst, err = exp.Resl(env, fst)
 	if fst == nil {
-		return nil, cor.Errorf("resolve task %s: %v", d, err)
+		return nil, cor.Errorf("resolve task %s: %v", args, err)
 	}
 	t.Expr = fst
 	if err == nil {
@@ -118,7 +164,7 @@ func resolveTask(p *exp.Prog, env exp.Env, d *exp.Named, par *Task) (t *Task, er
 		}
 	}
 	if t.Type == typ.Void {
-		return nil, cor.Errorf("no type for task %s, %s in %T", d, fst, env)
+		return nil, cor.Errorf("no type for task %s, %s in %T", args, fst, env)
 	}
 	// this is it, we handle the final resolution after planning
 	return t, nil
@@ -126,7 +172,7 @@ func resolveTask(p *exp.Prog, env exp.Env, d *exp.Named, par *Task) (t *Task, er
 
 var andSpec = std.Core("and")
 
-func resolveQuery(p *exp.Prog, env exp.Env, t *Task, ref string, lo *exp.Layout) error {
+func resolveQuery(p *exp.Prog, env exp.Env, t *Task, ref string, args []exp.El) error {
 	q := &Query{Ref: ref}
 	name := ref[1:]
 	if name == "" {
@@ -134,13 +180,12 @@ func resolveQuery(p *exp.Prog, env exp.Env, t *Task, ref string, lo *exp.Layout)
 	}
 	// locate the plan environment for a project and find the model
 	penv := FindEnv(env)
-	scalar := typ.Void
 	switch name[0] {
 	case '.', '/', '$': // path
 		return cor.Error("path query reference not yet implemented")
 	default:
 		// lookup schema
-		s := strings.SplitN(name, ".", 3)
+		s := strings.SplitN(name, ".", 2)
 		if len(s) < 2 {
 			return cor.Errorf("unknown schema name %q", ref)
 		}
@@ -151,33 +196,31 @@ func resolveQuery(p *exp.Prog, env exp.Env, t *Task, ref string, lo *exp.Layout)
 		if m != nil {
 			q.Type = m.Type
 		}
-		if len(s) > 2 {
-			f := m.Field(s[2])
-			if f.Param == nil {
-				return cor.Errorf("no field found for %q", ref)
-			}
-			scalar = f.Type
-		}
 	}
 	// at this point we need to have the result type to inform argument parsing
 	if q.Type == typ.Void {
 		return cor.Errorf("no type found for %q", ref)
 	}
 	t.Query = q
-	args := lo.Args(1)
 	tenv := &SelEnv{env, t}
-	err := resolveTag(p, tenv, q, args)
+	whr, args := splitPlain(args)
+	tags, decl := splitDecls(args)
+	err := resolveTag(p, tenv, q, tags)
 	if err != nil {
 		return err
 	}
-	// TODO check that order only accesses result fields
-	rt := scalar
-	if rt == typ.Void {
-		sel := lo.Args(2)
-		rt, err = resolveSel(p, tenv, q, sel)
-		if err != nil {
-			return err
+	if len(whr) > 0 {
+		we := t.Query.Whr
+		if we != nil {
+			we.Els = append(we.Els, whr...)
+		} else {
+			t.Query.Whr = &exp.Dyn{Els: whr}
 		}
+	}
+	// TODO check that order only accesses result fields
+	rt, err := resolveSel(p, tenv, q, decl)
+	if err != nil {
+		return err
 	}
 	// set the task result type based on the query subject type
 	switch ref[0] {
@@ -195,27 +238,26 @@ func resolveQuery(p *exp.Prog, env exp.Env, t *Task, ref string, lo *exp.Layout)
 	return nil
 }
 
-func resolveTag(p *exp.Prog, env exp.Env, q *Query, args []exp.El) (err error) {
+func resolveTag(p *exp.Prog, env exp.Env, q *Query, tags []*exp.Tag) (err error) {
 	var whr []exp.El
-	for _, arg := range args {
-		tag, ok := arg.(*exp.Named)
-		if !ok {
-			whr = append(whr, arg)
-			continue
-		}
+	if q.Whr != nil {
+		whr = q.Whr.Els
+	}
+	for _, tag := range tags {
 		switch tag.Name {
-		case ":whr":
-			whr = append(whr, tag.Args()...)
-		case ":lim":
+		case "whr":
+			whr = append(whr, tag.El)
+		case "lim":
 			// takes one number
-			q.Lim, err = resolveInt(p, env, tag.Args())
-		case ":off":
+			q.Lim, err = resolveInt(p, env, tag.El)
+		case "off":
 			// takes one or two number or a list of two numbers
-			q.Off, err = resolveInt(p, env, tag.Args())
-		case ":ord", ":asc", ":desc":
+			q.Off, err = resolveInt(p, env, tag.El)
+		case "ord", "asc", "desc":
 			// takes one or more field references
 			// can be used multiple times to append to order
-			err = resolveOrd(p, env, q, tag.Name == ":desc", tag.Args())
+			_, el := simpleExpr(tag.El)
+			err = resolveOrd(p, env, q, tag.Name == "desc", el)
 		default:
 			return cor.Errorf("unexpected query tag %q", tag.Name)
 		}
@@ -229,8 +271,8 @@ func resolveTag(p *exp.Prog, env exp.Env, q *Query, args []exp.El) (err error) {
 	return nil
 }
 
-func resolveInt(p *exp.Prog, env exp.Env, args []exp.El) (int64, error) {
-	el, err := p.Eval(env, &exp.Dyn{Els: args}, typ.Int)
+func resolveInt(p *exp.Prog, env exp.Env, arg exp.El) (int64, error) {
+	el, err := p.Eval(env, arg, typ.Int)
 	if err != nil {
 		return 0, err
 	}
@@ -241,24 +283,21 @@ func resolveInt(p *exp.Prog, env exp.Env, args []exp.El) (int64, error) {
 	return int64(n.Num()), nil
 }
 
-func resolveOrd(p *exp.Prog, env exp.Env, q *Query, desc bool, args []exp.El) error {
+func resolveOrd(p *exp.Prog, env exp.Env, q *Query, desc bool, arg exp.El) error {
 	// either takes a list of strings, one string or one local symbol
-	for _, arg := range args {
-		sym, ok := arg.(*exp.Sym)
-		if !ok {
-			return cor.Errorf("want order symbol got %T", arg)
-		}
-		q.Ord = append(q.Ord, Ord{"." + sym.Key(), desc})
+	sym, ok := arg.(*exp.Sym)
+	if !ok {
+		return cor.Errorf("want order symbol got %T", arg)
 	}
+	q.Ord = append(q.Ord, Ord{"." + sym.Key(), desc})
 	return nil
 }
 
-func resolveSel(p *exp.Prog, env *SelEnv, q *Query, args []exp.El) (typ.Type, error) {
+func resolveSel(p *exp.Prog, env *SelEnv, q *Query, args []*exp.Tag) (typ.Type, error) {
 	var ps []typ.Param
 	if q.Type.Kind&typ.MaskElem == typ.KindRec && q.Type.HasParams() {
 		ps = q.Type.Params
 	}
-	// start with all fields unless we start with "-"
 	res := make([]*Task, 0, len(ps)+len(args))
 	for _, p := range ps {
 		res = append(res, &Task{Name: p.Name, Type: p.Type, Parent: env.Task})
@@ -267,83 +306,71 @@ func resolveSel(p *exp.Prog, env *SelEnv, q *Query, args []exp.El) (typ.Type, er
 		q.Sel = res
 		return q.Type, nil
 	}
-	for i, arg := range args {
-		d, ok := arg.(*exp.Named)
-		if !ok || d.Name == "" {
-			return typ.Void, cor.Errorf("expect declaration got %T", arg)
-		}
+	var mode byte
+	var err error
+	for i, d := range args {
 		args := d.Args()
-		switch d.Name[0] {
-		case '-':
-			if len(d.Name) == 1 {
-				if len(args) > 0 {
-					// remove all arguments from fields
-					keys, err := getKeys(args)
-					if err != nil {
-						return typ.Void, err
-					}
-					for _, key := range keys {
-						res, err = removeKey(res, key)
-						if err != nil {
-							return typ.Void, err
-						}
-					}
-				} else if i == 0 {
-					// else start without
-					res = res[:0]
-				}
-			} else {
-				if len(args) > 0 {
-					return typ.Void, cor.Errorf("unexpected arguments %s", d)
-				}
-				// remove from fields
-				var err error
-				res, err = removeKey(res, strings.ToLower(d.Name[1:]))
+		name := d.Name
+		switch name {
+		case "+", "-":
+			mode = name[0]
+			if d.El != nil {
+				return typ.Void, cor.Errorf("unexpected selection arguments %s", d)
+			}
+			continue
+		case "_":
+			mode = '+'
+			if d.El == nil {
+				res = res[:0]
+				continue
+			} else if len(args[i:]) > 1 {
+				return typ.Void, cor.Errorf("unexpected selection arguments %s", d)
+			}
+			var sub string
+			sub, d.El = simpleExpr(d.El)
+			t, err := resolveTask(p, env, sub, d.Args(), env.Task)
+			if err != nil {
+				return typ.Void, err
+			}
+			res = append(res[:0], t)
+			q.Sel = res
+			q.Sca = true
+			return t.Type, nil
+		case "":
+			return typ.Void, cor.Errorf("unnamed selection %s", d)
+		}
+		switch name[0] {
+		case '-', '+':
+			mode = name[0]
+			name = name[1:]
+		default:
+		}
+		key := strings.ToLower(name)
+		switch mode {
+		case '-': // exclude
+			if d.El != nil {
+				return typ.Void, cor.Errorf("unexpected selection arguments %s", d)
+			}
+			res, err = removeKey(res, key)
+			if err != nil {
+				return typ.Void, err
+			}
+		case '+':
+			if d.El == nil { // naked selects choose a subj field by key
+				add, err := getParams(ps, key)
 				if err != nil {
 					return typ.Void, err
 				}
-			}
-		case '+':
-			if len(d.Name) == 1 {
-				if len(args) == 0 {
-					if i == 0 { // reset with explicit decls
-						res = res[:0]
-					}
-					// include all arguments as fields
-					keys, err := getKeys(args)
-					if err != nil {
-						return typ.Void, err
-					}
-					add, err := getParams(ps, keys...)
-					if err != nil {
-						return typ.Void, err
-					}
-					res, err = addParams(res, add, env.Task)
-					if err != nil {
-						return typ.Void, err
-					}
+				res, err = addParams(res, add, env.Task)
+				if err != nil {
+					return typ.Void, err
 				}
 			} else {
-				if len(args) > 0 {
-					// add arguments as task to sel
-					t, err := resolveTask(p, env, d, env.Task)
-					if err != nil {
-						return typ.Void, err
-					}
-					res = append(res, t)
-				} else {
-					if i == 0 { // reset with explicit decls
-						res = res[:0]
-					}
-					add, err := getParams(ps, strings.ToLower(d.Name[1:]))
-					if err != nil {
-						return typ.Void, err
-					}
-					res, err = addParams(res, add, env.Task)
-					if err != nil {
-						return typ.Void, err
-					}
+				t, err := resolveTask(p, env, name, d.Args(), env.Task)
+				if err != nil {
+					return typ.Void, err
 				}
+				res = append(res, t)
 			}
 		}
 	}

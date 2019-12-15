@@ -45,7 +45,7 @@ func ResolveProject(path string) (*dom.Project, error) {
 			}
 			err = includeSchema(s, ipath, s.Name, pr.Schemas[:i])
 			if err != nil {
-				return nil, err
+				return nil, cor.Errorf("include %q: %v", ipath, err)
 			}
 		}
 	}
@@ -55,7 +55,7 @@ func ResolveProject(path string) (*dom.Project, error) {
 func includeSchema(s *dom.Schema, path, name string, prev []*dom.Schema) error {
 	fi, err := os.Stat(path)
 	if err != nil {
-		return cor.Errorf("include %s not found: %w", path, err)
+		return cor.Errorf("include not found: %w", path, err)
 	}
 	if fi.IsDir() {
 		fpath := filepath.Join(path, fmt.Sprintf("%s.daql", name))
@@ -63,7 +63,7 @@ func includeSchema(s *dom.Schema, path, name string, prev []*dom.Schema) error {
 	}
 	f, err := os.Open(path)
 	if err != nil {
-		return cor.Errorf("include %s not readable: %w", path, err)
+		return cor.Errorf("include not readable: %w", path, err)
 	}
 	defer f.Close()
 	pr := &dom.Project{Schemas: prev}
@@ -73,7 +73,7 @@ func includeSchema(s *dom.Schema, path, name string, prev []*dom.Schema) error {
 	}
 	ps := pr.Schema(name)
 	if ps == nil {
-		return cor.Errorf("no schema %s found in %s", name, path)
+		return cor.Errorf("no schema %s found", name)
 	}
 	ps.Extra.SetKey("file", lit.Str(path))
 	*s = *ps

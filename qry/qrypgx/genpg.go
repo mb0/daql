@@ -46,28 +46,22 @@ func genSelect(w *genpg.Writer, c *exp.Prog, env exp.Env, j *Job) error {
 	prefix := j.Kind&(KindJoin|KindInline) != 0 || j.Parent != nil
 	w.WriteString("SELECT ")
 	if j.IsScalar() {
-		sc := getScalarName(j.Query)
 		if j.Kind&KindCount != 0 {
-			if sc == "" {
-				sc = "*"
-			}
-			w.WriteString("COUNT(")
-			w.WriteString(sc)
-			w.WriteByte(')')
+			w.WriteString("COUNT(*)")
 		} else if j.Kind&KindJSON != 0 {
 			w.WriteString("jsonb_agg(")
 			if prefix {
 				w.WriteString(j.Alias[j.Task])
 				w.WriteByte('.')
 			}
-			w.WriteString(sc)
+			w.WriteString(j.Cols[0].Name)
 			w.WriteByte(')')
 		} else {
 			if prefix {
 				w.WriteString(j.Alias[j.Task])
 				w.WriteByte('.')
 			}
-			w.WriteString(sc)
+			w.WriteString(j.Cols[0].Name)
 		}
 	} else {
 		jenv := &jobEnv{Alias: j.Alias, Task: j.Task, Env: env, Prefix: prefix}
@@ -127,7 +121,7 @@ func genSelect(w *genpg.Writer, c *exp.Prog, env exp.Env, j *Job) error {
 			}
 			wenv := &jobEnv{Alias: j.Alias, Task: e, Env: env, Prefix: prefix}
 			el, err := c.Resl(wenv, e.Query.Whr, typ.Void)
-			if err != nil && err != exp.ErrUnres {
+			if err != nil && err != exp.ErrVoid && err != exp.ErrUnres {
 				return err
 			}
 			err = w.WriteEl(wenv, el)

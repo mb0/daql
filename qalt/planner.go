@@ -1,8 +1,6 @@
 package qry
 
 import (
-	"strings"
-
 	"github.com/mb0/xelf/cor"
 	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/lit"
@@ -27,11 +25,7 @@ type planner struct {
 
 func (pl *planner) Prep(key string) *Query {
 	q := &Query{Kind: Kind(key[0]), Planner: pl}
-	sp := strings.SplitN(key[1:], "/", 2)
-	q.Ref = sp[0]
-	if len(sp) > 1 {
-		q.Path = sp[1]
-	}
+	q.Ref = key[1:]
 	switch key[1] {
 	case '.', '/', '$': // path subj
 	default: // model subj
@@ -45,6 +39,7 @@ func (pl *planner) Prep(key string) *Query {
 
 func (pl *planner) Plan(p *exp.Prog, env exp.Env, c *exp.Call, q *Query) (exp.El, error) {
 	plan := &Plan{}
+	// TODO create a job environment, so nested jobs can detect all parent jobs
 	job := &Job{Plan: plan, Query: q, Env: env}
 	plan.Jobs = []*Job{job}
 	spec := &exp.Spec{typ.Form("job", qrySig.Params), job}

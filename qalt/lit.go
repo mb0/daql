@@ -135,8 +135,11 @@ func collectList(p *exp.Prog, j *Job, list *lit.List, whr exp.El) (*lit.List, er
 			continue
 		}
 		rec := l.(lit.Keyer)
-		z := lit.ZeroProxy(j.Sel.Type).(lit.Keyer)
+		px := lit.ZeroProxy(j.Sel.Type)
+		z, ok := px.(lit.Keyer)
 		for _, f := range j.Sel.Fields {
+			var val lit.Lit
+			var err error
 			if f.El != nil {
 				env := &exp.DataScope{j.Env, exp.Def{l.Typ(), l}}
 				el, err := p.Eval(env, f.El, f.Type)
@@ -146,22 +149,23 @@ func collectList(p *exp.Prog, j *Job, list *lit.List, whr exp.El) (*lit.List, er
 				if err != nil {
 					return nil, err
 				}
-				_, err = z.SetKey(f.Key, el.(*exp.Atom).Lit)
-				if err != nil {
-					return nil, err
-				}
+				val = el.(*exp.Atom).Lit
 			} else {
-				el, err := rec.Key(f.Key)
-				if err != nil {
-					return nil, err
-				}
-				_, err = z.SetKey(f.Key, el)
+				val, err = rec.Key(f.Key)
 				if err != nil {
 					return nil, err
 				}
 			}
+			if ok {
+				_, err = z.SetKey(f.Key, val)
+			} else {
+				err = px.Assign(val)
+			}
+			if err != nil {
+				return nil, err
+			}
 		}
-		res = append(res, z)
+		res = append(res, px)
 	}
 	if len(j.Ord) != 0 {
 		err := orderResult(res, org, j.Ord)
@@ -178,19 +182,6 @@ func collectList(p *exp.Prog, j *Job, list *lit.List, whr exp.El) (*lit.List, er
 	}
 	if j.Lim > 0 && len(res) > int(j.Lim) {
 		res = res[:j.Lim]
-	}
-	if j.Path != "" {
-		p, err := lit.ReadPath(j.Path)
-		if err != nil {
-			return nil, err
-		}
-		for i, l := range res {
-			el, err := lit.SelectPath(l, p)
-			if err != nil {
-				return nil, err
-			}
-			res[i] = el
-		}
 	}
 	return &lit.List{Data: res}, nil
 }

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/mb0/daql/hub"
-	"github.com/mb0/xelf/exp"
 	"github.com/mb0/xelf/lit"
 )
 
@@ -39,7 +38,7 @@ type Action struct {
 	Arg *lit.Dict `json:"arg,omitempty"`
 }
 
-// Event represents action published to a ledger with a revision and unique id.
+// Event is an action published to a ledger with revision and unique id.
 type Event struct {
 	ID  int64     `json:"id"`
 	Rev time.Time `json:"rev"`
@@ -62,35 +61,6 @@ type Watch struct {
 type Update struct {
 	Rev time.Time `json:"rev"`
 	Evs []*Event  `json:"evs"`
-}
-
-type Result struct {
-	Rev time.Time `json:"rev"`
-	Val lit.Lit   `json:"val"`
-}
-
-type QryReq struct {
-	Arg *exp.Dyn `json:"arg"`
-}
-
-type QryRes struct {
-	Res *Result `json:"res,omitempty"`
-	Err string  `json:"err,omitempty"`
-}
-
-type QryFunc func(*hub.Msg, QryReq) (*Result, error)
-
-func (f QryFunc) Serve(m *hub.Msg) interface{} {
-	var req QryReq
-	err := json.Unmarshal(m.Raw, &req)
-	if err != nil {
-		return QryRes{Err: err.Error()}
-	}
-	res, err := f(m, req)
-	if err != nil {
-		return QryRes{Err: err.Error()}
-	}
-	return QryRes{Res: res}
 }
 
 type MetaReq struct {

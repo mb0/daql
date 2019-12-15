@@ -12,32 +12,48 @@ import (
 	"github.com/mb0/xelf/utl"
 )
 
-var projectSpec = std.SpecXX("(form 'project' :args? :decls? : @)",
+func splitDecls(args []exp.El) (tags, decl []*exp.Tag) {
+	tags = make([]*exp.Tag, 0, len(args))
+	decl = make([]*exp.Tag, 0, len(args))
+	for _, arg := range args {
+		switch t := arg.(type) {
+		case *exp.Tag:
+			if t.Name != "" && cor.IsKey(t.Name) && t.Name[0] != '_' {
+				tags = append(tags, t)
+			} else {
+				decl = append(decl, t)
+			}
+		default:
+			decl = append(decl, &exp.Tag{El: arg, Src: arg.Source()})
+		}
+	}
+	return tags, decl
+}
+
+var projectSpec = std.SpecXX("<form project name:sym tail?; @>",
 	func(x std.CallCtx) (exp.El, error) {
 		p := FindEnv(x.Env)
 		n, err := utl.GetNode(p.Project)
 		if err != nil {
 			return nil, err
 		}
-		err = commonRules.Resolve(x.Prog, x.Env, x.Tags(0), n)
-		if err != nil {
-			return nil, err
+		sym, ok := x.Arg(0).(*exp.Sym)
+		if !ok {
+			return nil, cor.Errorf("expect project symbol got %T", x.Arg(0))
 		}
-		decls, err := x.Decls(1)
+		p.Name = sym.Name
+		tags, decl := splitDecls(x.Args(1))
+		err = commonRules.Resolve(x.Prog, x.Env, tags, n)
 		if err != nil {
 			return nil, err
 		}
 		if p.Schemas == nil {
-			p.Schemas = make([]*Schema, 0, len(decls))
+			p.Schemas = make([]*Schema, 0, len(decl))
 		}
-		for _, d := range decls {
-			name := d.Name[1:]
+		for _, d := range decl {
+			name := d.Key()
 			s := &Schema{Common: Common{Name: name}}
-			slo, err := exp.FormLayout(schemaSpec.Type, d.Args())
-			if err != nil {
-				return nil, err
-			}
-			_, err = resolveSchema(x.Prog, x.Env, s, slo)
+			_, err = resolveSchema(x.Prog, x.Env, s, d.Args())
 			if err != nil {
 				return nil, err
 			}
@@ -46,10 +62,15 @@ var projectSpec = std.SpecXX("(form 'project' :args? :decls? : @)",
 		return &exp.Atom{Lit: n}, nil
 	})
 
-var schemaSpec = std.SpecXX("(form 'schema' :args? :decls? : @)",
+var schemaSpec = std.SpecXX("<form schema name:sym tail?; @>",
 	func(x std.CallCtx) (exp.El, error) {
 		s := &Schema{Common: Common{Extra: &lit.Dict{}}}
-		n, err := resolveSchema(x.Prog, x.Env, s, &x.Layout)
+		sym, ok := x.Arg(0).(*exp.Sym)
+		if !ok {
+			return nil, cor.Errorf("expect schema symbol got %T %s", x.Arg(0), x.Arg(0))
+		}
+		s.Name = sym.Name
+		n, err := resolveSchema(x.Prog, x.Env, s, x.Args(1))
 		if err != nil {
 			return nil, err
 		}
@@ -60,36 +81,32 @@ var schemaSpec = std.SpecXX("(form 'schema' :args? :decls? : @)",
 		return &exp.Atom{Lit: n}, nil
 	})
 
-func resolveSchema(p *exp.Prog, env exp.Env, s *Schema, lo *exp.Layout) (utl.Node, error) {
+func resolveSchema(p *exp.Prog, env exp.Env, s *Schema, args []exp.El) (utl.Node, error) {
 	n, err := utl.GetNode(s)
 	if err != nil {
 		return nil, err
 	}
 	senv := &SchemaEnv{parent: env, Schema: s}
-	err = commonRules.Resolve(p, senv, lo.Tags(0), n)
+	tags, decl := splitDecls(args)
+	err = commonRules.Resolve(p, senv, tags, n)
 	if err != nil {
-		return nil, err
-	}
-	decls, err := lo.Decls(1)
-	if err != nil {
-		return nil, err
+		return nil, cor.Errorf("schema common rules: %v", err)
 	}
 	qual := s.Key()
 	// first initialize the models...
-	s.Models = make([]*Model, 0, len(decls))
-	for _, d := range decls {
-		name := d.Name[1:]
+	s.Models = make([]*Model, 0, len(decl))
+	for _, d := range decl {
 		m := &Model{
-			Common: Common{Name: name}, Schema: qual,
+			Common: Common{Name: d.Name}, Schema: qual,
 			Type: typ.Type{typ.KindObj, &typ.Info{
-				Ref: qual + "." + name,
+				Ref: qual + "." + d.Name,
 			}},
 		}
 		s.Models = append(s.Models, m)
 	}
 	// ...then resolve the models with all other schema model names in scope
 	for i, m := range s.Models {
-		err = resolveModel(p, senv, m, decls[i].Args())
+		err = resolveModel(p, senv, m, decl[i].Args())
 		if err != nil {
 			return nil, err
 		}
@@ -98,24 +115,25 @@ func resolveSchema(p *exp.Prog, env exp.Env, s *Schema, lo *exp.Layout) (utl.Nod
 }
 
 func resolveModel(p *exp.Prog, env *SchemaEnv, m *Model, args []exp.El) error {
+	if len(args) == 0 {
+		return cor.Errorf("empty model arguments")
+	}
 	menv := &ModelEnv{SchemaEnv: env, Model: m}
 	n, err := utl.GetNode(m)
 	if err != nil {
 		return err
 	}
-	lo, err := exp.FormLayout(modelSig, args)
+	at, ok := args[0].(*exp.Atom)
+	if !ok || at.Typ().Kind != typ.KindTyp {
+		return cor.Errorf("expect model kind got %T", args[0])
+	}
+	m.Type.Kind = at.Lit.(typ.Type).Kind
+	tags, decl := splitDecls(args[1:])
+	err = modelRules.Resolve(p, menv, tags, n)
 	if err != nil {
 		return err
 	}
-	err = modelRules.Resolve(p, menv, lo.Tags(0), n)
-	if err != nil {
-		return err
-	}
-	decls, err := lo.Decls(1)
-	if err != nil {
-		return err
-	}
-	for _, d := range decls {
+	for _, d := range decl {
 		switch m.Type.Kind {
 		case typ.KindBits, typ.KindEnum:
 			_, err = resolveConst(p, menv, d)
@@ -128,10 +146,8 @@ func resolveModel(p *exp.Prog, env *SchemaEnv, m *Model, args []exp.El) error {
 			return err
 		}
 	}
-	return defaultRules.Resolve(p, menv, lo.Tags(2), n)
+	return nil
 }
-
-var modelSig = exp.MustSig("(form 'model' :args? :decls? :tail? : @)")
 
 var commonRules = utl.TagRules{
 	IdxKeyer: utl.OffsetKeyer(0),
@@ -148,13 +164,14 @@ var modelRules = utl.TagRules{
 }
 var defaultRules utl.TagRules
 
-func resolveConst(p *exp.Prog, env *ModelEnv, n *exp.Named) (lit.Lit, error) {
-	d, err := resolveConstVal(p, env, n.Args(), len(env.Model.Type.Consts))
+func resolveConst(p *exp.Prog, env *ModelEnv, n *exp.Tag) (lit.Lit, error) {
+	args := n.Args()
+	d, err := resolveConstVal(p, env, args, len(env.Model.Type.Consts))
 	if err != nil {
 		return nil, cor.Errorf("resolve const val: %w", err)
 	}
 	m := env.Model
-	m.Type.Consts = append(m.Type.Consts, typ.Const{n.Name[1:], int64(d)})
+	m.Type.Consts = append(m.Type.Consts, typ.Const{n.Name, int64(d)})
 	m.Elems = append(m.Elems, &Elem{})
 	return m.Type, nil
 }
@@ -200,14 +217,18 @@ var fieldRules = utl.TagRules{
 	KeyRule: utl.KeyRule{KeySetter: utl.ExtraMapSetter("extra")},
 }
 
-func resolveField(p *exp.Prog, env *ModelEnv, n *exp.Named) (lit.Lit, error) {
-	param, el := typ.Param{Name: n.Name[1:]}, &Elem{}
+func resolveField(p *exp.Prog, env *ModelEnv, n *exp.Tag) (lit.Lit, error) {
+	name := n.Name
+	if name == "_" {
+		name = ""
+	}
+	param, el := typ.Param{Name: name}, &Elem{}
 	if strings.HasSuffix(n.Name, "?") {
 		el.Bits = BitOpt
 	}
 	err := utl.ParseTags(p, env, n.Args(), &FieldElem{&param, el}, fieldRules)
 	if err != nil {
-		return nil, cor.Errorf("parsing tags: %w", err)
+		return nil, cor.Errorf("parsing tags for %q: %w", n.Name, err)
 	}
 	m := env.Model
 	m.Elems = append(m.Elems, el)
@@ -215,7 +236,7 @@ func resolveField(p *exp.Prog, env *ModelEnv, n *exp.Named) (lit.Lit, error) {
 	return param.Type, nil
 }
 
-func typPrepper(p *exp.Prog, env exp.Env, n *exp.Named) (_ lit.Lit, err error) {
+func typPrepper(p *exp.Prog, env exp.Env, n *exp.Tag) (_ lit.Lit, err error) {
 	args := n.Args()
 	if len(args) == 0 {
 		return nil, cor.Errorf("expect type for model kind")
@@ -223,7 +244,7 @@ func typPrepper(p *exp.Prog, env exp.Env, n *exp.Named) (_ lit.Lit, err error) {
 	fst := args[0]
 	fst, err = p.Eval(env, fst, typ.Void)
 	if err != nil && err != exp.ErrUnres {
-		return nil, err
+		return nil, cor.Errorf("prep type %v", err)
 	}
 	if a, ok := fst.(*exp.Atom); ok {
 		if t, ok := a.Lit.(typ.Type); ok {
@@ -247,7 +268,7 @@ func typSetter(o utl.Node, key string, l lit.Lit) error {
 	return nil
 }
 
-func idxPrepper(p *exp.Prog, env exp.Env, n *exp.Named) (lit.Lit, error) {
+func idxPrepper(p *exp.Prog, env exp.Env, n *exp.Tag) (lit.Lit, error) {
 	l, err := utl.DynPrepper(p, env, n)
 	if err != nil {
 		return l, cor.Errorf("dyn prepper: %w", err)

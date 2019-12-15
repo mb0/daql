@@ -2,7 +2,6 @@ package qrymem
 
 import (
 	"sort"
-	"strings"
 
 	"github.com/mb0/daql/qry"
 	"github.com/mb0/xelf/cor"
@@ -60,16 +59,6 @@ func orderResult(list []lit.Lit, sel []qry.Ord) (res error) {
 		return less
 	})
 	return res
-}
-
-func modelName(q *qry.Query) (model, rest string) {
-	model = q.Ref[1:]
-	s := strings.SplitN(model, ".", 3)
-	if len(s) < 3 {
-		return model, ""
-	}
-	rest = s[2]
-	return model[:len(model)-len(rest)-1], rest
 }
 
 func isBool(el exp.El) bool {

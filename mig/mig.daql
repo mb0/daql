@@ -1,6 +1,6 @@
-(schema 'mig' 
+(schema mig
 
-(+Version :backup :doc `
+Version:(obj backup; doc:`
   Version contains essential details for a node to derive a new version number.
 
   The name is the node's qualified name, and date is an optional recording time. Vers is a positive
@@ -8,9 +8,9 @@
   hash of the node's qualified name and its contents. For models the default string representation
   is used as content, for schemas each model hash and for projects each schema hash.`
 
-	+Name  str :pk
-	+Vers  int
-	+Date? time
-	+Hash  str
+	Name:  (str pk;)
+	Vers:  int
+	Date?: time
+	Hash:  str
 )
 )

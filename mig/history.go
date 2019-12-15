@@ -112,7 +112,7 @@ func ReadHistory(path string) (_ History, err error) {
 	}
 	h.curr.Project, err = ResolveProject(h.path)
 	if err != nil {
-		return nil, err
+		return nil, cor.Errorf("resolve project %q: %v", h.path, err)
 	}
 	h.hdir = historyPath(h.curr.Project, h.path)
 	dir, err := os.Open(h.hdir)

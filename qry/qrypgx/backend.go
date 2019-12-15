@@ -15,7 +15,7 @@ import (
 	"github.com/mb0/xelf/typ"
 )
 
-// Backend is a specialized postresql backend using the pgx package.
+// Backend is a specialized postgresql backend using the pgx package.
 type Backend struct {
 	DB *pgx.ConnPool
 	mig.Record

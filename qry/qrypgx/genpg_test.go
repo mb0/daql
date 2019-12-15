@@ -19,62 +19,62 @@ func TestGenQuery(t *testing.T) {
 		raw  string
 		want []string
 	}{
-		{`(qry +count #prod.cat)`, []string{`SELECT COUNT(*) FROM prod.cat`}},
+		{`(qry count:#prod.cat)`, []string{`SELECT COUNT(*) FROM prod.cat`}},
 		{`(qry *prod.cat)`, []string{
 			`SELECT id, name FROM prod.cat`,
 		}},
 		{`(qry ?prod.cat)`, []string{
 			`SELECT id, name FROM prod.cat LIMIT 1`,
 		}},
-		{`(qry ?prod.cat.name)`, []string{
+		{`(qry ?prod.cat _:name)`, []string{
 			`SELECT name FROM prod.cat LIMIT 1`,
 		}},
-		{`(qry ?prod.cat :off 2)`, []string{
+		{`(qry ?prod.cat off:2)`, []string{
 			`SELECT id, name FROM prod.cat LIMIT 1 OFFSET 2`,
 		}},
-		{`(qry (*prod.cat +id))`, []string{
+		{`(qry *prod.cat _ id;)`, []string{
 			`SELECT id FROM prod.cat`,
 		}},
 		{`(qry *prod.cat (gt .name 'B'))`, []string{
 			`SELECT id, name FROM prod.cat WHERE name > 'B'`,
 		}},
-		{`(qry *prod.cat :asc .name)`, []string{
+		{`(qry *prod.cat asc:name)`, []string{
 			`SELECT id, name FROM prod.cat ORDER BY name`,
 		}},
-		{`(qry (*prod.cat +id +label ('label: ' .name)))`, []string{
+		{`(qry *prod.cat _ id; label:('label: ' .name))`, []string{
 			`SELECT id, 'label: ' || name FROM prod.cat`,
 		}},
-		{`(qry (?prod.prod (eq .name 'A') +name  +cname ?prod.cat.name (eq .id ..cat)))`,
+		{`(qry ?prod.prod (eq .name 'A') _ name; cname:(?prod.cat (eq .id ..cat) _:name))`,
 			[]string{
 				`SELECT p.name, c.name FROM prod.prod p, prod.cat c ` +
 					`WHERE p.name = 'A' AND c.id = p.cat LIMIT 1`,
 			}},
-		{`(qry (*prod.cat (or (eq .name 'b') (eq .name 'c'))
-			+prods #prod.prod (eq .cat ..id)
-		))`, []string{
+		{`(qry *prod.cat (or (eq .name 'b') (eq .name 'c'))
+			+ prods:(#prod.prod (eq .cat ..id))
+		)`, []string{
 			`SELECT c.id, c.name, ` +
 				`(SELECT COUNT(*) FROM prod.prod p WHERE p.cat = c.id) ` +
 				`FROM prod.cat c WHERE c.name = 'b' OR c.name = 'c'`,
 		}},
-		{`(qry (*prod.cat (or (eq .name 'b') (eq .name 'c'))
-			+prods *prod.prod.id (eq .cat ..id)
-		))`, []string{
+		{`(qry *prod.cat (or (eq .name 'b') (eq .name 'c'))
+			+ prods:(*prod.prod (eq .cat ..id) _:id)
+		)`, []string{
 			`SELECT c.id, c.name, ` +
 				`(SELECT jsonb_agg(p.id) FROM prod.prod p WHERE p.cat = c.id) ` +
 				`FROM prod.cat c WHERE c.name = 'b' OR c.name = 'c'`,
 		}},
-		{`(qry (*prod.cat (or (eq .name 'b') (eq .name 'c'))
-			+prods (*prod.prod (eq .cat ..id) +id +name)
-		))`, []string{
+		{`(qry *prod.cat (or (eq .name 'b') (eq .name 'c'))
+			+ prods:(*prod.prod (eq .cat ..id) _ id; name;)
+		)`, []string{
 			`SELECT c.id, c.name, (SELECT jsonb_agg(_.*) FROM ` +
 				`(SELECT p.id, p.name FROM prod.prod p WHERE p.cat = c.id) _) ` +
 				`FROM prod.cat c WHERE c.name = 'b' OR c.name = 'c'`,
 		}},
-		{`(qry (?prod.prod (eq .id 1) +name (+c ?prod.cat (eq .id ..cat))))`, []string{
+		{`(qry ?prod.prod (eq .id 1) _ name; c:(?prod.cat (eq .id ..cat)))`, []string{
 			`SELECT p.name, c.id, c.name FROM prod.prod p, prod.cat c ` +
 				`WHERE p.id = 1 AND c.id = p.cat LIMIT 1`,
 		}},
-		{`(qry (?prod.prod (eq .id 1) +name (+c ?prod.cat.name (eq .id ..cat))))`, []string{
+		{`(qry ?prod.prod (eq .id 1) _ name; c:(?prod.cat (eq .id ..cat) _:name))`, []string{
 			`SELECT p.name, c.name FROM prod.prod p, prod.cat c ` +
 				`WHERE p.id = 1 AND c.id = p.cat LIMIT 1`,
 		}},
@@ -100,7 +100,7 @@ func TestGenQuery(t *testing.T) {
 		}
 		qs, err := genQueries(c, env, p)
 		if err != nil {
-			t.Errorf("gen queries: %v", err)
+			t.Errorf("gen queries %s: %v", test.raw, err)
 			continue
 		}
 		if len(qs) != len(test.want) {

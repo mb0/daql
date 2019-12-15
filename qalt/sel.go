@@ -75,27 +75,63 @@ func subjFields(t typ.Type) Fields {
 	return fs
 }
 
-func reslSel(p *exp.Prog, env exp.Env, q *Query, ds []*exp.Named) (*Sel, error) {
+func simpleExpr(el exp.El) exp.El {
+	s, ok := el.(*exp.Sym)
+	if ok && cor.IsKey(s.Name) {
+		s := *s
+		s.Name = "." + s.Name
+		return &s
+	}
+	return el
+}
+
+func reslSel(p *exp.Prog, env exp.Env, q *Query, ds []*exp.Tag) (*Sel, error) {
 	fs := subjFields(q.Subj)
 	if len(ds) == 0 {
 		return &Sel{Type: q.Subj, Fields: fs}, nil
 	}
-	for _, d := range ds {
-		key := strings.ToLower(d.Name[1:])
-		switch d.Name[0] {
+	var mode byte
+	for i, d := range ds {
+		name := d.Name
+		switch name {
+		case "+", "-":
+			mode = name[0]
+			if d.El != nil {
+				return nil, cor.Errorf("unexpected selection arguments %s", d)
+			}
+			continue
+		case "_":
+			mode = '+'
+			if d.El == nil {
+				fs = nil
+				continue
+			} else if len(ds[i:]) > 1 {
+				return nil, cor.Errorf("unexpected selection arguments %s", d)
+			}
+			renv := &ReslEnv{env, q, nil, fs}
+			el, err := p.Resl(renv, simpleExpr(d.El), typ.Void)
+			if err != nil && err != exp.ErrUnres {
+				return nil, err
+			}
+			f := &Field{El: el, Type: exp.ResType(el)}
+			return &Sel{Type: exp.ResType(el), Fields: Fields{f}}, nil
+		case "":
+			return nil, cor.Errorf("unnamed selection %s", d)
+		}
+		switch name[0] {
+		case '-', '+':
+			mode = name[0]
+			name = name[1:]
+		default:
+		}
+		key := strings.ToLower(name)
+		switch mode {
 		case '-': // exclude
 			if d.El != nil {
 				return nil, cor.Errorf("unexpected selection arguments %s", d)
 			}
-			if key == "" {
-				fs = fs[:0]
-			} else {
-				fs, _ = fs.without(key)
-			}
-		case '+': // include
-			if key == "" {
-				return nil, cor.Errorf("unnamed selection %s", d)
-			}
+			fs, _ = fs.without(key)
+		case '+':
 			if d.El == nil { // naked selects choose a subj field by key
 				p, _, err := q.Subj.ParamByKey(key)
 				if err != nil {
@@ -103,7 +139,7 @@ func reslSel(p *exp.Prog, env exp.Env, q *Query, ds []*exp.Named) (*Sel, error) 
 				}
 				fs, _ = fs.with(paramField(*p))
 			} else {
-				name := cor.Cased(d.Name[1:])
+				name := cor.Cased(name)
 				f := &Field{Key: key, Name: name}
 				renv := &ReslEnv{env, q, f, fs}
 				el, err := p.Resl(renv, d.El, typ.Void)
@@ -114,7 +150,6 @@ func reslSel(p *exp.Prog, env exp.Env, q *Query, ds []*exp.Named) (*Sel, error) 
 				f.El = el
 				f.Type = exp.ResType(d.El)
 				fs, _ = fs.with(f)
-				continue
 			}
 		}
 	}

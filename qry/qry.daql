@@ -1,37 +1,39 @@
-(schema 'qry'
+(schema qry
 
-(+Task :doc `
-Task is a unit of work as a part of a query document. Root tasks are either expression or query
-tasks. Expression tasks consist of a xelf expressions, that cannot query the data source, but
-can reference results of previous tasks. Query tasks do access the data source, and may have a
-list of explicit selection tasks. The selection tasks can have only simple field names or an
-expression or sub query. In effect building a tree of queries.`
-	+Name    str
-	+Expr?   ~expr
-	+Query?  @Query?
-	+Parent? @Task?
-	+Type?   ~typ :doc `
-		Type is the task's result type or void if not yet resolved.`)
+Task:(obj doc:`
+  Task is a unit of work as a part of a query document. Root tasks are either expression or query
+  tasks. Expression tasks consist of a xelf expressions, that cannot query the data source, but
+  can reference results of previous tasks. Query tasks do access the data source, and may have a
+  list of explicit selection tasks. The selection tasks can have only simple field names or an
+  expression or sub query. In effect building a tree of queries.`
 
-(+Ord
-	+Key   str
-	+Desc? bool)
+	Name:    str
+	Expr?:   ~expr
+	Query?:  @Query?
+	Parent?: @Task?
+	Type?:   ~typ doc:`Type is the task's result type or void if not yet resolved.`
+)
 
-(+Query
-	+Ref  str
-	+Type ~typ :doc `
-		Type represents the query subject type.`
-	+Whr? ~dyn :doc `
+Ord:(obj
+	Key:   str
+	Desc?: bool
+)
+
+Query:(obj
+	Ref:  str
+	Type: (~typ doc:`Type represents the query subject type.`)
+	Whr?: (~dyn doc:`
 		Whr is a list of expression elements treated as 'and' arguments.
-		The whr clause can only refer to full subject but none of the extra selections.`
-	+Ord? list|@Ord :doc `
-		Ord is a list of selection keys used for ordering.`
-	+Off? int
-	+Lim? int
-	+Sel? list|@Task?)
+		The whr clause can only refer to full subject but none of the extra selections.`)
+	Ord?: (list|@Ord doc:`Ord is a list of selection keys used for ordering.`)
+	Off?: int
+	Lim?: int
+	Sel?: list|@Task?
+	Sca?: bool
+)
 
-(+Doc :doc `
-Doc represents a whole query document, consisting of one or more tasks.`
-	+Root  list|@Task?
-	+Type? ~typ)
+Doc:(obj doc:`Doc represents a whole query document, consisting of one or more tasks.`
+	Root:  list|@Task?
+	Type?: ~typ
+)
 )

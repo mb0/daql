@@ -34,7 +34,6 @@ type Ord struct {
 type Query struct {
 	Kind Kind
 	Ref  string
-	Path string
 	Subj typ.Type
 
 	Sel *Sel
@@ -50,7 +49,41 @@ type Query struct {
 	Err     error
 }
 
-var qrySig = exp.MustSig("(form 'qry' :args? :decls? : @)")
+func splitPlain(args []exp.El) (plain, rest []exp.El) {
+	for i, arg := range args {
+		switch t := arg.(type) {
+		case *exp.Tag:
+			return args[:i], args[i:]
+		case *exp.Sym:
+			switch t.Name {
+			case "_", "+", "-":
+				return args[:i], args[i:]
+			}
+		}
+	}
+	return args, nil
+}
+func splitDecls(args []exp.El) (tags, decl []*exp.Tag) {
+	tags = make([]*exp.Tag, 0, len(args))
+	decl = make([]*exp.Tag, 0, len(args))
+	for _, arg := range args {
+		switch t := arg.(type) {
+		case *exp.Tag:
+			if len(decl) == 0 && cor.IsKey(t.Name) && t.Name[0] != '_' {
+				tags = append(tags, t)
+			} else {
+				decl = append(decl, t)
+			}
+		case *exp.Sym:
+			decl = append(decl, &exp.Tag{Name: t.Name, Src: t.Src})
+		default:
+			decl = append(decl, &exp.Tag{El: arg, Src: arg.Source()})
+		}
+	}
+	return tags, decl
+}
+
+var qrySig = exp.MustSig("<form qry tail?; @>")
 
 func (q *Query) Resl(p *exp.Prog, env exp.Env, c *exp.Call, h typ.Type) (exp.El, error) {
 	renv, ok := exp.Supports(env, '?').(*ReslEnv)
@@ -72,21 +105,13 @@ func (q *Query) Resl(p *exp.Prog, env exp.Env, c *exp.Call, h typ.Type) (exp.El,
 			q.Subj = ref.Type
 		}
 	}
+	whr, args := splitPlain(c.Args(0))
+	tags, decl := splitDecls(args)
 	if q.Sel == nil {
 		// resolve selection
-		decls, err := c.Decls(1)
+		sel, err := reslSel(p, env, q, decl)
 		if err != nil {
-			return c, err
-		}
-		if q.Path != "" {
-			if len(decls) == 0 {
-				decls = append(decls, &exp.Named{Name: "-"})
-			}
-			decls = append(decls, &exp.Named{Name: "+" + q.Path})
-		}
-		sel, err := reslSel(p, env, q, decls)
-		if err != nil {
-			return c, cor.Errorf("resl sel %v: %v", decls, err)
+			return c, cor.Errorf("resl sel %v: %v", decl, err)
 		}
 		q.Sel = sel
 	}
@@ -99,25 +124,19 @@ func (q *Query) Resl(p *exp.Prog, env exp.Env, c *exp.Call, h typ.Type) (exp.El,
 		q.Res = res
 	}
 	// resolve arguments for whr ord lim and off
-	var whr []exp.El
-	for _, arg := range c.Args(0) {
-		tag, ok := arg.(*exp.Named)
-		if !ok {
-			whr = append(whr, arg)
-			continue
-		}
+	for _, tag := range tags {
 		var err error
 		switch tag.Name {
-		case ":whr":
+		case "whr":
 			whr = append(whr, tag.Args()...)
-		case ":lim":
+		case "lim":
 			q.Lim, err = evalInt(p, env, tag.El)
-		case ":off":
+		case "off":
 			q.Off, err = evalInt(p, env, tag.El)
-		case ":ord", ":asc", ":desc":
+		case "ord", "asc", "desc":
 			// takes one or more field references
 			// can be used multiple times to append to order
-			err = evalOrd(p, env, q, tag.Name == ":desc", tag.Args())
+			err = evalOrd(p, env, q, tag.Name == "desc", tag.Args())
 		default:
 			return c, cor.Errorf("unexpected query tag %q", tag.Name)
 		}
@@ -151,14 +170,6 @@ func resType(q *Query, sel typ.Type) (typ.Type, error) {
 	if q.Kind == KindCount {
 		return typ.Int, nil
 	}
-	if q.Model != nil && q.Path != "" {
-		// scalar selection from sel type
-		st, err := typ.Select(sel, q.Path)
-		if err != nil {
-			return typ.Void, err
-		}
-		sel = st
-	}
 	switch q.Kind {
 	case KindOne:
 		return typ.Opt(sel), nil
@@ -171,10 +182,10 @@ func resType(q *Query, sel typ.Type) (typ.Type, error) {
 func evalOrd(p *exp.Prog, env exp.Env, q *Query, desc bool, args []exp.El) error {
 	for _, arg := range args {
 		sym, ok := arg.(*exp.Sym)
-		if !ok || sym.Name == "" || sym.Name[0] != '.' {
-			return cor.Errorf("order want local sym got %s", arg)
+		if !ok || sym.Name == "" {
+			return cor.Errorf("order want sym got %s", arg)
 		}
-		key := sym.Name[1:]
+		key := sym.Name
 		var subj bool
 		_, _, err := q.Sel.Type.ParamByKey(key)
 		if err != nil {

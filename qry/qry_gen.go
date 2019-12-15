@@ -7,11 +7,7 @@ import (
 	"github.com/mb0/xelf/typ"
 )
 
-// Task is a unit of work as a part of a query document. Root tasks are either expression or query
-// tasks. Expression tasks consist of a xelf expressions, that cannot query the data source, but
-// can reference results of previous tasks. Query tasks do access the data source, and may have a
-// list of explicit selection tasks. The selection tasks can have only simple field names or an
-// expression or sub query. In effect building a tree of queries.
+// Type is the task's result type or void if not yet resolved.
 type Task struct {
 	Name   string   `json:"name"`
 	Expr   exp.El   `json:"expr,omitempty"`
@@ -33,6 +29,7 @@ type Query struct {
 	Off  int64    `json:"off,omitempty"`
 	Lim  int64    `json:"lim,omitempty"`
 	Sel  []*Task  `json:"sel,omitempty"`
+	Sca  bool     `json:"sca,omitempty"`
 }
 
 // Doc represents a whole query document, consisting of one or more tasks.

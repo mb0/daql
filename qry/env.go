@@ -133,10 +133,11 @@ func (d *Doc) EvalEnv(par exp.Env) *DocEnv {
 }
 
 func (de *DocEnv) Prep(parent lit.Proxy, t *Task) (lit.Proxy, error) {
-	if t.Name == "" {
+	pp := lit.Deopt(parent)
+	k, ok := pp.(lit.Keyer)
+	if !ok || t.Name == "" {
 		return parent, nil
 	}
-	k := lit.Deopt(parent).(lit.Keyer)
 	l, err := k.Key(cor.Keyed(t.Name))
 	if err != nil {
 		return nil, err
@@ -170,6 +171,12 @@ func (te *TaskEnv) Get(sym string) *exp.Def {
 	}
 	sym = sym[1:]
 	if te.Query != nil {
+		if te.Param != nil {
+			l, err := lit.Select(te.Param, sym)
+			if err == nil {
+				return exp.NewDef(l)
+			}
+		}
 		for _, t := range te.Query.Sel {
 			if t.Name != sym {
 				continue
@@ -182,17 +189,10 @@ func (te *TaskEnv) Get(sym string) *exp.Def {
 			}
 			return &exp.Def{Type: t.Type}
 		}
-		if te.Param != nil {
-			l, err := lit.Select(te.Param, sym)
-			if err == nil {
-				return exp.NewDef(l)
-			}
-		} else {
-			// otherwise check query result type
-			p, _, err := te.Query.Type.ParamByKey(sym)
-			if err == nil {
-				return &exp.Def{Type: p.Type}
-			}
+		// otherwise check query result type
+		p, _, err := te.Query.Type.ParamByKey(sym)
+		if err == nil {
+			return &exp.Def{Type: p.Type}
 		}
 	}
 	if te.Task.Parent != nil {

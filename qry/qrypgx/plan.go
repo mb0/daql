@@ -94,11 +94,11 @@ func (p *Plan) newJob(t *qry.Task, par *Job, a aliaser) (*Job, error) {
 		return j, nil
 	}
 	a.addAlias(j.Task)
-	s := strings.SplitN(t.Query.Ref[1:], ".", 3)
+	s := strings.SplitN(t.Query.Ref[1:], ".", 2)
 	if len(s) < 2 {
 		return nil, cor.Errorf("unqualified query %s", t.Query.Ref)
 	}
-	if len(s) > 2 {
+	if t.Query.Sca {
 		j.Kind |= KindScalar
 	}
 	switch t.Query.Ref[0] {
@@ -160,7 +160,7 @@ func (p *Plan) addJoin(j, s *Job) error {
 	s.Kind |= KindJoined
 	j.Tabs = append(j.Tabs, s.Task)
 	if s.IsScalar() {
-		col := Column{Task: s.Task, Job: s, Key: getScalarName(s.Query)}
+		col := Column{Task: s.Task, Job: s, Key: s.Cols[0].Name}
 		j.Cols = append(j.Cols, col)
 		return nil
 	}
@@ -243,21 +243,10 @@ func (a aliaser) try(k string, t *qry.Task) bool {
 	return false
 }
 
-func getScalarName(q *qry.Query) string {
-	s := strings.SplitN(q.Ref[1:], ".", 3)
-	if len(s) < 3 {
-		return ""
-	}
-	return s[2]
-}
 func getTableName(q *qry.Query) string {
-	n := q.Ref[1:]
-	s := strings.SplitN(n, ".", 3)
-	if len(s) < 3 {
-		return n
-	}
-	return n[:len(s[0])+1+len(s[1])]
+	return q.Ref[1:]
 }
+
 func getModelName(q *qry.Query) string {
 	s := strings.Split(q.Ref[1:], ".")
 	if len(s) > 1 {

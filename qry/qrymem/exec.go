@@ -29,7 +29,7 @@ func execTask(c execer, t *qry.Task, par lit.Proxy) error {
 func execExpr(c execer, t *qry.Task, res lit.Proxy) error {
 	el, err := c.Prog.Eval(c.Env, t.Expr, t.Type)
 	if err != nil {
-		return err
+		return cor.Errorf("%q %v: %v", t.Expr, c.Prog.Unres, err)
 	}
 	err = res.Assign(el.(*exp.Atom).Lit)
 	if err != nil {
@@ -40,7 +40,7 @@ func execExpr(c execer, t *qry.Task, res lit.Proxy) error {
 }
 
 func execQuery(c execer, t *qry.Task, res lit.Proxy) error {
-	model, rest := modelName(t.Query)
+	model := t.Query.Ref[1:]
 	m := c.tables[model]
 	if m == nil {
 		return cor.Errorf("mem table %s not found in %v", model, c.tables)
@@ -54,7 +54,7 @@ func execQuery(c execer, t *qry.Task, res lit.Proxy) error {
 		var list *lit.List
 		switch t.Query.Ref[0] {
 		case '?':
-			list, err = collectList(c, t, m, whr, rest)
+			list, err = collectList(c, t, m, whr)
 			if err != nil {
 				return cor.Errorf("qrymem: collect list %v", err)
 			}
@@ -64,7 +64,7 @@ func execQuery(c execer, t *qry.Task, res lit.Proxy) error {
 				l = lit.Null(res.Typ())
 			}
 		case '*':
-			l, err = collectList(c, t, m, whr, rest)
+			l, err = collectList(c, t, m, whr)
 		case '#':
 			l, err = collectCount(c, t, m, whr)
 		}
@@ -100,14 +100,14 @@ func collectSel(c execer, tt *qry.Task, l lit.Lit, z lit.Proxy) error {
 		} else {
 			err := execTask(c, t, z)
 			if err != nil {
-				return err
+				return cor.Errorf("exec task %v", err)
 			}
 		}
 	}
 	return nil
 }
 
-func collectList(c execer, t *qry.Task, m *lit.List, whr exp.El, rest string) (*lit.List, error) {
+func collectList(c execer, t *qry.Task, m *lit.List, whr exp.El) (*lit.List, error) {
 	q := t.Query
 	rt := t.Type
 	if rt.Kind&typ.MaskElem == typ.KindList {
@@ -125,27 +125,13 @@ func collectList(c execer, t *qry.Task, m *lit.List, whr exp.El, rest string) (*
 				continue
 			}
 		}
-		if rest != "" {
-			// handle scalar selection
-			var err error
-			l, err = lit.Select(l, rest)
-			if err != nil {
-				return nil, err
-			}
-			z, err := lit.Convert(l, rt, 0)
-			if err != nil {
-				return nil, cor.Errorf("exec scalar query: %v", err)
-			}
-			result = append(result, z)
-		} else {
-			// TODO use proxy type if available
-			z := lit.ZeroProxy(rt)
-			err := collectSel(c, t, l, z)
-			if err != nil {
-				return nil, err
-			}
-			result = append(result, z)
+		// TODO use proxy type if available
+		z := lit.ZeroProxy(rt)
+		err := collectSel(c, t, l, z)
+		if err != nil {
+			return nil, cor.Errorf("for %T: %w", z, err)
 		}
+		result = append(result, z)
 	}
 	if len(q.Ord) != 0 {
 		err := orderResult(result, q.Ord)

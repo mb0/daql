@@ -1,57 +1,57 @@
-(schema 'evt'
-(+Detail :doc `Detail holds extra information for audits and translations.`
-	+Created? time
-	+Arrived? time
-	+Acct?    uuid
-	+Extra?   dict
+(schema evt
+
+Detail:(obj doc:`Detail holds extra information for audits and translations.`
+	Created?: time
+	Arrived?: time
+	Acct?:    uuid
+	Extra?:   dict
 )
 
-(+Audit :backup :doc `Audit holds detailed information for a published revision.`
-	+Rev time :pk
-	+    @Detail
+Audit:(obj backup; doc:`Audit holds detailed information for a published revision.`
+	Rev: (time pk;)
+	_:   @Detail
 )
 
-(+Sig :doc `Sig is the event signature.`
-	+Top str
-	+Key str
+Sig:(obj doc:`Sig is the event signature.`
+	Top: str
+	Key: str
 )
 
-(+Action :doc `Action is an unpublished event represented by a command string and argument map.
-It usually is a data operation on a record identified by a topic and primary key.`
-	+     @Sig
-	+Cmd  str
-	+Arg? dict
+Action:(obj doc:`
+  Action is an unpublished event represented by a command string and argument map.
+  It usually is a data operation on a record identified by a topic and primary key.`
+	_:    @Sig
+	Cmd:  str
+	Arg?: dict
 )
 
-(+Event :backup :doc `Event represents action published to a ledger with a revision and unique id.`
-	+ID  int :pk :auto
-	+Rev time :idx
-	+    @Action
-	(()- :idx ['top' 'key'])
+Event:(obj backup; doc:`Event is an action published to a ledger with revision and unique id.`
+	ID:  (int pk; auto;)
+	Rev: (time idx;)
+	_:   @Action
+	idx: ['top' 'key']
 )
 
-(+Trans :doc `Trans is an request to publish a list of actions for a base revision.`
-	+Base time
-	+Acts list|@Action
-	+     @Detail
+Trans:(obj doc:`Trans is an request to publish a list of actions for a base revision.`
+	Base: time
+	Acts: list|@Action
+	_:    @Detail
 )
-(+Watch
-	+Top  str
-	+Rev? time
-	+IDs? list|str
+
+Watch:(obj
+	Top:  str
+	Rev?: time
+	IDs?: list|str
 )
-(+Update
-	+Rev  time
-	+Evs  list|@Event?
+
+Update:(obj
+	Rev: time
+	Evs: list|@Event?
 )
-(+Result
-	+Rev time
-	+Val ~any
-)
-(+Qry  func +Arg ~dyn + @Result?)
-(+Meta func +Rev time + @Audit?)
-(+Hist func + @Sig    + @Update?)
-(+Pub  func + @Trans  + @Update?)
-(+Sub  func +List list|@Watch + @Update?)
-(+Uns  func +List list|@Watch + bool)
+
+Meta: (func Rev:time    @Audit?)
+Hist: (func @Sig        @Update?)
+Pub:  (func @Trans      @Update?)
+Sub:  (func List:list|@Watch @Update?)
+Uns:  (func List:list|@Watch bool)
 )

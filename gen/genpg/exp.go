@@ -255,19 +255,16 @@ func writeApd(w *Writer, env exp.Env, e *exp.Call) error {
 	return nil
 }
 
-var setSig = exp.MustSig("(form 'set' @1:keyr :plain? :tags?  @1)")
+var setSig = exp.MustSig("<form set @1|keyr plain?; tags?; @1>")
 
 func writeSet(w *Writer, env exp.Env, e *exp.Call) error {
 	// First arg can only be a jsonb obj
 	// TODO but check that
-	decls, err := e.Unis(1)
-	if err != nil {
-		return err
-	}
+	decls := e.Tags(2)
 	// Collect literals and other decls. We can merge all literal directly,
 	// but need to use jsonb_set for references and other expressions.
 	dict := &lit.Dict{}
-	var rest []*exp.Named
+	var rest []*exp.Tag
 	for _, d := range decls {
 		switch v := d.El.(type) {
 		case lit.Lit:
@@ -281,7 +278,7 @@ func writeSet(w *Writer, env exp.Env, e *exp.Call) error {
 	for range rest {
 		w.WriteString("jsonb_set(")
 	}
-	err = w.WriteEl(env, e.Arg(0))
+	err := w.WriteEl(env, e.Arg(0))
 	if err != nil {
 		return err
 	}

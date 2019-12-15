@@ -1,14 +1,20 @@
 package domtest
 
-const ProdRaw = `(schema 'prod'
-	(+Cat   +ID   int :pk
-		+Name str)
-	(+Prod  +ID   int :pk
-		+Name str
-		+Cat  int :ref '..Cat')
-	(+Label	+ID   int :pk
-		+Name str
-		+Tmpl raw)
+const ProdRaw = `(schema prod
+Cat:(obj
+	ID:   (int pk;)
+	Name: str
+)
+Prod:(obj
+	ID:   (int pk;)
+	Name: str
+	Cat:  (int ref:'..Cat')
+)
+Label:(obj
+	ID:   (int pk;)
+	Name: str
+	Tmpl: raw
+)
 )`
 
 type Cat struct {

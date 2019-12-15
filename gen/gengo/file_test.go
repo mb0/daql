@@ -10,20 +10,14 @@ import (
 	"github.com/mb0/xelf/typ"
 )
 
-const barRaw = `(schema 'bar' (+Kind enum +X +Y +Z))`
-const fooRaw = `(schema 'foo'
-	(+Align bits
-		+A
-		+B
-		(+C 3))
-	(+Kind enum
-		+A
-		+B
-		+C)
-	(+Node1 +Name? str)
-	(+Node2 +Start time)
-	(+Node3 +Kind  (bits 'bar.Kind'))
-	(+Node4 +Kind  @Kind)
+const barRaw = `(schema bar Kind:(enum X; Y; Z;))`
+const fooRaw = `(schema foo
+	Align: (bits A; B; C:3)
+	Kind:  (enum A; B; C;)
+	Node1: (obj Name?:str)
+	Node2: (obj Start:time)
+	Node3: (obj Kind:<bits bar.Kind>)
+	Node4: (obj Kind:@Kind)
 )`
 
 func TestWriteFile(t *testing.T) {

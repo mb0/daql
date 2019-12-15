@@ -124,11 +124,11 @@ type Project struct {
 func project() (*Project, error) {
 	path, err := mig.DiscoverProject(*dirFlag)
 	if err != nil {
-		return nil, err
+		return nil, cor.Errorf("discover project: %v", err)
 	}
 	h, err := mig.ReadHistory(path)
 	if err != nil && err != mig.ErrNoHistory {
-		return nil, err
+		return nil, cor.Errorf("read history: %v", err)
 	}
 	return &Project{filepath.Dir(path), h, h.Curr()}, nil
 }

@@ -4,15 +4,26 @@ import (
 	"time"
 )
 
-const PersonRaw = `(schema 'person'
-	(+Group  +ID int :pk +Name str)
-	(+Contact +Addr str)
-	(+Person +ID int :pk +Name str +Family int :ref '..Group' + @Contact?)
-	(+Member +ID int :pk
-		+Person int :ref '..Person'
-		+Group  int :ref '..Group'
-		+Joined time
-	)
+const PersonRaw = `(schema person
+Group:(obj
+	ID:   (int pk;)
+	Name: str
+)
+Contact:(obj
+	Addr: str
+)
+Person:(obj
+	ID:     (int pk;)
+	Name:   str
+	Family: (int ref:'..Group')
+	_:      @Contact?
+)
+Member:(obj
+	ID:     (int pk;)
+	Person: (int ref:'..Person')
+	Group:  (int ref:'..Group')
+	Joined: time
+)
 )`
 
 type Group struct {

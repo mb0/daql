@@ -1,4 +1,7 @@
-(project 'daql' :hist '.hist'
-	+evt :inc 'evt'
-	+qry :inc 'qry'
+(project daql hist:'.hist'
+	+dom:    (inc:'dom')
+	+mig:    (inc:'mig')
+	+evt:    (inc:'evt')
+	+evtsat: (inc:'evt/evtsat')
+	+qry:    (inc:'qry')
 )
